@@ -13,8 +13,11 @@ enum MessageSendResult: Equatable {
 }
 
 /// 全局数据层（方案 4.2 数据层）
-/// 当前为本地 Mock 实现；正式版替换为 Node.js + Express + MySQL 后端的 APIClient，
-/// 同步接入 Socket.io 实时消息、高德定位、百度 AI 风控。
+/// 双模式：
+///   - 服务端模式（登录后）：数据来自 Node.js + Express 后端（APIClient），
+///     实时消息走 Socket.io（RealtimeClient），风控由服务端执行
+///   - 演示模式（未登录/离线）：内置示例数据，纯本地运行
+@MainActor
 final class MockDataStore: ObservableObject {
     static let shared = MockDataStore()
 
@@ -28,8 +31,16 @@ final class MockDataStore: ObservableObject {
     @Published var dynamics: [DynamicModel]
     @Published var currentExposurePackage: ExposurePackage?
 
+    /// 当前打开中的会话（用于实时消息未读计数）
+    var activeConversationID: UUID?
+
+    /// 服务端用户 id（非空 = 服务端模式）
+    private(set) var serverUserID: String?
+
     private var messagesByConversation: [UUID: [ChatMessage]] = [:]
     private var evaluationsByUser: [UUID: [EvaluateModel]] = [:]
+
+    var isServerMode: Bool { serverUserID != nil }
 
     // MARK: - 初始化
 
@@ -43,7 +54,62 @@ final class MockDataStore: ObservableObject {
         seedData()
     }
 
-    // MARK: - 双向匹配（方案 2.3.2）
+    // MARK: - 登录 / 会话（服务端模式）
+
+    func login(username: String, password: String) async throws {
+        let user = try await APIClient.shared.login(username: username, password: password)
+        try await activateServerSession(user)
+    }
+
+    func register(username: String, password: String, nickname: String) async throws {
+        let user = try await APIClient.shared.register(username: username, password: password, nickname: nickname)
+        try await activateServerSession(user)
+    }
+
+    private func activateServerSession(_ user: ServerUser) async throws {
+        serverUserID = user.id
+        currentUser = UserModel(server: user)
+        try await refreshAll()
+        RealtimeClient.shared.onMessage = { [weak self] payload in
+            Task { @MainActor in
+                self?.handleSocketMessage(payload)
+            }
+        }
+        if let token = TokenStore.token {
+            RealtimeClient.shared.connect(token: token)
+        }
+    }
+
+    func logout() {
+        TokenStore.token = nil
+        serverUserID = nil
+        RealtimeClient.shared.disconnect()
+        // 重置为演示数据
+        currentUser = Self.makeCurrentUser()
+        allUsers = Self.makeOtherUsers()
+        conversations = []
+        agreements = []
+        exchangeRecords = []
+        dynamics = []
+        messagesByConversation = [:]
+        seedData()
+    }
+
+    /// 全量刷新（登录后 / 下拉刷新）
+    func refreshAll() async throws {
+        async let users = APIClient.shared.fetchUsers()
+        async let convs = APIClient.shared.fetchConversations()
+        async let dyns = APIClient.shared.fetchDynamics()
+        async let recs = APIClient.shared.fetchExchanges()
+        async let agrs = APIClient.shared.fetchAgreements()
+        allUsers = try await users.map { UserModel(server: $0) }
+        conversations = try await convs.map { Conversation(server: $0) }
+        dynamics = try await dyns.map { DynamicModel(server: $0) }
+        exchangeRecords = try await recs.map { ExchangeRecord(server: $0) }
+        agreements = try await agrs.map { ExchangeAgreement(server: $0) }
+    }
+
+    // MARK: - 双向匹配（方案 2.3.2，本地算法与服务端一致）
 
     func matches(filters: MatchFilters = .standard) -> [SkillMatchResult] {
         SkillMatchManager.shared.match(currentUser: currentUser, allUsers: allUsers, filters: filters)
@@ -55,10 +121,22 @@ final class MockDataStore: ObservableObject {
         messagesByConversation[conversationID] ?? []
     }
 
-    /// 获取与某用户的会话；不存在则自动创建
-    func openConversation(with partner: UserModel) -> Conversation {
+    /// 获取与某用户的会话（服务端模式：优先走服务器，不存在则创建；失败回退本地）
+    func openConversation(with partner: UserModel) async -> Conversation {
         if let existing = conversations.first(where: { $0.partner.id == partner.id }) {
             return existing
+        }
+        if isServerMode, let partnerServerID = partner.id.serverIDString {
+            do {
+                let server = try await APIClient.shared.openConversation(partnerId: partnerServerID)
+                let convo = Conversation(server: server)
+                if !conversations.contains(where: { $0.id == convo.id }) {
+                    conversations.insert(convo, at: 0)
+                }
+                return convo
+            } catch {
+                // 服务器不可用时回退本地会话
+            }
         }
         let convo = Conversation(
             id: UUID(),
@@ -78,18 +156,51 @@ final class MockDataStore: ObservableObject {
         return convo
     }
 
+    /// 拉取会话历史消息（服务端模式）
+    func loadMessages(conversationID: UUID) async {
+        guard isServerMode, let serverID = conversationID.serverIDString else { return }
+        do {
+            let serverMessages = try await APIClient.shared.fetchMessages(conversationId: serverID)
+            messagesByConversation[conversationID] = serverMessages.map { ChatMessage(server: $0) }
+        } catch {
+            // 保留现有消息
+        }
+    }
+
     func markConversationRead(_ conversationID: UUID) {
+        activeConversationID = conversationID
         guard let idx = conversations.firstIndex(where: { $0.id == conversationID }) else { return }
         conversations[idx].unreadCount = 0
+        if isServerMode, let serverID = conversationID.serverIDString {
+            Task {
+                try? await APIClient.shared.markConversationRead(conversationId: serverID)
+            }
+        }
     }
 
     /// 发送消息（前置风控拦截，方案 2.3.6）
+    /// 服务端模式：Socket.io 实时发送（服务端风控），演示模式：本地风控
     @discardableResult
-    func sendMessage(conversationID: UUID, text: String) -> MessageSendResult {
-        let risk = TradeRiskControlManager.shared.checkTextRisk(text: text)
+    func sendMessage(conversationID: UUID, text: String) async -> MessageSendResult {
+        if isServerMode, let serverID = conversationID.serverIDString {
+            return await withCheckedContinuation { continuation in
+                RealtimeClient.shared.send(conversationId: serverID, text: text) { ok, blocked, warning in
+                    Task { @MainActor in
+                        if blocked {
+                            continuation.resume(returning: .blocked(warning: warning ?? "内容违规，已被拦截"))
+                        } else if ok {
+                            continuation.resume(returning: .sent)
+                        } else {
+                            continuation.resume(returning: .blocked(warning: warning ?? "发送失败，请重试"))
+                        }
+                    }
+                }
+            }
+        }
 
+        // 演示模式：本地风控
+        let risk = TradeRiskControlManager.shared.checkTextRisk(text: text)
         if risk.isIllegal {
-            // 原文不发送，追加系统提示
             let note = ChatMessage(
                 senderIsMe: false,
                 text: "⚠️ 该消息含违禁词：\(risk.matchedWords.joined(separator: "、"))，已被平台风控拦截。技遇仅支持纯技能无偿互换。",
@@ -99,11 +210,30 @@ final class MockDataStore: ObservableObject {
             updateConversationPreview(conversationID, text: note.text, time: note.time)
             return .blocked(warning: risk.warning)
         }
-
         let msg = ChatMessage(senderIsMe: true, text: text)
         appendMessage(conversationID, msg)
         updateConversationPreview(conversationID, text: text, time: msg.time)
         return .sent
+    }
+
+    /// 实时消息处理（服务端 chat:message 广播）
+    private func handleSocketMessage(_ payload: RealtimeClient.SocketMessagePayload) {
+        let convID = UUID(serverID: payload.conversationId)
+        let isMe = payload.senderId == serverUserID
+        let message = ChatMessage(
+            id: UUID(serverID: payload.id),
+            senderIsMe: isMe,
+            text: payload.text,
+            time: payload.time,
+            isSystemNote: false
+        )
+        appendMessage(convID, message)
+        guard let idx = conversations.firstIndex(where: { $0.id == convID }) else { return }
+        conversations[idx].lastMessageText = payload.text
+        conversations[idx].lastTime = payload.time
+        if !isMe && activeConversationID != convID {
+            conversations[idx].unreadCount += 1
+        }
     }
 
     // MARK: - 协议 & 互换（方案 2.3.4）
@@ -112,7 +242,7 @@ final class MockDataStore: ObservableObject {
         agreements.first { $0.partnerID == partnerID }
     }
 
-    /// 签署协议并生成互换记录
+    /// 签署协议并生成互换记录（服务端模式：服务端校验 + 实时推送对方）
     @discardableResult
     func signAgreement(
         partner: UserModel,
@@ -121,7 +251,23 @@ final class MockDataStore: ObservableObject {
         exchangeType: ExchangeType,
         scheduledTime: String,
         location: String?
-    ) -> ExchangeRecord {
+    ) async throws -> ExchangeRecord {
+        if isServerMode, let partnerServerID = partner.id.serverIDString {
+            let server = try await APIClient.shared.signAgreement(
+                partnerId: partnerServerID,
+                mySkillName: mySkillName,
+                learnSkillName: learnSkillName,
+                exchangeType: exchangeType,
+                scheduledTime: scheduledTime,
+                location: location
+            )
+            let record = ExchangeRecord(server: server)
+            if !exchangeRecords.contains(where: { $0.id == record.id }) {
+                exchangeRecords.insert(record, at: 0)
+            }
+            return record
+        }
+
         let agreement = AgreementManager.shared.buildAgreement(
             partnerID: partner.id,
             partnerName: partner.userName,
@@ -146,14 +292,15 @@ final class MockDataStore: ObservableObject {
             createdAt: Date()
         )
         exchangeRecords.insert(record, at: 0)
-
-        // 签署后自动建立会话，便于沟通教学细节
-        _ = openConversation(with: partner)
+        _ = await openConversation(with: partner)
         return record
     }
 
     /// 标记互换完成（进入互评阶段）
-    func completeExchange(recordID: UUID) {
+    func completeExchange(recordID: UUID) async {
+        if isServerMode, let serverID = recordID.serverIDString {
+            try? await APIClient.shared.completeExchange(id: serverID)
+        }
         guard let idx = exchangeRecords.firstIndex(where: { $0.id == recordID }) else { return }
         exchangeRecords[idx].status = .completed
     }
@@ -164,8 +311,24 @@ final class MockDataStore: ObservableObject {
         evaluationsByUser[userID] ?? []
     }
 
-    /// 提交评价：重新计算对方信用分并同步到用户列表
-    func submitEvaluation(recordID: UUID, evaluate: EvaluateModel) {
+    /// 提交评价：服务端重算信用分并同步
+    func submitEvaluation(recordID: UUID, evaluate: EvaluateModel) async {
+        if isServerMode, let serverID = recordID.serverIDString {
+            if let newScore = try? await APIClient.shared.submitEvaluation(
+                recordId: serverID,
+                punctuality: evaluate.punctuality,
+                serious: evaluate.serious,
+                communication: evaluate.communication,
+                comment: evaluate.comment
+            ) {
+                if let idx = exchangeRecords.firstIndex(where: { $0.id == recordID }) {
+                    let partnerID = exchangeRecords[idx].partner.id
+                    if let userIdx = allUsers.firstIndex(where: { $0.id == partnerID }) {
+                        allUsers[userIdx].creditScore = newScore
+                    }
+                }
+            }
+        }
         guard let idx = exchangeRecords.firstIndex(where: { $0.id == recordID }) else { return }
         let record = exchangeRecords[idx]
         exchangeRecords[idx].evaluateGiven = true
@@ -175,15 +338,32 @@ final class MockDataStore: ObservableObject {
         list.append(evaluate)
         evaluationsByUser[record.partner.id] = list
 
-        let newScore = CreditScoreManager.shared.calculateCreditScore(evaluateList: list)
-        if let userIdx = allUsers.firstIndex(where: { $0.id == record.partner.id }) {
-            allUsers[userIdx].creditScore = newScore
+        if !isServerMode {
+            let newScore = CreditScoreManager.shared.calculateCreditScore(evaluateList: list)
+            if let userIdx = allUsers.firstIndex(where: { $0.id == record.partner.id }) {
+                allUsers[userIdx].creditScore = newScore
+            }
         }
     }
 
     // MARK: - 曝光服务（方案 3.1）
 
-    func applyExposure(package: ExposurePackage?) {
+    func applyExposure(package: ExposurePackage?) async {
+        if isServerMode {
+            do {
+                if let package {
+                    let user = try await APIClient.shared.applyExposure(packageId: package.id)
+                    currentUser = UserModel(server: user)
+                } else {
+                    let user = try await APIClient.shared.cancelExposure()
+                    currentUser = UserModel(server: user)
+                }
+                currentExposurePackage = package
+                return
+            } catch {
+                // 服务端失败回退本地
+            }
+        }
         if let package {
             ExposureService.shared.activate(package, for: &currentUser)
             currentExposurePackage = package
@@ -195,20 +375,46 @@ final class MockDataStore: ObservableObject {
 
     // MARK: - 档案认证（方案 2.3.1）
 
-    func setVerification(_ verification: UserVerification) {
+    func setVerification(_ verification: UserVerification) async {
+        if isServerMode {
+            if let user = try? await APIClient.shared.setVerification(verification) {
+                currentUser = UserModel(server: user)
+                return
+            }
+        }
         currentUser.verification = verification
     }
 
     // MARK: - 技能档案编辑（方案 2.3.1）
 
-    func addSkill(_ skill: SkillModel, kind: SkillKind) {
+    func addSkill(_ skill: SkillModel, kind: SkillKind) async {
+        if isServerMode {
+            if let serverSkill = try? await APIClient.shared.addSkill(
+                kind: kind == .teach ? "teach" : "want",
+                skill: skill
+            ) {
+                let local = SkillModel(server: serverSkill)
+                switch kind {
+                case .teach: currentUser.mySkills.append(local)
+                case .want: currentUser.wantSkills.append(local)
+                }
+                return
+            }
+        }
         switch kind {
         case .teach: currentUser.mySkills.append(skill)
         case .want: currentUser.wantSkills.append(skill)
         }
     }
 
-    func removeSkill(kind: SkillKind, at offsets: IndexSet) {
+    func removeSkill(kind: SkillKind, at offsets: IndexSet) async {
+        let skills = kind == .teach ? currentUser.mySkills : currentUser.wantSkills
+        let removedIDs = offsets.compactMap { skills.indices.contains($0) ? skills[$0].id.serverIDString : nil }
+        if isServerMode {
+            for serverID in removedIDs {
+                try? await APIClient.shared.removeSkill(kind: kind == .teach ? "teach" : "want", id: serverID)
+            }
+        }
         switch kind {
         case .teach: currentUser.mySkills.remove(atOffsets: offsets)
         case .want: currentUser.wantSkills.remove(atOffsets: offsets)
@@ -217,9 +423,27 @@ final class MockDataStore: ObservableObject {
 
     // MARK: - 互换动态（方案 2.3.6 动态区风控）
 
-    /// 发布动态，前置文本风控
+    /// 发布动态（服务端模式：服务端风控）
     @discardableResult
-    func postDynamic(content: String) -> MessageSendResult {
+    func postDynamic(content: String) async -> MessageSendResult {
+        if isServerMode {
+            do {
+                try await APIClient.shared.postDynamic(content: content)
+                dynamics.insert(
+                    DynamicModel(
+                        authorName: currentUser.userName,
+                        avatarSymbol: currentUser.avatarSymbol,
+                        content: content,
+                        time: Date(),
+                        isSystemPost: false
+                    ),
+                    at: 0
+                )
+                return .sent
+            } catch {
+                return .blocked(warning: (error as? LocalizedError)?.errorDescription ?? "发布失败")
+            }
+        }
         let risk = TradeRiskControlManager.shared.checkProfileText(text: content)
         guard !risk.isIllegal else { return .blocked(warning: risk.warning) }
         dynamics.insert(
@@ -250,7 +474,7 @@ final class MockDataStore: ObservableObject {
         conversations[idx].unreadCount = 0
     }
 
-    // MARK: - 示例数据
+    // MARK: - 演示数据
 
     private static func skill(_ name: String, _ level: SkillLevel, _ type: ExchangeType, _ time: String) -> SkillModel {
         SkillModel(skillName: name, skillLevel: level, exchangeType: type, availableTime: time)
@@ -289,7 +513,8 @@ final class MockDataStore: ObservableObject {
             want: [
                 skill("吉他", .beginner, .online, "工作日晚上"),
                 skill("编程", .beginner, .both, "周末"),
-                skill("日语", .beginner, .online, "工作日晚上")
+                skill("日语", .beginner, .online, "工作日晚上"),
+                skill("摄影", .beginner, .both, "周末")
             ]
         )
     }
@@ -344,7 +569,6 @@ final class MockDataStore: ObservableObject {
         let zhouKe = allUsers[4]    // 周可
         let miLi = allUsers[8]      // 米粒
 
-        // 会话与消息（含一条风控拦截系统提示，演示方案 2.3.6）
         let convo1 = Conversation(id: UUID(uuidString: "10000000-0000-0000-0000-000000000001")!,
                                   partner: linXiao, lastMessageText: "好的，周六见！",
                                   lastTime: Date(timeIntervalSinceNow: -3600), unreadCount: 1)
@@ -360,7 +584,7 @@ final class MockDataStore: ObservableObject {
             ChatMessage(senderIsMe: false, text: "你好！看到你想学摄影，我可以带你入门～", time: Date(timeIntervalSinceNow: -86400 * 2)),
             ChatMessage(senderIsMe: true, text: "太棒了！我正想用视频剪辑和你交换摄影", time: Date(timeIntervalSinceNow: -86400 * 2 + 600)),
             ChatMessage(senderIsMe: false, text: "没问题！周六下午两点国贸图书馆见？", time: Date(timeIntervalSinceNow: -86400)),
-            ChatMessage(senderIsMe: false, text: "⚠️ 该消息含违禁词（价格），已被平台风控拦截。技遇仅支持纯技能无偿互换。", time: Date(timeIntervalSinceNow: -86400 + 300), isSystemNote: true),
+            ChatMessage(senderIsMe: false, text: "⚠️ 该消息含违禁词：价格，已被平台风控拦截。技遇仅支持纯技能无偿互换。", time: Date(timeIntervalSinceNow: -86400 + 300), isSystemNote: true),
             ChatMessage(senderIsMe: false, text: "好的，周六见！", time: Date(timeIntervalSinceNow: -3600))
         ]
         messagesByConversation[convo2.id] = [
@@ -373,7 +597,6 @@ final class MockDataStore: ObservableObject {
             ChatMessage(senderIsMe: false, text: "周末晚上有空吗？", time: Date(timeIntervalSinceNow: -7200))
         ]
 
-        // 互换记录（方案 2.3.3：交换时长自定义）
         let record1 = ExchangeRecord(
             id: UUID(uuidString: "20000000-0000-0000-0000-000000000001")!,
             partner: linXiao, mySkillName: "视频剪辑", learnSkillName: "摄影",
@@ -388,7 +611,6 @@ final class MockDataStore: ObservableObject {
         )
         exchangeRecords = [record1, record2]
 
-        // 已签署协议
         agreements = [
             AgreementManager.shared.buildAgreement(
                 partnerID: linXiao.id, partnerName: linXiao.userName,
@@ -402,7 +624,6 @@ final class MockDataStore: ObservableObject {
             )
         ]
 
-        // 动态区
         dynamics = [
             DynamicModel(authorName: "平台", avatarSymbol: "shield.lefthalf.filled",
                          content: "温馨提示：技遇是纯技能无偿互换平台，严禁任何金钱交易。发现违规内容可举报，平台将给予警告、限流、封禁处理。",

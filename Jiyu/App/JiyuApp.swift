@@ -1,13 +1,22 @@
 import SwiftUI
 
 /// 技遇 —— 纯公益、无金钱交易的技能互换 iOS 平台
-/// 入口：注入全局数据层 MockDataStore（正式版替换为 APIClient 网络层）
+/// 入口：未登录 → 登录页；已登录（token 持久化）→ 主框架
 @main
 struct JiyuApp: App {
+    @StateObject private var appState = AppState()
+
     var body: some Scene {
         WindowGroup {
-            ContentView()
-                .environmentObject(MockDataStore.shared)
+            Group {
+                if appState.isLoggedIn {
+                    ContentView()
+                        .environmentObject(MockDataStore.shared)
+                } else {
+                    LoginView()
+                }
+            }
+            .environmentObject(appState)
         }
     }
 }

@@ -51,7 +51,7 @@ struct MatchDetailView: View {
                     }
 
                     NavigationLink {
-                        ChatDetailView(conversation: store.openConversation(with: result.user))
+                        ChatDetailView(partner: result.user)
                     } label: {
                         Text("私信沟通")
                             .font(.headline)

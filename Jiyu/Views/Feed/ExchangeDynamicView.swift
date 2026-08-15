@@ -121,14 +121,16 @@ struct ExchangeDynamicView: View {
     private func publish() {
         let content = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !content.isEmpty else { return }
-        let result = store.postDynamic(content: content)
-        if case .blocked(let warning) = result {
-            alertTitle = "风控拦截"
-            alertMessage = warning
-            showAlert = true
-        } else {
-            draft = ""
-            showCompose = false
+        Task {
+            let result = await store.postDynamic(content: content)
+            if case .blocked(let warning) = result {
+                alertTitle = "风控拦截"
+                alertMessage = warning
+                showAlert = true
+            } else {
+                draft = ""
+                showCompose = false
+            }
         }
     }
 }

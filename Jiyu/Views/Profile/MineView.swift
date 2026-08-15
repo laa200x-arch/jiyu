@@ -116,7 +116,9 @@ struct MineView: View {
                 alertMessage = "你已完成\(label)"
                 showAlert = true
             } else {
-                store.setVerification(verification)
+                Task {
+                    await store.setVerification(verification)
+                }
                 alertTitle = "认证成功"
                 alertMessage = "已通过\(label)（模拟）\n认证档案将提升匹配可信度"
                 showAlert = true
@@ -270,7 +272,11 @@ struct MineView: View {
                             .background(Capsule().fill(Theme.primary))
                     }
                 } else if record.status == .pending || record.status == .ongoing {
-                    Button("标记完成") { store.completeExchange(recordID: record.id) }
+                    Button("标记完成") {
+                        Task {
+                            await store.completeExchange(recordID: record.id)
+                        }
+                    }
                         .font(.caption)
                         .bold()
                         .foregroundStyle(Theme.primary)

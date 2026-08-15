@@ -89,15 +89,17 @@ struct EvaluateView: View {
     }
 
     private func submit() {
-        store.submitEvaluation(
-            recordID: record.id,
-            evaluate: EvaluateModel(
-                punctuality: Double(punctuality),
-                serious: Double(serious),
-                communication: Double(communication),
-                comment: comment.trimmingCharacters(in: .whitespacesAndNewlines)
+        Task {
+            await store.submitEvaluation(
+                recordID: record.id,
+                evaluate: EvaluateModel(
+                    punctuality: Double(punctuality),
+                    serious: Double(serious),
+                    communication: Double(communication),
+                    comment: comment.trimmingCharacters(in: .whitespacesAndNewlines)
+                )
             )
-        )
-        showSuccess = true
+            showSuccess = true
+        }
     }
 }

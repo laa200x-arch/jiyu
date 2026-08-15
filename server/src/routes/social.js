@@ -27,8 +27,24 @@ export function socialRouter(db, io) {
 6. 本协议为平台约束性规则，双方确认签署即认可全部条款。`
 
   router.get('/agreements', (req, res) => {
-    const rows = db.all('SELECT * FROM agreements WHERE user_id = ? ORDER BY id DESC', [req.userId])
-    res.json({ agreements: rows })
+    const rows = db.all(`
+      SELECT a.*, u.nickname AS partner_name
+      FROM agreements a JOIN users u ON u.id = a.partner_id
+      WHERE a.user_id = ? ORDER BY a.id DESC`, [req.userId])
+    res.json({
+      agreements: rows.map((row) => ({
+        id: String(row.id),
+        partnerId: String(row.partner_id),
+        partnerName: row.partner_name,
+        mySkillName: row.my_skill_name,
+        learnSkillName: row.learn_skill_name,
+        exchangeType: row.exchange_type,
+        scheduledTime: row.scheduled_time,
+        location: row.location || null,
+        content: row.content,
+        signedAt: row.signed_at
+      }))
+    })
   })
 
   router.post('/agreements', (req, res) => {

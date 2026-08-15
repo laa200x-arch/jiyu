@@ -26,7 +26,11 @@ struct ProfileEditView: View {
                                     .foregroundStyle(Theme.textSecondary)
                             }
                         }
-                        .onDelete { store.removeSkill(kind: .teach, at: $0) }
+                        .onDelete { offsets in
+                            Task {
+                                await store.removeSkill(kind: .teach, at: offsets)
+                            }
+                        }
                     }
                     Button {
                         showAddTeach = true
@@ -51,7 +55,11 @@ struct ProfileEditView: View {
                                     .foregroundStyle(Theme.textSecondary)
                             }
                         }
-                        .onDelete { store.removeSkill(kind: .want, at: $0) }
+                        .onDelete { offsets in
+                            Task {
+                                await store.removeSkill(kind: .want, at: offsets)
+                            }
+                        }
                     }
                     Button {
                         showAddWant = true
@@ -166,7 +174,9 @@ struct AddSkillSheet: View {
             exchangeType: exchangeType,
             availableTime: availableTime.trimmingCharacters(in: .whitespaces).isEmpty ? "待协商" : availableTime
         )
-        store.addSkill(skill, kind: kind)
-        dismiss()
+        Task {
+            await store.addSkill(skill, kind: kind)
+            dismiss()
+        }
     }
 }

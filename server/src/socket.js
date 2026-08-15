@@ -15,7 +15,7 @@ export function setupSocket(httpServer, db, chatApi) {
   })
 
   io.use((socket, next) => {
-    const token = socket.handshake.auth?.token
+    const token = socket.handshake.auth?.token || socket.handshake.query?.token
     if (!token) return next(new Error('未提供 token'))
     try {
       const payload = jwt.verify(token, config.jwtSecret)

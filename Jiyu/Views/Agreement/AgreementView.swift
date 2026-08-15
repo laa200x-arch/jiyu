@@ -184,16 +184,23 @@ struct AgreementView: View {
             return
         }
 
-        store.signAgreement(
-            partner: partner,
-            mySkillName: mySkillName,
-            learnSkillName: learnSkillName,
-            exchangeType: exchangeType,
-            scheduledTime: scheduledTime,
-            location: exchangeType == .online ? nil : location
-        )
-        alertTitle = "签署成功"
-        alertMessage = "已与 \(partner.userName) 签署官方互换协议，互换记录已生成。请按时履约，认真教学～"
-        showAlert = true
+        Task {
+            do {
+                try await store.signAgreement(
+                    partner: partner,
+                    mySkillName: mySkillName,
+                    learnSkillName: learnSkillName,
+                    exchangeType: exchangeType,
+                    scheduledTime: scheduledTime,
+                    location: exchangeType == .online ? nil : location
+                )
+                alertTitle = "签署成功"
+                alertMessage = "已与 \(partner.userName) 签署官方互换协议，互换记录已生成。请按时履约，认真教学～"
+            } catch {
+                alertTitle = "签署失败"
+                alertMessage = (error as? LocalizedError)?.errorDescription ?? "请稍后重试"
+            }
+            showAlert = true
+        }
     }
 }

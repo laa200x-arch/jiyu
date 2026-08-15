@@ -27,6 +27,11 @@ struct MessageView: View {
         .background(Theme.bg)
         .navigationTitle("消息")
         .navigationBarTitleDisplayMode(.inline)
+        .refreshable {
+            if store.isServerMode {
+                try? await store.refreshAll()
+            }
+        }
     }
 
     private func conversationRow(_ convo: Conversation) -> some View {
@@ -64,62 +69,146 @@ struct MessageView: View {
 }
 
 /// 聊天详情（线上交换 IM，方案 2.3.3）
-/// 消息发送前置风控：命中金钱交易词 → 拦截 + 系统提示
+/// - 从消息列表进入：直接使用已有会话
+/// - 从匹配详情进入：先创建/获取会话，再加载历史消息
+/// - 发送消息：服务端模式走 Socket.io 实时发送（服务端风控），演示模式本地风控
 struct ChatDetailView: View {
     @EnvironmentObject private var store: MockDataStore
-    let conversation: Conversation
 
+    /// 已有会话（消息列表进入）
+    private let initialConversation: Conversation?
+    /// 匹配详情进入（按伙伴创建/获取会话）
+    private let partner: UserModel?
+
+    @State private var conversation: Conversation?
     @State private var inputText = ""
     @State private var blockedBanner: String?
+    @State private var isLoading = true
     @FocusState private var inputFocused: Bool
+
+    init(conversation: Conversation) {
+        self.initialConversation = conversation
+        self.partner = nil
+    }
+
+    init(partner: UserModel) {
+        self.initialConversation = nil
+        self.partner = partner
+    }
 
     var body: some View {
         VStack(spacing: 0) {
-            ScrollViewReader { proxy in
-                ScrollView {
-                    LazyVStack(spacing: 8) {
-                        ForEach(store.messages(for: conversation.id)) { message in
-                            messageBubble(message)
-                        }
-                    }
-                    .padding(12)
+            if isLoading {
+                Spacer()
+                ProgressView("正在加载会话…")
+                Spacer()
+            } else if let conversation {
+                messagesList(conversation)
+                if let blockedBanner {
+                    blockedBannerView(blockedBanner)
                 }
-                .onAppear {
-                    store.markConversationRead(conversation.id)
-                    scrollToBottom(proxy)
-                }
-                .onChange(of: store.messages(for: conversation.id).count) { _ in
-                    scrollToBottom(proxy)
-                }
+                inputBar(conversation)
+            } else {
+                Spacer()
+                Text("无法创建会话")
+                    .font(.caption)
+                    .foregroundStyle(Theme.textSecondary)
+                Spacer()
             }
-
-            if let blockedBanner {
-                HStack(spacing: 6) {
-                    Image(systemName: "exclamationmark.shield.fill")
-                        .foregroundStyle(Theme.warning)
-                    Text(blockedBanner)
-                        .font(.caption2)
-                        .foregroundStyle(Theme.warning)
-                    Spacer()
-                    Button {
-                        self.blockedBanner = nil
-                    } label: {
-                        Image(systemName: "xmark")
-                            .font(.caption2)
-                            .foregroundStyle(Theme.warning)
-                    }
-                }
-                .padding(10)
-                .background(RoundedRectangle(cornerRadius: 8).fill(Theme.warning.opacity(0.12)))
-                .padding(.horizontal, 12)
-                .padding(.bottom, 4)
-            }
-
-            inputBar
         }
         .background(Theme.bg)
-        .navigationTitle(conversation.partner.userName)
+        .navigationTitle(conversation?.partner.userName ?? initialConversation?.partner.userName ?? partner?.userName ?? "")
         .navigationBarTitleDisplayMode(.inline)
+        .task {
+            await loadConversation()
+        }
+    }
+
+    // MARK: - 加载
+
+    private func loadConversation() async {
+        defer { isLoading = false }
+        if let initialConversation {
+            conversation = initialConversation
+        } else if let partner {
+            conversation = await store.openConversation(with: partner)
+        }
+        if let conversation {
+            store.markConversationRead(conversation.id)
+            await store.loadMessages(conversationID: conversation.id)
+        }
+    }
+
+    // MARK: - 视图
+
+    private func messagesList(_ conversation: Conversation) -> some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(spacing: 8) {
+                    ForEach(store.messages(for: conversation.id)) { message in
+                        messageBubble(message)
+                    }
+                }
+                .padding(12)
+            }
+            .onAppear {
+                scrollToBottom(proxy, conversation: conversation)
+            }
+            .onChange(of: store.messages(for: conversation.id).count) { _ in
+                scrollToBottom(proxy, conversation: conversation)
+            }
+        }
+    }
+
+    private func blockedBannerView(_ message: String) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: "exclamationmark.shield.fill")
+                .foregroundStyle(Theme.warning)
+            Text(message)
+                .font(.caption2)
+                .foregroundStyle(Theme.warning)
+            Spacer()
+            Button {
+                self.blockedBanner = nil
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.caption2)
+                    .foregroundStyle(Theme.warning)
+            }
+        }
+        .padding(10)
+        .background(RoundedRectangle(cornerRadius: 8).fill(Theme.warning.opacity(0.12)))
+        .padding(.horizontal, 12)
+        .padding(.bottom, 4)
+    }
+
+    private func inputBar(_ conversation: Conversation) -> some View {
+        HStack(spacing: 10) {
+            TextField("发送消息（严禁金钱交易内容）", text: $inputText, axis: .vertical)
+                .textFieldStyle(.plain)
+                .font(.subheadline)
+                .lineLimit(1...4)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(RoundedRectangle(cornerRadius: 18).fill(Color(.systemGray6)))
+                .focused($inputFocused)
+            Button {
+                send(conversation)
+            } label: {
+                Image(systemName: "paperplane.fill")
+                    .font(.system(size: 15))
+                    .foregroundStyle(.white)
+                    .frame(width: 38, height: 38)
+                    .background(Circle().fill(
+                        inputText.trimmingCharacters(in: .whitespaces).isEmpty
+                            ? Theme.primary.opacity(0.4) : Theme.primary
+                    ))
+            }
+            .disabled(inputText.trimmingCharacters(in: .whitespaces).isEmpty)
+        }
+        .padding(10)
+        .background(Theme.cardBg)
+        .overlay(alignment: .top) { Rectangle().fill(Theme.divider).frame(height: 1) }
     }
 
     private func messageBubble(_ message: ChatMessage) -> some View {
@@ -151,46 +240,24 @@ struct ChatDetailView: View {
         }
     }
 
-    private var inputBar: some View {
-        HStack(spacing: 10) {
-            TextField("发送消息（严禁金钱交易内容）", text: $inputText, axis: .vertical)
-                .textFieldStyle(.plain)
-                .font(.subheadline)
-                .lineLimit(1...4)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(RoundedRectangle(cornerRadius: 18).fill(Color(.systemGray6)))
-                .focused($inputFocused)
-            Button {
-                send()
-            } label: {
-                Image(systemName: "paperplane.fill")
-                    .font(.system(size: 15))
-                    .foregroundStyle(.white)
-                    .frame(width: 38, height: 38)
-                    .background(Circle().fill(
-                        inputText.trimmingCharacters(in: .whitespaces).isEmpty
-                            ? Theme.primary.opacity(0.4) : Theme.primary
-                    ))
-            }
-            .disabled(inputText.trimmingCharacters(in: .whitespaces).isEmpty)
-        }
-        .padding(10)
-        .background(Theme.cardBg)
-        .overlay(alignment: .top) { Rectangle().fill(Theme.divider).frame(height: 1) }
-    }
+    // MARK: - 发送
 
-    private func send() {
+    private func send(_ conversation: Conversation) {
         let text = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
-        let result = store.sendMessage(conversationID: conversation.id, text: text)
         inputText = ""
-        if case .blocked(let warning) = result {
-            blockedBanner = warning
+        Task {
+            let result = await store.sendMessage(conversationID: conversation.id, text: text)
+            if case .blocked(let warning) = result {
+                blockedBanner = warning
+            }
+            if store.isServerMode {
+                await store.loadMessages(conversationID: conversation.id)
+            }
         }
     }
 
-    private func scrollToBottom(_ proxy: ScrollViewProxy) {
+    private func scrollToBottom(_ proxy: ScrollViewProxy, conversation: Conversation) {
         let list = store.messages(for: conversation.id)
         if let last = list.last {
             withAnimation(.easeOut(duration: 0.2)) {

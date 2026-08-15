@@ -125,7 +125,7 @@ export function chatRouter(db, bus = { io: null }) {
         `INSERT INTO messages (conversation_id, sender_id, text, is_system_note, created_at) VALUES (?,?,?,?,?)`,
         [convo.id, senderId, note, 1, now()]
       )
-      updatePreviewAndBroadcast(convo, senderId, note)
+      updatePreviewAndBroadcast(convo, senderId, note, r.lastInsertRowid)
       return {
         blocked: true,
         warning: risk.warning,
@@ -139,7 +139,7 @@ export function chatRouter(db, bus = { io: null }) {
       `INSERT INTO messages (conversation_id, sender_id, text, is_system_note, created_at) VALUES (?,?,?,?,?)`,
       [convo.id, senderId, content, 0, now()]
     )
-    updatePreviewAndBroadcast(convo, senderId, content)
+    updatePreviewAndBroadcast(convo, senderId, content, r.lastInsertRowid)
     return {
       message: serializeMessage({
         id: r.lastInsertRowid, conversation_id: convo.id, sender_id: senderId,
@@ -148,7 +148,7 @@ export function chatRouter(db, bus = { io: null }) {
     }
   }
 
-  function updatePreviewAndBroadcast(convo, senderId, text) {
+  function updatePreviewAndBroadcast(convo, senderId, text, messageId) {
     const nowIso = now()
     if (convo.user_a === senderId) {
       db.run('UPDATE conversations SET last_message_text = ?, last_time = ?, unread_b = unread_b + 1 WHERE id = ?',
@@ -157,7 +157,13 @@ export function chatRouter(db, bus = { io: null }) {
       db.run('UPDATE conversations SET last_message_text = ?, last_time = ?, unread_a = unread_a + 1 WHERE id = ?',
         [text, nowIso, convo.id])
     }
-    const payload = { conversationId: String(convo.id), text, time: nowIso, senderId: String(senderId) }
+    const payload = {
+      id: String(messageId),
+      conversationId: String(convo.id),
+      text,
+      time: nowIso,
+      senderId: String(senderId)
+    }
     bus.io?.to(`user:${convo.user_a}`).emit('chat:message', payload)
     bus.io?.to(`user:${convo.user_b}`).emit('chat:message', payload)
   }

@@ -32,7 +32,9 @@ struct ExposureView: View {
 
                     if store.currentExposurePackage != nil {
                         Button(role: .destructive) {
-                            store.applyExposure(package: nil)
+                            Task {
+                                await store.applyExposure(package: nil)
+                            }
                         } label: {
                             Text("取消曝光")
                                 .font(.subheadline)
@@ -63,7 +65,9 @@ struct ExposureView: View {
             )) {
                 Button("模拟开通（本版本不扣费）") {
                     if let pkg = confirmPackage {
-                        store.applyExposure(package: pkg)
+                        Task {
+                            await store.applyExposure(package: pkg)
+                        }
                     }
                     confirmPackage = nil
                 }
