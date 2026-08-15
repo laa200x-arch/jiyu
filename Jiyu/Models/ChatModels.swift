@@ -42,4 +42,20 @@ struct DynamicModel: Codable, Identifiable, Hashable {
     var content: String
     var time: Date
     var isSystemPost: Bool
+
+    init(
+        id: UUID = UUID(),
+        authorName: String,
+        avatarSymbol: String,
+        content: String,
+        time: Date = Date(),
+        isSystemPost: Bool = false
+    ) {
+        self.id = id
+        self.authorName = authorName
+        self.avatarSymbol = avatarSymbol
+        self.content = content
+        self.time = time
+        self.isSystemPost = isSystemPost
+    }
 }

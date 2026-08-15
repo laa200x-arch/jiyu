@@ -39,7 +39,7 @@ class TradeRiskControlManager {
         return RiskCheckResult(
             isIllegal: true,
             matchedWords: matched,
-            warning: "平台严禁任何金钱交易，仅支持纯技能无偿互换（命中词：\(matched.joined(separator: "、")）"
+            warning: "平台严禁任何金钱交易，仅支持纯技能无偿互换。命中词：\(matched.joined(separator: "、"))"
         )
     }
 

@@ -46,7 +46,9 @@ struct ExchangeDynamicView: View {
         HStack(alignment: .top, spacing: 12) {
             ZStack {
                 Circle()
-                    .fill(item.isSystemPost ? Theme.secondary.opacity(0.25) : Theme.gradient)
+                    .fill(item.isSystemPost
+                          ? AnyShapeStyle(Theme.secondary.opacity(0.25))
+                          : AnyShapeStyle(Theme.gradient))
                     .frame(width: 42, height: 42)
                 Image(systemName: item.avatarSymbol)
                     .font(.system(size: 18))

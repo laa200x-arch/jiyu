@@ -92,7 +92,7 @@ final class MockDataStore: ObservableObject {
             // 原文不发送，追加系统提示
             let note = ChatMessage(
                 senderIsMe: false,
-                text: "⚠️ 该消息含违禁词（\(risk.matchedWords.joined(separator: "、"))），已被平台风控拦截。技遇仅支持纯技能无偿互换。",
+                text: "⚠️ 该消息含违禁词：\(risk.matchedWords.joined(separator: "、"))，已被平台风控拦截。技遇仅支持纯技能无偿互换。",
                 isSystemNote: true
             )
             appendMessage(conversationID, note)
@@ -148,7 +148,7 @@ final class MockDataStore: ObservableObject {
         exchangeRecords.insert(record, at: 0)
 
         // 签署后自动建立会话，便于沟通教学细节
-        openConversation(with: partner)
+        _ = openConversation(with: partner)
         return record
     }
 

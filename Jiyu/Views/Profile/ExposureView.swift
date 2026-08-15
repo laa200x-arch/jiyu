@@ -70,7 +70,7 @@ struct ExposureView: View {
                 Button("取消", role: .cancel) { confirmPackage = nil }
             } message: {
                 Text(confirmPackage.map {
-                    "\($0.name)（\($0.days) 天）：\($0.description)。正式版价格为 ¥\($0.priceYuan)，经苹果内购支付。"
+                    "\($0.name) · \($0.days) 天：\($0.description)。正式版价格为 ¥\($0.priceYuan)，经苹果内购支付。"
                 } ?? "")
             }
         }

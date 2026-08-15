@@ -135,7 +135,7 @@ struct AgreementView: View {
 
     private func signedBanner(_ agreement: ExchangeAgreement) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Label("已签署（\(Formatters.timeText(agreement.signedAt))）", systemImage: "checkmark.shield.fill")
+            Label("已签署 · \(Formatters.timeText(agreement.signedAt))", systemImage: "checkmark.shield.fill")
                 .font(.subheadline)
                 .bold()
                 .foregroundStyle(Theme.success)

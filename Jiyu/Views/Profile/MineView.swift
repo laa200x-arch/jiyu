@@ -177,7 +177,7 @@ struct MineView: View {
                     .bold()
                     .foregroundStyle(Theme.textPrimary)
                 Text(store.currentUser.isExposureVip
-                     ? "置顶加权进行中（\(store.currentExposurePackage?.name ?? "")）"
+                     ? "置顶加权进行中 · \(store.currentExposurePackage?.name ?? "")"
                      : "主页置顶 + 精准匹配加权，不影响纯公益属性")
                     .font(.caption2)
                     .foregroundStyle(Theme.textSecondary)
