@@ -4,6 +4,7 @@ import SwiftUI
 /// 设计原则：去商业化、去交易化 —— 全页面无价格、无付费商品、无充值入口
 struct ContentView: View {
     @State private var tabIndex = 0
+    @State private var updateInfo: ServerVersion?
 
     var body: some View {
         TabView(selection: $tabIndex) {
@@ -40,6 +41,38 @@ struct ContentView: View {
             .tag(3)
         }
         .tint(Theme.primary)
+        .task {
+            await checkForUpdate()
+        }
+        .alert(
+            "发现新版本 \(updateInfo?.current ?? "")",
+            isPresented: Binding(
+                get: { updateInfo != nil },
+                set: { if !$0 { updateInfo = nil } }
+            )
+        ) {
+            Button("去下载") {
+                if let urlString = updateInfo?.downloadUrl,
+                   let url = URL(string: urlString) {
+                    UIApplication.shared.open(url)
+                }
+            }
+            Button("稍后再说", role: .cancel) {
+                updateInfo = nil
+            }
+        } message: {
+            Text(updateInfo?.updateMessage ?? "")
+        }
+    }
+
+    /// 版本更新检查（方案：服务器 /api/version，有新版本则弹窗提示）
+    private func checkForUpdate() async {
+        guard TokenStore.token != nil else { return }
+        guard let version = try? await APIClient.shared.fetchVersion() else { return }
+        let localVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+        if version.current != localVersion {
+            updateInfo = version
+        }
     }
 }
 

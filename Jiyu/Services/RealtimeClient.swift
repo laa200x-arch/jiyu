@@ -22,6 +22,9 @@ final class RealtimeClient {
     /// 收到新消息（服务端 chat:message 广播）
     var onMessage: ((SocketMessagePayload) -> Void)?
 
+    /// 收到互换邀约推送（服务端 match:push，参数：对方昵称、消息内容）
+    var onMatchPush: ((String, String) -> Void)?
+
     var isConnected: Bool { socket?.status == .connected }
 
     private init() {}
@@ -44,6 +47,14 @@ final class RealtimeClient {
         newSocket.on("chat:message") { [weak self] data, _ in
             guard let payload = data.first as? [String: Any] else { return }
             self?.handleIncoming(payload)
+        }
+        newSocket.on("match:push") { [weak self] data, _ in
+            guard let payload = data.first as? [String: Any] else { return }
+            let from = (payload["from"] as? [String: Any])?["userName"] as? String ?? "技遇"
+            let message = payload["message"] as? String ?? "你收到一条新的互换邀约"
+            DispatchQueue.main.async {
+                self?.onMatchPush?(from, message)
+            }
         }
         newSocket.connect(withPayload: ["token": token])
 

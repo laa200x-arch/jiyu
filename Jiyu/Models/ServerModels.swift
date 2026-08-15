@@ -213,6 +213,12 @@ struct ServerAgreement: Decodable {
 
 // MARK: - 响应包装
 
+struct ServerVersion: Decodable {
+    let current: String
+    let updateMessage: String
+    let downloadUrl: String
+}
+
 struct TokenResponse: Decodable { let token: String; let user: ServerUser }
 struct UserResponse: Decodable { let user: ServerUser }
 struct UsersResponse: Decodable { let users: [ServerUser] }

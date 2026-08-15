@@ -39,6 +39,7 @@
 		A0000000000000000000001E /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000011D /* LoginView.swift */; };
 		A0000000000000000000001F /* SocketIO in Frameworks */ = {isa = PBXBuildFile; productRef = A00000000000000000000902 /* SocketIO */; };
 		A00000000000000000000020 /* MatchMapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000011E /* MatchMapView.swift */; };
+		A00000000000000000000021 /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000011F /* NotificationService.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -72,6 +73,7 @@
 		A0000000000000000000011C /* RealtimeClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RealtimeClient.swift; sourceTree = "<group>"; };
 		A0000000000000000000011D /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
 		A0000000000000000000011E /* MatchMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MatchMapView.swift; sourceTree = "<group>"; };
+		A0000000000000000000011F /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
 		A00000000000000000000124 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A00000000000000000000125 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A00000000000000000000126 /* Jiyu.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Jiyu.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -169,6 +171,7 @@
 				A0000000000000000000010D /* MockDataStore.swift */,
 				A0000000000000000000011B /* APIClient.swift */,
 				A0000000000000000000011C /* RealtimeClient.swift */,
+				A0000000000000000000011F /* NotificationService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -362,6 +365,7 @@
 				A0000000000000000000001D /* RealtimeClient.swift in Sources */,
 				A0000000000000000000001E /* LoginView.swift in Sources */,
 				A00000000000000000000020 /* MatchMapView.swift in Sources */,
+				A00000000000000000000021 /* NotificationService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -1,7 +1,7 @@
 import Foundation
 
 /// 后端 API 错误
-enum APIError: LocalizedError {
+enum APIError: LocalizedError, Equatable {
     case server(message: String)
     case network
     case unauthorized
@@ -257,5 +257,11 @@ final class APIClient {
 
     func removeSkill(kind: String, id: String) async throws {
         let _: OkResponse = try await request("/api/me/skills/\(kind)/\(id)", method: "DELETE")
+    }
+
+    // MARK: - 版本检查
+
+    func fetchVersion() async throws -> ServerVersion {
+        try await request("/api/version")
     }
 }

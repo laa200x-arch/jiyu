@@ -37,6 +37,15 @@ async function main() {
     res.json({ ok: true, service: 'jiyu-server', time: new Date().toISOString() })
   })
 
+  // 版本检查（App 启动时轮询：有新版本则提示下载）
+  app.get('/api/version', (req, res) => {
+    res.json({
+      current: '1.1',
+      updateMessage: '新版本已发布：新增同城地图、动态图片上传、账号切换、消息推送、自动登录修复',
+      downloadUrl: 'https://github.com/laa200x-arch/jiyu/releases'
+    })
+  })
+
   // 路由
   app.use('/api/auth', authRouter(db))
   app.use('/api', profileRouter(db))
@@ -60,10 +69,12 @@ async function main() {
     res.status(404).json({ error: `接口不存在: ${req.method} ${req.path}` })
   })
 
-  // 全局错误处理
+  // 全局错误处理（body-parser 解析错误返回 400 而非 500）
   app.use((err, req, res, next) => {
     console.error('[error]', err)
-    res.status(500).json({ error: '服务器内部错误' })
+    const status = err.statusCode || err.status || 500
+    const message = err.type === 'entity.parse.failed' ? '请求格式错误' : '服务器内部错误'
+    res.status(status).json({ error: message })
   })
 
   httpServer.listen(config.port, () => {

@@ -57,23 +57,49 @@ final class MockDataStore: ObservableObject {
     // MARK: - 登录 / 会话（服务端模式）
 
     func login(username: String, password: String) async throws {
-        let user = try await APIClient.shared.login(username: username, password: password)
-        try await activateServerSession(user)
+        do {
+            let user = try await APIClient.shared.login(username: username, password: password)
+            try await activateServerSession(user)
+        } catch {
+            // 登录失败：清除可能残留的旧 token，避免重启后"误自动登录"
+            TokenStore.token = nil
+            serverUserID = nil
+            throw error
+        }
     }
 
     func register(username: String, password: String, nickname: String) async throws {
-        let user = try await APIClient.shared.register(username: username, password: password, nickname: nickname)
-        try await activateServerSession(user)
+        do {
+            let user = try await APIClient.shared.register(username: username, password: password, nickname: nickname)
+            try await activateServerSession(user)
+        } catch {
+            TokenStore.token = nil
+            serverUserID = nil
+            throw error
+        }
     }
 
-    /// 自动登录：App 启动时若存在持久化 Token，从服务器拉取该账号数据（修复重启后回到演示账号的问题）
-    func autoLogin() async {
-        guard TokenStore.token != nil else { return }
+    /// 自动登录：App 启动时若存在持久化 Token，从服务器拉取该账号数据
+    /// - 返回 true：会话有效（或网络异常保留会话兜底）
+    /// - 返回 false：token 已失效，需要重新登录
+    @discardableResult
+    func autoLogin() async -> Bool {
+        guard TokenStore.token != nil else { return false }
         do {
             let user = try await APIClient.shared.fetchMe()
             try await activateServerSession(user)
+            return true
+        } catch let error as APIError {
+            if error == .unauthorized {
+                // token 失效：彻底登出
+                TokenStore.token = nil
+                serverUserID = nil
+                RealtimeClient.shared.disconnect()
+                return false
+            }
+            return true // 网络异常：保留会话，演示数据兜底
         } catch {
-            // 网络异常时保留演示数据，用户可在「我的 → 切换账号」重新登录
+            return true
         }
     }
 
@@ -81,9 +107,16 @@ final class MockDataStore: ObservableObject {
         serverUserID = user.id
         currentUser = UserModel(server: user)
         try await refreshAll()
+        NotificationService.requestPermission()
         RealtimeClient.shared.onMessage = { [weak self] payload in
             Task { @MainActor in
                 self?.handleSocketMessage(payload)
+            }
+        }
+        RealtimeClient.shared.onMatchPush = { [weak self] from, message in
+            Task { @MainActor in
+                NotificationService.post(title: "\(from) 发来互换邀约", body: message)
+                try? await self?.refreshAll()
             }
         }
         if let token = TokenStore.token {
@@ -227,7 +260,7 @@ final class MockDataStore: ObservableObject {
         return .sent
     }
 
-    /// 实时消息处理（服务端 chat:message 广播）
+    /// 实时消息处理（服务端 chat:message 广播 + 本地通知）
     private func handleSocketMessage(_ payload: RealtimeClient.SocketMessagePayload) {
         let convID = UUID(serverID: payload.conversationId)
         let isMe = payload.senderId == serverUserID
@@ -244,6 +277,11 @@ final class MockDataStore: ObservableObject {
         conversations[idx].lastTime = payload.time
         if !isMe && activeConversationID != convID {
             conversations[idx].unreadCount += 1
+            // 本地通知（对方发来新消息）
+            NotificationService.post(
+                title: "\(conversations[idx].partner.userName) 发来消息",
+                body: payload.text
+            )
         }
     }
 
