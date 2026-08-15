@@ -1,0 +1,45 @@
+import Foundation
+
+/// 会话（内置 IM，方案 2.3.3 线上交换）
+struct Conversation: Codable, Identifiable, Hashable {
+    let id: UUID
+    let partner: UserModel
+    var lastMessageText: String
+    var lastTime: Date
+    var unreadCount: Int
+}
+
+/// 聊天消息
+/// - senderIsMe: 是否本人发送
+/// - isSystemNote: 系统提示（如风控拦截提示），非普通消息气泡
+struct ChatMessage: Codable, Identifiable, Hashable {
+    let id: UUID
+    var senderIsMe: Bool
+    var text: String
+    var time: Date
+    var isSystemNote: Bool
+
+    init(
+        id: UUID = UUID(),
+        senderIsMe: Bool,
+        text: String,
+        time: Date = Date(),
+        isSystemNote: Bool = false
+    ) {
+        self.id = id
+        self.senderIsMe = senderIsMe
+        self.text = text
+        self.time = time
+        self.isSystemNote = isSystemNote
+    }
+}
+
+/// 互换动态（动态区，发布内容同样受文本风控）
+struct DynamicModel: Codable, Identifiable, Hashable {
+    let id: UUID
+    var authorName: String
+    var avatarSymbol: String
+    var content: String
+    var time: Date
+    var isSystemPost: Bool
+}

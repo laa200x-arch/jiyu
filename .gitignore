@@ -1,0 +1,20 @@
+# macOS
+.DS_Store
+
+# Xcode 用户数据与派生数据
+xcuserdata/
+DerivedData/
+build/
+*.xcuserstate
+
+# Swift Package Manager
+.build/
+.swiftpm/
+
+# 证书与密钥（切勿提交）
+*.p12
+*.mobileprovision
+*.cer
+
+# 系统
+Thumbs.db
