@@ -4,13 +4,12 @@ rem  Jiyu - push to GitHub and trigger cloud IPA build
 rem  Double-click to run.
 rem  BEFORE running: create an EMPTY repo on GitHub:
 rem    https://github.com/new  ->  name: jiyu  ->  do NOT add README
-rem  If you named it differently, edit $repo line in push-to-github.ps1
-rem  (actually: edit the "set REPO=" line below).
+rem  If you named it differently, edit the "set REPO=" line below.
 rem ============================================================
 setlocal
 cd /d "%~dp0"
 
-set USER=laa200x
+set USER=laa200x-arch
 set REPO=jiyu
 set REMOTE=https://github.com/%USER%/%REPO%.git
 
