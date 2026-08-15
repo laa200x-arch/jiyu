@@ -94,60 +94,11 @@ struct ExchangeDynamicView: View {
     private var composeSheet: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 12) {
-                Text("发布动态")
-                    .font(.headline)
-                    .foregroundStyle(Theme.textPrimary)
-                TextEditor(text: $draft)
-                    .frame(minHeight: 140)
-                    .padding(8)
-                    .background(RoundedRectangle(cornerRadius: 10).fill(Theme.bg))
-                    .overlay(RoundedRectangle(cornerRadius: 10).stroke(Theme.divider, lineWidth: 1))
-                HStack(spacing: 12) {
-                    PhotosPicker(selection: $pickerItem, matching: .images) {
-                        HStack(spacing: 6) {
-                            Image(systemName: "photo.on.rectangle")
-                            Text(selectedImage == nil ? "添加图片" : "更换图片")
-                        }
-                        .font(.caption)
-                        .foregroundStyle(Theme.primary)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .background(Capsule().fill(Theme.primary.opacity(0.10)))
-                    }
-                    if let selectedImage {
-                        Image(uiImage: selectedImage)
-                            .resizable()
-                            .scaledToFill()
-                            .frame(width: 56, height: 56)
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
-                        Button {
-                            pickerItem = nil
-                            selectedImage = nil
-                        } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .foregroundStyle(Theme.textSecondary)
-                        }
-                    }
-                    Spacer()
-                }
-                Label("禁止发布任何收费、交易、接单等商业信息，发布内容将自动经过平台风控审核",
-                      systemImage: "exclamationmark.shield.fill")
-                    .font(.caption2)
-                    .foregroundStyle(Theme.warning)
-                Button {
-                    publish()
-                } label: {
-                    Text("发布")
-                        .font(.headline)
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
-                        .background(Capsule().fill(
-                            draft.trimmingCharacters(in: .whitespaces).isEmpty && selectedImage == nil
-                                ? Theme.primary.opacity(0.4) : Theme.primary
-                        ))
-                }
-                .disabled(draft.trimmingCharacters(in: .whitespaces).isEmpty && selectedImage == nil)
+                composeHeader
+                composeEditor
+                photoPickerRow
+                composeWarning
+                publishButton
                 Spacer()
             }
             .padding(16)
@@ -158,15 +109,94 @@ struct ExchangeDynamicView: View {
                 }
             }
             .onChange(of: pickerItem) { _ in
-                Task {
-                    guard let pickerItem else { return }
-                    if let data = try? await pickerItem.loadTransferable(type: Data.self),
-                       let image = UIImage(data: data) {
-                        selectedImage = downscale(image)
-                        imageBase64 = selectedImage?.jpegData(compressionQuality: 0.7)?
-                            .base64EncodedString()
-                    }
+                handlePickerChange()
+            }
+        }
+    }
+
+    private var composeHeader: some View {
+        Text("发布动态")
+            .font(.headline)
+            .foregroundStyle(Theme.textPrimary)
+    }
+
+    private var composeEditor: some View {
+        TextEditor(text: $draft)
+            .frame(minHeight: 140)
+            .padding(8)
+            .background(RoundedRectangle(cornerRadius: 10).fill(Theme.bg))
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Theme.divider, lineWidth: 1))
+    }
+
+    private var photoPickerRow: some View {
+        HStack(spacing: 12) {
+            PhotosPicker(selection: $pickerItem, matching: .images) {
+                HStack(spacing: 6) {
+                    Image(systemName: "photo.on.rectangle")
+                    Text(selectedImage == nil ? "添加图片" : "更换图片")
                 }
+                .font(.caption)
+                .foregroundStyle(Theme.primary)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(Capsule().fill(Theme.primary.opacity(0.10)))
+            }
+            if let selectedImage {
+                selectedImageThumb(selectedImage)
+                Button {
+                    pickerItem = nil
+                    self.selectedImage = nil
+                    imageBase64 = nil
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(Theme.textSecondary)
+                }
+            }
+            Spacer()
+        }
+    }
+
+    private func selectedImageThumb(_ image: UIImage) -> some View {
+        Image(uiImage: image)
+            .resizable()
+            .scaledToFill()
+            .frame(width: 56, height: 56)
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+    }
+
+    private var composeWarning: some View {
+        Label("禁止发布任何收费、交易、接单等商业信息，发布内容将自动经过平台风控审核",
+              systemImage: "exclamationmark.shield.fill")
+            .font(.caption2)
+            .foregroundStyle(Theme.warning)
+    }
+
+    private var publishButton: some View {
+        Button {
+            publish()
+        } label: {
+            Text("发布")
+                .font(.headline)
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .background(Capsule().fill(
+                    draft.trimmingCharacters(in: .whitespaces).isEmpty && selectedImage == nil
+                        ? Theme.primary.opacity(0.4) : Theme.primary
+                ))
+        }
+        .disabled(draft.trimmingCharacters(in: .whitespaces).isEmpty && selectedImage == nil)
+    }
+
+    /// 相册选择回调：压缩图片并生成 base64
+    private func handlePickerChange() {
+        guard let pickerItem else { return }
+        Task {
+            if let data = try? await pickerItem.loadTransferable(type: Data.self),
+               let image = UIImage(data: data) {
+                let scaled = downscale(image)
+                selectedImage = scaled
+                imageBase64 = scaled.jpegData(compressionQuality: 0.7)?.base64EncodedString()
             }
         }
     }

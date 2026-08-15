@@ -127,7 +127,9 @@ struct MatchMapView: View {
             VStack(spacing: 4) {
                 ZStack {
                     Circle()
-                        .fill(pin.isVip ? Theme.secondary : Theme.gradient)
+                        .fill(pin.isVip
+                              ? AnyShapeStyle(Theme.secondary)
+                              : AnyShapeStyle(Theme.gradient))
                         .frame(width: 40, height: 40)
                     Image(systemName: pin.result.user.avatarSymbol)
                         .font(.system(size: 16))
@@ -158,7 +160,9 @@ struct MatchMapView: View {
         HStack(spacing: 12) {
             ZStack {
                 Circle()
-                    .fill(pin.isVip ? Theme.secondary : Theme.gradient)
+                    .fill(pin.isVip
+                          ? AnyShapeStyle(Theme.secondary)
+                          : AnyShapeStyle(Theme.gradient))
                     .frame(width: 44, height: 44)
                 Image(systemName: pin.result.user.avatarSymbol)
                     .font(.system(size: 18))
