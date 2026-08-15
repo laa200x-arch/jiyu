@@ -7,7 +7,7 @@ import http from 'node:http'
 import { config } from './config.js'
 import { initDb, closeDb } from './db.js'
 import { SQLITE_DDL, MYSQL_DDL } from './schema.js'
-import { seed } from './seed.js'
+import { seed, ensureEveryoneHasDynamics } from './seed.js'
 import { authRouter } from './routes/auth.js'
 import { profileRouter } from './routes/profile.js'
 import { matchRouter } from './routes/match.js'
@@ -26,7 +26,10 @@ async function main() {
     db.exec('ALTER TABLE dynamics ADD COLUMN image_base64 TEXT')
   } catch { /* 列已存在 */ }
   // 演示数据
-  if (config.autoSeed) await seed(db)
+  if (config.autoSeed) {
+    await seed(db)
+    ensureEveryoneHasDynamics(db)
+  }
 
   const app = express()
   app.use(cors())

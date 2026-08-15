@@ -37,6 +37,7 @@ struct ChatMessage: Codable, Identifiable, Hashable {
 /// 互换动态（动态区，发布内容同样受文本风控）
 struct DynamicModel: Codable, Identifiable, Hashable {
     let id: UUID
+    var userId: UUID?
     var authorName: String
     var avatarSymbol: String
     var content: String
@@ -46,6 +47,7 @@ struct DynamicModel: Codable, Identifiable, Hashable {
 
     init(
         id: UUID = UUID(),
+        userId: UUID? = nil,
         authorName: String,
         avatarSymbol: String,
         content: String,
@@ -54,6 +56,7 @@ struct DynamicModel: Codable, Identifiable, Hashable {
         isSystemPost: Bool = false
     ) {
         self.id = id
+        self.userId = userId
         self.authorName = authorName
         self.avatarSymbol = avatarSymbol
         self.content = content

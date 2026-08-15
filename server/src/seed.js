@@ -187,3 +187,38 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   db.exec(config.dbDriver === 'mysql' ? MYSQL_DDL : SQLITE_DDL)
   await seed(db, { force: process.argv.includes('--force') })
 }
+
+/**
+ * 为还没有动态的用户自动补充动态（幂等，不影响已有数据）
+ * 让动态区覆盖"所有人的动态"
+ */
+export function ensureEveryoneHasDynamics(db) {
+  const users = db.all('SELECT id, nickname, avatar_symbol FROM users')
+  const samples = {
+    阿青: '想找编程搭子一起写个小项目，用剪辑技能互换～',
+    林晓: '周六下午国贸图书馆带新人学摄影构图，还有两个名额',
+    陈默: '整理了 50 个常用日语动词卡片，想换英语口语练习',
+    苏晴: '周末在文创园画水彩，欢迎来一起画（纯兴趣，颜料自备）',
+    王野: '剪了一支校园 Vlog，想学剪辑的同学可以交流',
+    周可: '本周三晚线上吉他入门互换，还剩一个名额',
+    高远: '下周末去郊外拍星空，求同好结伴，我可以教摄影基础',
+    韩雪: '想找摄影搭子，我用编程知识交换',
+    白一凡: '速写练习第 21 天，坚持就是胜利',
+    米粒: '日语五十音图口诀整理好了，需要的同学评论区扣 1',
+    阿哲: '自学编程一年了，最近想找人互换剪辑和日语'
+  }
+  let added = 0
+  for (const user of users) {
+    const count = db.get('SELECT COUNT(*) AS c FROM dynamics WHERE user_id = ?', [user.id]).c
+    const sample = samples[user.nickname]
+    if (count === 0 && sample) {
+      db.run(
+        `INSERT INTO dynamics (user_id, content, is_system_post, created_at) VALUES (?,?,?,?)`,
+        [user.id, sample, 0, new Date().toISOString()]
+      )
+      added++
+    }
+  }
+  if (added > 0) console.log(`[seed] 为 ${added} 位用户补充了动态`)
+  return added
+}

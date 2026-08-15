@@ -139,10 +139,11 @@ export function socialRouter(db, io) {
     const rows = db.all(`
       SELECT d.*, u.nickname, u.avatar_symbol
       FROM dynamics d JOIN users u ON u.id = d.user_id
-      ORDER BY d.id DESC LIMIT 100`)
+      ORDER BY d.id DESC LIMIT 200`)
     res.json({
       dynamics: rows.map((row) => ({
         id: String(row.id),
+        userId: String(row.user_id),
         authorName: row.nickname,
         avatarSymbol: row.avatar_symbol,
         content: row.content,

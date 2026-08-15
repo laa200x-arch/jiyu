@@ -47,7 +47,7 @@ struct ExchangeDynamicView: View {
     }
 
     private func dynamicCard(_ item: DynamicModel) -> some View {
-        HStack(alignment: .top, spacing: 12) {
+        let card = HStack(alignment: .top, spacing: 12) {
             ZStack {
                 Circle()
                     .fill(item.isSystemPost
@@ -64,6 +64,11 @@ struct ExchangeDynamicView: View {
                         .font(.subheadline)
                         .bold()
                         .foregroundStyle(Theme.textPrimary)
+                    if !item.isSystemPost {
+                        Image(systemName: "chevron.right")
+                            .font(.caption2)
+                            .foregroundStyle(Theme.textSecondary.opacity(0.6))
+                    }
                     Spacer()
                     Text(Formatters.timeText(item.time))
                         .font(.caption2)
@@ -89,6 +94,29 @@ struct ExchangeDynamicView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(RoundedRectangle(cornerRadius: 16).fill(Theme.cardBg))
         .overlay(RoundedRectangle(cornerRadius: 16).stroke(Theme.divider, lineWidth: 1))
+
+        // 非系统动态：点击查看作者资料（支持私聊）
+        if item.isSystemPost {
+            return AnyView(card)
+        }
+        if let author = author(of: item) {
+            return AnyView(
+                NavigationLink(destination: UserProfileView(user: author)) {
+                    card
+                }
+                .buttonStyle(.plain)
+            )
+        }
+        return AnyView(card)
+    }
+
+    /// 从用户列表解析动态作者（找不到则返回 nil，卡片不可点击）
+    private func author(of item: DynamicModel) -> UserModel? {
+        if let userId = item.userId,
+           let user = store.allUsers.first(where: { $0.id == userId }) {
+            return user
+        }
+        return store.allUsers.first(where: { $0.userName == item.authorName })
     }
 
     private var composeSheet: some View {

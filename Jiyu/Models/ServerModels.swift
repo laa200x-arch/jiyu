@@ -177,6 +177,7 @@ struct ServerMessage: Decodable {
 
 struct ServerDynamic: Decodable {
     let id: String
+    let userId: String
     let authorName: String
     let avatarSymbol: String
     let content: String
@@ -302,6 +303,8 @@ extension ChatMessage {
 extension DynamicModel {
     init(server: ServerDynamic) {
         self.init(
+            id: UUID(serverID: server.id),
+            userId: UUID(serverID: server.userId),
             authorName: server.authorName,
             avatarSymbol: server.avatarSymbol,
             content: server.content,
