@@ -18,3 +18,7 @@ build/
 
 # 绯荤粺
 Thumbs.db
+
+# 调试临时文件
+run.html
+logs.txt
