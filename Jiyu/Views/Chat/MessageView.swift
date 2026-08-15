@@ -110,9 +110,23 @@ struct ChatDetailView: View {
                 inputBar(conversation)
             } else {
                 Spacer()
-                Text("无法创建会话")
+                VStack(spacing: 12) {
+                    Text("无法创建会话，请检查网络后重试")
+                        .font(.caption)
+                        .foregroundStyle(Theme.textSecondary)
+                    Button("重试") {
+                        Task {
+                            isLoading = true
+                            await loadConversation()
+                        }
+                    }
                     .font(.caption)
-                    .foregroundStyle(Theme.textSecondary)
+                    .bold()
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 8)
+                    .background(Capsule().fill(Theme.primary))
+                }
                 Spacer()
             }
         }

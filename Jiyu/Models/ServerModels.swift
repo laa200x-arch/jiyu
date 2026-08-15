@@ -111,10 +111,12 @@ extension ExchangeStatus {
 // MARK: - 服务端 id ↔ 本地 UUID 确定性映射
 
 extension UUID {
-    /// 服务端数字 id → 稳定 UUID（"00000000-0000-0000-0000-" + 12 位补零）
+    /// 服务端数字 id → 稳定 UUID（"00000000-0000-0000-0000-" + 12 位**前导**补零）
+    /// 注意：不能用 String.padding（它是在末尾补字符），必须手动前导补零
     init(serverID: String) {
         let digits = serverID.filter { $0.isNumber }
-        let padded = String(digits.padding(toLength: 12, withPad: "0", startingAt: 0).suffix(12))
+        let trimmed = digits.count > 12 ? String(digits.suffix(12)) : digits
+        let padded = String(repeating: "0", count: max(0, 12 - trimmed.count)) + trimmed
         self = UUID(uuidString: "00000000-0000-0000-0000-\(padded)") ?? UUID()
     }
 

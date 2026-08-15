@@ -166,8 +166,8 @@ final class MockDataStore: ObservableObject {
         messagesByConversation[conversationID] ?? []
     }
 
-    /// 获取与某用户的会话（服务端模式：优先走服务器，不存在则创建；失败回退本地）
-    func openConversation(with partner: UserModel) async -> Conversation {
+    /// 获取与某用户的会话（服务端模式：优先走服务器，失败返回 nil 由界面提示重试；演示模式：本地创建）
+    func openConversation(with partner: UserModel) async -> Conversation? {
         if let existing = conversations.first(where: { $0.partner.id == partner.id }) {
             return existing
         }
@@ -180,8 +180,8 @@ final class MockDataStore: ObservableObject {
                 }
                 return convo
             } catch {
-                // 服务器不可用时回退本地会话
                 print("[store] openConversation 失败: \(error)")
+                return nil
             }
         }
         let convo = Conversation(
