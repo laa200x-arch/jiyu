@@ -49,7 +49,7 @@ jobs:
       - name: 打包 .ipa
         run: |
           mkdir -p Payload
-          cp -R "build/Build/Products/Release-iphoneos/技遇.app" "Payload/技遇.app"
+          cp -R "build/Build/Products/Release-iphoneos/Jiyu.app" "Payload/Jiyu.app"
           zip -qry Jiyu-unsigned.ipa Payload
           ls -lh Jiyu-unsigned.ipa
 

@@ -15,7 +15,7 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "A00000000000000000000401"
-               BuildableName = "技遇.app"
+               BuildableName = "Jiyu.app"
                BlueprintName = "Jiyu"
                ReferencedContainer = "container:Jiyu.xcodeproj">
             </BuildableReference>
