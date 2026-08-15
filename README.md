@@ -17,6 +17,34 @@
 > ⚠️ 本工程当前使用 `MockDataStore`（内存示例数据）运行，不依赖任何后端。
 > 后端（Node.js + Express + MySQL + Socket.io）接口接入点已在代码注释中标注。
 
+### 真机测试（在自己 iPhone 上运行）
+
+**方式 A：有 Mac（免费，最推荐）**
+1. Mac 安装 Xcode（App Store 免费），拷贝本目录到 Mac，打开 `Jiyu.xcodeproj`
+2. 用数据线连接 iPhone，iPhone 上点「信任此电脑」
+3. Xcode：Signing & Capabilities → 勾选 Automatically manage signing → Team 选择自己的 Apple ID（免费账号即可，Xcode 会提示 Add an Account）
+4. 顶部运行目标从模拟器切换为你的 iPhone，点 Run → 首次安装需在 iPhone 设置 → 通用 → VPN与设备管理 → 信任开发者证书
+5. 免费个人签名有效期 **7 天**，到期后在 Xcode 重新 Run 一次即可续期
+
+**方式 B：没有 Mac（免费，Windows + 云端打包）**
+1. 在 GitHub 创建仓库，推送到 GitHub（三条命令见下方「推送命令」）
+2. 仓库 Actions 页 → 左侧 **Build IPA** → **Run workflow**（约 5-10 分钟），完成后下载 Artifacts 里的 `Jiyu-unsigned.ipa`
+3. Windows 安装 [Sideloadly](https://sideloadly.io/)（免费）→ iPhone 数据线连接电脑并「信任」
+4. Sideloadly 中拖入 .ipa → 输入你的 Apple ID → Start（首次需在 iPhone 设置里开启 **开发者模式**：设置 → 隐私与安全性 → 开发者模式）
+5. 免费签名同样 7 天有效，到期重装一次即可
+
+**方式 C：TestFlight 内测（正式分发，需 $99/年开发者账号）**
+1. Mac + Xcode：Product → Archive → Distribute App → App Store Connect
+2. 在 App Store Connect 添加 TestFlight 测试员，最多 100 人，90 天有效期
+
+### 推送命令（触发云端打包）
+
+```bash
+git remote add origin https://github.com/<你的用户名>/<仓库名>.git
+git branch -M main
+git push -u origin main
+```
+
 ## 二、方案落地对照表
 
 | 方案章节 | 模块 | 落地文件 |
