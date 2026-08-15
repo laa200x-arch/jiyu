@@ -17,6 +17,12 @@ struct JiyuApp: App {
                 }
             }
             .environmentObject(appState)
+            .task {
+                // 有持久化 Token 时自动登录并拉取账号数据
+                if appState.isLoggedIn {
+                    await MockDataStore.shared.autoLogin()
+                }
+            }
         }
     }
 }

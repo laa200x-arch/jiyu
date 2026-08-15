@@ -4,12 +4,14 @@ import SwiftUI
 /// 技能档案 / 认证 / 信用分 / 曝光服务 / 我的互换（协议+评价入口）/ 协议与风控规则
 struct MineView: View {
     @EnvironmentObject private var store: MockDataStore
+    @EnvironmentObject private var appState: AppState
 
     @State private var showEdit = false
     @State private var showExposure = false
     @State private var showProtocol = false
     @State private var showRules = false
     @State private var showEvaluate: ExchangeRecord?
+    @State private var showLogoutConfirm = false
     @State private var showAlert = false
     @State private var alertTitle = ""
     @State private var alertMessage = ""
@@ -313,10 +315,22 @@ struct MineView: View {
                 alertMessage = "技遇 —— 纯公益、无金钱交易的技能互换平台。以技能换技能，用自己的特长兑换他人专长，零成本提升自我。"
                 showAlert = true
             }
+            Divider().padding(.leading, 40)
+            toolRow(icon: "arrow.left.arrow.right.circle", title: "切换账号 / 退出登录") {
+                showLogoutConfirm = true
+            }
         }
         .padding(.horizontal, 14)
         .background(RoundedRectangle(cornerRadius: 16).fill(Theme.cardBg))
         .overlay(RoundedRectangle(cornerRadius: 16).stroke(Theme.divider, lineWidth: 1))
+        .confirmationDialog("退出当前账号？", isPresented: $showLogoutConfirm, titleVisibility: .visible) {
+            Button("退出登录（\(store.currentUser.userName)）", role: .destructive) {
+                appState.logout()
+            }
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text("退出后将返回登录页，可选择其他账号登录")
+        }
     }
 
     private func toolRow(icon: String, title: String, action: @escaping () -> Void) -> some View {

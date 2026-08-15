@@ -66,6 +66,17 @@ final class MockDataStore: ObservableObject {
         try await activateServerSession(user)
     }
 
+    /// 自动登录：App 启动时若存在持久化 Token，从服务器拉取该账号数据（修复重启后回到演示账号的问题）
+    func autoLogin() async {
+        guard TokenStore.token != nil else { return }
+        do {
+            let user = try await APIClient.shared.fetchMe()
+            try await activateServerSession(user)
+        } catch {
+            // 网络异常时保留演示数据，用户可在「我的 → 切换账号」重新登录
+        }
+    }
+
     private func activateServerSession(_ user: ServerUser) async throws {
         serverUserID = user.id
         currentUser = UserModel(server: user)
@@ -423,17 +434,18 @@ final class MockDataStore: ObservableObject {
 
     // MARK: - 互换动态（方案 2.3.6 动态区风控）
 
-    /// 发布动态（服务端模式：服务端风控）
+    /// 发布动态（服务端模式：服务端风控，支持图片）
     @discardableResult
-    func postDynamic(content: String) async -> MessageSendResult {
+    func postDynamic(content: String, imageBase64: String? = nil) async -> MessageSendResult {
         if isServerMode {
             do {
-                try await APIClient.shared.postDynamic(content: content)
+                try await APIClient.shared.postDynamic(content: content, imageBase64: imageBase64)
                 dynamics.insert(
                     DynamicModel(
                         authorName: currentUser.userName,
                         avatarSymbol: currentUser.avatarSymbol,
                         content: content,
+                        imageBase64: imageBase64,
                         time: Date(),
                         isSystemPost: false
                     ),
@@ -451,6 +463,7 @@ final class MockDataStore: ObservableObject {
                 authorName: currentUser.userName,
                 avatarSymbol: currentUser.avatarSymbol,
                 content: content,
+                imageBase64: imageBase64,
                 time: Date(),
                 isSystemPost: false
             ),

@@ -1,12 +1,16 @@
 import SwiftUI
+import PhotosUI
 
 /// 互换动态（方案 2.3.3/2.3.6）
-/// 动态区同样受文本风控：发布含金钱交易词的内容会被拦截
+/// 动态区同样受文本风控：发布含金钱交易词的内容会被拦截；支持上传本地图片
 struct ExchangeDynamicView: View {
     @EnvironmentObject private var store: MockDataStore
 
     @State private var showCompose = false
     @State private var draft = ""
+    @State private var pickerItem: PhotosPickerItem?
+    @State private var selectedImage: UIImage?
+    @State private var imageBase64: String?
     @State private var showAlert = false
     @State private var alertTitle = ""
     @State private var alertMessage = ""
@@ -69,6 +73,16 @@ struct ExchangeDynamicView: View {
                     .font(.subheadline)
                     .foregroundStyle(Theme.textPrimary)
                     .lineSpacing(3)
+                if let imageBase64 = item.imageBase64,
+                   let imageData = Data(base64Encoded: imageBase64),
+                   let uiImage = UIImage(data: imageData) {
+                    Image(uiImage: uiImage)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 180)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
             }
         }
         .padding(14)
@@ -88,6 +102,34 @@ struct ExchangeDynamicView: View {
                     .padding(8)
                     .background(RoundedRectangle(cornerRadius: 10).fill(Theme.bg))
                     .overlay(RoundedRectangle(cornerRadius: 10).stroke(Theme.divider, lineWidth: 1))
+                HStack(spacing: 12) {
+                    PhotosPicker(selection: $pickerItem, matching: .images) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "photo.on.rectangle")
+                            Text(selectedImage == nil ? "添加图片" : "更换图片")
+                        }
+                        .font(.caption)
+                        .foregroundStyle(Theme.primary)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(Capsule().fill(Theme.primary.opacity(0.10)))
+                    }
+                    if let selectedImage {
+                        Image(uiImage: selectedImage)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 56, height: 56)
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                        Button {
+                            pickerItem = nil
+                            selectedImage = nil
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundStyle(Theme.textSecondary)
+                        }
+                    }
+                    Spacer()
+                }
                 Label("禁止发布任何收费、交易、接单等商业信息，发布内容将自动经过平台风控审核",
                       systemImage: "exclamationmark.shield.fill")
                     .font(.caption2)
@@ -101,11 +143,11 @@ struct ExchangeDynamicView: View {
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 12)
                         .background(Capsule().fill(
-                            draft.trimmingCharacters(in: .whitespaces).isEmpty
+                            draft.trimmingCharacters(in: .whitespaces).isEmpty && selectedImage == nil
                                 ? Theme.primary.opacity(0.4) : Theme.primary
                         ))
                 }
-                .disabled(draft.trimmingCharacters(in: .whitespaces).isEmpty)
+                .disabled(draft.trimmingCharacters(in: .whitespaces).isEmpty && selectedImage == nil)
                 Spacer()
             }
             .padding(16)
@@ -115,20 +157,47 @@ struct ExchangeDynamicView: View {
                     Button("取消") { showCompose = false }
                 }
             }
+            .onChange(of: pickerItem) { _ in
+                Task {
+                    guard let pickerItem else { return }
+                    if let data = try? await pickerItem.loadTransferable(type: Data.self),
+                       let image = UIImage(data: data) {
+                        selectedImage = downscale(image)
+                        imageBase64 = selectedImage?.jpegData(compressionQuality: 0.7)?
+                            .base64EncodedString()
+                    }
+                }
+            }
+        }
+    }
+
+    /// 压缩图片至最长边 1024px（控制上传体积）
+    private func downscale(_ image: UIImage) -> UIImage {
+        let maxSide: CGFloat = 1024
+        let size = image.size
+        guard max(size.width, size.height) > maxSide else { return image }
+        let scale = maxSide / max(size.width, size.height)
+        let newSize = CGSize(width: size.width * scale, height: size.height * scale)
+        let renderer = UIGraphicsImageRenderer(size: newSize)
+        return renderer.image { _ in
+            image.draw(in: CGRect(origin: .zero, size: newSize))
         }
     }
 
     private func publish() {
         let content = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !content.isEmpty else { return }
+        guard !content.isEmpty || selectedImage != nil else { return }
         Task {
-            let result = await store.postDynamic(content: content)
+            let result = await store.postDynamic(content: content, imageBase64: imageBase64)
             if case .blocked(let warning) = result {
                 alertTitle = "风控拦截"
                 alertMessage = warning
                 showAlert = true
             } else {
                 draft = ""
+                pickerItem = nil
+                selectedImage = nil
+                imageBase64 = nil
                 showCompose = false
             }
         }

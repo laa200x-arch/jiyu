@@ -146,6 +146,7 @@ export function socialRouter(db, io) {
         authorName: row.nickname,
         avatarSymbol: row.avatar_symbol,
         content: row.content,
+        imageBase64: row.image_base64 || null,
         time: row.created_at,
         isSystemPost: !!row.is_system_post
       }))
@@ -154,13 +155,17 @@ export function socialRouter(db, io) {
 
   router.post('/dynamics', (req, res) => {
     const content = String(req.body?.content || '').trim()
-    if (!content) return res.status(400).json({ error: '内容不能为空' })
+    const imageBase64 = req.body?.imageBase64 ? String(req.body.imageBase64) : null
+    if (!content && !imageBase64) return res.status(400).json({ error: '内容不能为空' })
+    if (imageBase64 && imageBase64.length > 3_000_000) {
+      return res.status(400).json({ error: '图片过大，请压缩后重试' })
+    }
     const risk = checkTextRisk(content)
     if (risk.isIllegal) {
       return res.status(403).json({ error: risk.warning, matchedWords: risk.matchedWords, blocked: true })
     }
-    db.run('INSERT INTO dynamics (user_id, content, is_system_post, created_at) VALUES (?,?,?,?)',
-      [req.userId, content, 0, now()])
+    db.run('INSERT INTO dynamics (user_id, content, image_base64, is_system_post, created_at) VALUES (?,?,?,?,?)',
+      [req.userId, content, imageBase64, 0, now()])
     res.status(201).json({ ok: true })
   })
 

@@ -75,6 +75,7 @@ CREATE TABLE IF NOT EXISTS dynamics (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id INTEGER NOT NULL,
   content TEXT NOT NULL,
+  image_base64 TEXT,
   is_system_post INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL
 );
@@ -171,6 +172,7 @@ CREATE TABLE IF NOT EXISTS dynamics (
   id INT AUTO_INCREMENT PRIMARY KEY,
   user_id INT NOT NULL,
   content TEXT NOT NULL,
+  image_base64 LONGTEXT NULL,
   is_system_post TINYINT(1) NOT NULL DEFAULT 0,
   created_at DATETIME NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

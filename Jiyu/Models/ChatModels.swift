@@ -40,6 +40,7 @@ struct DynamicModel: Codable, Identifiable, Hashable {
     var authorName: String
     var avatarSymbol: String
     var content: String
+    var imageBase64: String?
     var time: Date
     var isSystemPost: Bool
 
@@ -48,6 +49,7 @@ struct DynamicModel: Codable, Identifiable, Hashable {
         authorName: String,
         avatarSymbol: String,
         content: String,
+        imageBase64: String? = nil,
         time: Date = Date(),
         isSystemPost: Bool = false
     ) {
@@ -55,6 +57,7 @@ struct DynamicModel: Codable, Identifiable, Hashable {
         self.authorName = authorName
         self.avatarSymbol = avatarSymbol
         self.content = content
+        self.imageBase64 = imageBase64
         self.time = time
         self.isSystemPost = isSystemPost
     }

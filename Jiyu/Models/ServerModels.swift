@@ -180,6 +180,7 @@ struct ServerDynamic: Decodable {
     let authorName: String
     let avatarSymbol: String
     let content: String
+    let imageBase64: String?
     let time: Date
     let isSystemPost: Bool
 }
@@ -298,6 +299,7 @@ extension DynamicModel {
             authorName: server.authorName,
             avatarSymbol: server.avatarSymbol,
             content: server.content,
+            imageBase64: server.imageBase64,
             time: server.time,
             isSystemPost: server.isSystemPost
         )

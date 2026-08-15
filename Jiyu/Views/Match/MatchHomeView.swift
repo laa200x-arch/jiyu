@@ -7,6 +7,7 @@ struct MatchHomeView: View {
     @State private var keyword = ""
     @State private var typeFilter: ExchangeType?
     @State private var nearbyOnly = false
+    @State private var showMap = false
 
     private var results: [SkillMatchResult] {
         store.matches(filters: MatchFilters(
@@ -45,6 +46,19 @@ struct MatchHomeView: View {
         .background(Theme.bg)
         .navigationTitle("技能匹配")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button {
+                    showMap = true
+                } label: {
+                    Image(systemName: "map")
+                }
+                .accessibilityLabel("同城地图")
+            }
+        }
+        .sheet(isPresented: $showMap) {
+            MatchMapView(results: results)
+        }
     }
 
     private var header: some View {

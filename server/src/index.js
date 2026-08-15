@@ -21,12 +21,16 @@ async function main() {
   const db = await initDb()
   // 建表
   db.exec(config.dbDriver === 'mysql' ? MYSQL_DDL : SQLITE_DDL)
+  // 轻量迁移：为已存在的 dynamics 表补充 image_base64 列（重复执行无副作用）
+  try {
+    db.exec('ALTER TABLE dynamics ADD COLUMN image_base64 TEXT')
+  } catch { /* 列已存在 */ }
   // 演示数据
   if (config.autoSeed) await seed(db)
 
   const app = express()
   app.use(cors())
-  app.use(express.json({ limit: '1mb' }))
+  app.use(express.json({ limit: '5mb' }))
 
   // 健康检查
   app.get('/api/health', (req, res) => {

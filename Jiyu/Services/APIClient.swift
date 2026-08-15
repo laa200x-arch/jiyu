@@ -114,6 +114,11 @@ final class APIClient {
 
     // MARK: - 用户与匹配
 
+    func fetchMe() async throws -> ServerUser {
+        let response: UserResponse = try await request("/api/me")
+        return response.user
+    }
+
     func fetchUsers() async throws -> [ServerUser] {
         let response: UsersResponse = try await request("/api/users")
         return response.users
@@ -157,8 +162,10 @@ final class APIClient {
         return response.dynamics
     }
 
-    func postDynamic(content: String) async throws {
-        let _: OkResponse = try await request("/api/dynamics", method: "POST", body: ["content": content])
+    func postDynamic(content: String, imageBase64: String? = nil) async throws {
+        var body: [String: Any] = ["content": content]
+        if let imageBase64 { body["imageBase64"] = imageBase64 }
+        let _: OkResponse = try await request("/api/dynamics", method: "POST", body: body)
     }
 
     // MARK: - 协议与互换
