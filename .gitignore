@@ -27,3 +27,6 @@ logs.txt
 server/node_modules/
 server/data/
 server/.env
+
+# 部署工具（含服务器凭据，绝不提交）
+.deploy/
