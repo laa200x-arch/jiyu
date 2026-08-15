@@ -30,3 +30,4 @@ server/.env
 
 # 部署工具（含服务器凭据，绝不提交）
 .deploy/
+.tmp-validate/
