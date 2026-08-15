@@ -33,7 +33,9 @@ export function setupSocket(httpServer, db, chatApi) {
 
     // 实时发送消息（走与 REST 相同风控与落库）
     socket.on('chat:send', ({ conversationId, text }, ack) => {
+      console.log(`[socket] user=${userId} chat:send conv=${conversationId} text="${String(text).slice(0, 20)}"`)
       const result = chatApi.saveMessage(userId, conversationId, text)
+      console.log(`[socket] user=${userId} chat:send 结果: ${result.error || (result.blocked ? 'blocked' : 'ok')}`)
       if (ack) ack({ ok: !result.error && !result.blocked, ...result })
     })
 

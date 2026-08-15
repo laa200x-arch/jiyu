@@ -155,6 +155,12 @@ final class APIClient {
         let _: OkResponse = try await request("/api/conversations/\(conversationId)/read", method: "POST")
     }
 
+    /// REST 发送消息（Socket 失败时的兜底通道，服务端同一套风控）
+    func sendMessage(conversationId: String, text: String) async throws -> MessageSendResponse {
+        try await request("/api/messages", method: "POST",
+            body: ["conversationId": conversationId, "text": text])
+    }
+
     // MARK: - 动态
 
     func fetchDynamics() async throws -> [ServerDynamic] {

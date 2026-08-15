@@ -248,8 +248,11 @@ struct ChatDetailView: View {
         inputText = ""
         Task {
             let result = await store.sendMessage(conversationID: conversation.id, text: text)
-            if case .blocked(let warning) = result {
+            switch result {
+            case .blocked(let warning), .failed(let warning):
                 blockedBanner = warning
+            case .sent:
+                break
             }
             if store.isServerMode {
                 await store.loadMessages(conversationID: conversation.id)

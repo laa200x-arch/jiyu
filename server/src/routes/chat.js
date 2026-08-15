@@ -41,6 +41,7 @@ export function chatRouter(db, bus = { io: null }) {
   // 打开/创建与某用户的会话
   router.post('/conversations/open', (req, res) => {
     const { partnerId } = req.body || {}
+    console.log(`[chat] user=${req.userId} openConversation partner=${partnerId}`)
     if (!partnerId) return res.status(400).json({ error: 'partnerId 必填' })
     const partner = db.get('SELECT * FROM users WHERE id = ?', [partnerId])
     if (!partner) return res.status(404).json({ error: '用户不存在' })

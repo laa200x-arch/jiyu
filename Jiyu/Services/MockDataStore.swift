@@ -6,10 +6,11 @@ enum SkillKind {
     case want
 }
 
-/// 消息发送结果（用于 UI 展示风控拦截）
+/// 消息发送结果（用于 UI 展示风控拦截 / 发送失败）
 enum MessageSendResult: Equatable {
     case sent
     case blocked(warning: String)
+    case failed(warning: String)
 }
 
 /// 全局数据层（方案 4.2 数据层）
@@ -180,6 +181,7 @@ final class MockDataStore: ObservableObject {
                 return convo
             } catch {
                 // 服务器不可用时回退本地会话
+                print("[store] openConversation 失败: \(error)")
             }
         }
         let convo = Conversation(
@@ -223,22 +225,32 @@ final class MockDataStore: ObservableObject {
     }
 
     /// 发送消息（前置风控拦截，方案 2.3.6）
-    /// 服务端模式：Socket.io 实时发送（服务端风控），演示模式：本地风控
+    /// 服务端模式：Socket.io 实时发送（服务端风控），失败自动 REST 兜底保证必达
     @discardableResult
     func sendMessage(conversationID: UUID, text: String) async -> MessageSendResult {
-        if isServerMode, let serverID = conversationID.serverIDString {
-            return await withCheckedContinuation { continuation in
-                RealtimeClient.shared.send(conversationId: serverID, text: text) { ok, blocked, warning in
-                    Task { @MainActor in
-                        if blocked {
-                            continuation.resume(returning: .blocked(warning: warning ?? "内容违规，已被拦截"))
-                        } else if ok {
-                            continuation.resume(returning: .sent)
-                        } else {
-                            continuation.resume(returning: .blocked(warning: warning ?? "发送失败，请重试"))
-                        }
-                    }
+        if isServerMode {
+            guard let serverID = conversationID.serverIDString else {
+                return .failed(warning: "会话未同步，请返回消息列表重新进入")
+            }
+            // 1) Socket 实时发送
+            let socketResult = await sendViaSocket(serverID: serverID, text: text)
+            switch socketResult {
+            case .sent:
+                return .sent
+            case .blocked(let warning):
+                return .blocked(warning: warning)
+            case .failed:
+                break // 连接类失败 → REST 兜底
+            }
+            // 2) REST 兜底（服务端同一套风控与落库，消息必达服务器）
+            do {
+                let response = try await APIClient.shared.sendMessage(conversationId: serverID, text: text)
+                if response.blocked == true {
+                    return .blocked(warning: response.warning ?? "内容违规，已被拦截")
                 }
+                return .sent
+            } catch {
+                return .failed(warning: (error as? LocalizedError)?.errorDescription ?? "发送失败，请重试")
             }
         }
 
@@ -258,6 +270,23 @@ final class MockDataStore: ObservableObject {
         appendMessage(conversationID, msg)
         updateConversationPreview(conversationID, text: text, time: msg.time)
         return .sent
+    }
+
+    /// Socket 实时发送（失败返回 .failed，由调用方决定 REST 兜底）
+    private func sendViaSocket(serverID: String, text: String) async -> MessageSendResult {
+        await withCheckedContinuation { continuation in
+            RealtimeClient.shared.send(conversationId: serverID, text: text) { ok, blocked, warning in
+                Task { @MainActor in
+                    if blocked {
+                        continuation.resume(returning: .blocked(warning: warning ?? "内容违规，已被拦截"))
+                    } else if ok {
+                        continuation.resume(returning: .sent)
+                    } else {
+                        continuation.resume(returning: .failed(warning: warning ?? "发送失败，请重试"))
+                    }
+                }
+            }
+        }
     }
 
     /// 实时消息处理（服务端 chat:message 广播 + 本地通知）
