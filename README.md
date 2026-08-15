@@ -93,6 +93,10 @@ exchange/
 │   │   ├── Evaluate/          # 双向互评
 │   │   └── Components/        # 通用组件
 │   └── Assets.xcassets/       # AppIcon（已生成）/ AccentColor
+├── server/                    # 后端服务（Node.js + Express + MySQL/SQLite + Socket.io）
+│   ├── src/                   # 路由/匹配算法/风控/聊天/推送（32 项测试全部通过）
+│   ├── test/smoke.mjs         # 端到端冒烟测试
+│   └── README.md              # 启动/部署/API 文档
 ├── docs/
 │   └── 方案文档.md            # 原始落地方案全文
 └── README.md

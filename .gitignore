@@ -22,3 +22,8 @@ Thumbs.db
 # 调试临时文件
 run.html
 logs.txt
+
+# 后端
+server/node_modules/
+server/data/
+server/.env

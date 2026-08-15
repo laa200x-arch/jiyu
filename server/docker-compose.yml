@@ -1,0 +1,22 @@
+# 技遇后端 MySQL（生产数据库）
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: jiyu-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root123456
+      MYSQL_DATABASE: jiyu
+      MYSQL_USER: jiyu
+      MYSQL_PASSWORD: jiyu123456
+      TZ: Asia/Shanghai
+    ports:
+      - "3306:3306"
+    volumes:
+      - jiyu-mysql-data:/var/lib/mysql
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+
+volumes:
+  jiyu-mysql-data:
