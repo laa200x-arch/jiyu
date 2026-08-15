@@ -342,7 +342,7 @@ final class MockDataStore: ObservableObject {
     private func seedData() {
         let linXiao = allUsers[0]   // 林晓
         let zhouKe = allUsers[4]    // 周可
-        let miLi = allUsers[9]      // 米粒
+        let miLi = allUsers[8]      // 米粒
 
         // 会话与消息（含一条风控拦截系统提示，演示方案 2.3.6）
         let convo1 = Conversation(id: UUID(uuidString: "10000000-0000-0000-0000-000000000001")!,
