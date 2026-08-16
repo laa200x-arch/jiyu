@@ -70,18 +70,36 @@ export function chatRouter(db, bus = { io: null }) {
     })
   })
 
-  // 历史消息
+  // 历史消息（分页：limit 默认最近 50 条；before 加载更早）
   router.get('/conversations/:id/messages', (req, res) => {
     const convo = db.get('SELECT * FROM conversations WHERE id = ?', [req.params.id])
     if (!convo || (convo.user_a !== req.userId && convo.user_b !== req.userId)) {
       return res.status(404).json({ error: '会话不存在' })
     }
-    const rows = db.all('SELECT * FROM messages WHERE conversation_id = ? ORDER BY id ASC', [convo.id])
+    const limit = Math.min(Number(req.query.limit) || 50, 200)
+    const before = req.query.before ? Number(req.query.before) : null
+    let rows
+    if (before) {
+      rows = db.all(
+        'SELECT * FROM messages WHERE conversation_id = ? AND id < ? ORDER BY id DESC LIMIT ?',
+        [convo.id, before, limit]
+      ).reverse()
+    } else {
+      rows = db.all(
+        'SELECT * FROM messages WHERE conversation_id = ? ORDER BY id DESC LIMIT ?',
+        [convo.id, limit]
+      ).reverse()
+    }
+    const oldestId = rows.length > 0 ? rows[0].id : null
+    const hasMore = oldestId
+      ? db.get('SELECT COUNT(*) AS c FROM messages WHERE conversation_id = ? AND id < ?', [convo.id, oldestId]).c > 0
+      : false
     res.json({
       messages: rows.map((row) => serializeMessage({
         ...row,
         sender_is_me: row.sender_id === req.userId
-      }))
+      })),
+      hasMore
     })
   })
 

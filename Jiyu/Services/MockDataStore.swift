@@ -40,6 +40,8 @@ final class MockDataStore: ObservableObject {
 
     /// 会话消息缓存（@Published：消息加载完成后驱动聊天界面重绘）
     @Published private var messagesByConversation: [UUID: [ChatMessage]] = [:]
+    /// 会话是否还有更早消息（分页加载）
+    @Published private var hasMoreByConversation: [UUID: Bool] = [:]
     private var evaluationsByUser: [UUID: [EvaluateModel]] = [:]
 
     var isServerMode: Bool { serverUserID != nil }
@@ -255,12 +257,35 @@ final class MockDataStore: ObservableObject {
         return convo
     }
 
-    /// 拉取会话历史消息（服务端模式）
+    /// 拉取会话历史消息（服务端模式，默认最近 50 条）
     func loadMessages(conversationID: UUID) async {
         guard isServerMode, let serverID = conversationID.serverIDString else { return }
         do {
-            let serverMessages = try await APIClient.shared.fetchMessages(conversationId: serverID)
+            let (serverMessages, hasMore) = try await APIClient.shared.fetchMessages(conversationId: serverID)
             messagesByConversation[conversationID] = serverMessages.map { ChatMessage(server: $0) }
+            hasMoreByConversation[conversationID] = hasMore
+        } catch {
+            // 保留现有消息
+        }
+    }
+
+    /// 会话是否还有更早消息（聊天页显示「加载更早消息」按钮）
+    func hasMoreMessages(for conversationID: UUID) -> Bool {
+        hasMoreByConversation[conversationID] ?? false
+    }
+
+    /// 加载更早消息（分页，插入到现有消息之前）
+    func loadEarlierMessages(conversationID: UUID) async {
+        guard isServerMode, let serverID = conversationID.serverIDString else { return }
+        let existing = messagesByConversation[conversationID] ?? []
+        guard let oldest = existing.first, let oldestServerID = oldest.id.serverIDString else { return }
+        do {
+            let (serverMessages, hasMore) = try await APIClient.shared.fetchMessages(
+                conversationId: serverID, before: oldestServerID
+            )
+            let earlier = serverMessages.map { ChatMessage(server: $0) }
+            messagesByConversation[conversationID] = earlier + existing
+            hasMoreByConversation[conversationID] = hasMore
         } catch {
             // 保留现有消息
         }

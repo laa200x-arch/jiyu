@@ -5,6 +5,9 @@ import SwiftUI
 struct ContentView: View {
     @State private var tabIndex = 0
     @State private var updateInfo: ServerVersion?
+    @AppStorage("jiyu.syncHistory") private var syncHistory = true
+    @AppStorage("jiyu.syncHistoryChosen") private var syncChosen = false
+    @State private var showSyncChoice = false
 
     var body: some View {
         TabView(selection: $tabIndex) {
@@ -43,6 +46,22 @@ struct ContentView: View {
         .tint(Theme.primary)
         .task {
             await checkForUpdate()
+            // 首次登录后询问聊天记录同步方式（之后可在「我的 → 设置」修改）
+            if TokenStore.token != nil && !syncChosen {
+                showSyncChoice = true
+            }
+        }
+        .alert("同步聊天记录", isPresented: $showSyncChoice) {
+            Button("自动加载历史记录（推荐）") {
+                syncHistory = true
+                syncChosen = true
+            }
+            Button("不自动加载，仅新消息") {
+                syncHistory = false
+                syncChosen = true
+            }
+        } message: {
+            Text("不同设备登录同一账号时，可同步之前的聊天记录。你可以随时在「我的 → 聊天记录同步」中修改。")
         }
         .alert(
             "发现新版本 \(updateInfo?.current ?? "")",

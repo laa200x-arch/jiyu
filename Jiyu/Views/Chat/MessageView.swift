@@ -102,6 +102,8 @@ struct ChatDetailView: View {
     @State private var audioRecorder: AVAudioRecorder?
     @State private var audioPlayer: AVAudioPlayer?
     @State private var playingAudioURL: URL?
+    // 聊天记录同步开关（不同设备登录同一账号可同步历史聊天；关闭则不自动加载历史）
+    @AppStorage("jiyu.syncHistory") private var syncHistory = true
     @FocusState private var inputFocused: Bool
 
     init(conversation: Conversation) {
@@ -186,7 +188,10 @@ struct ChatDetailView: View {
         }
         if let conversation {
             store.markConversationRead(conversation.id)
-            await store.loadMessages(conversationID: conversation.id)
+            // 按「聊天记录同步」设置决定是否自动加载历史消息
+            if syncHistory {
+                await store.loadMessages(conversationID: conversation.id)
+            }
         }
     }
 
@@ -196,6 +201,19 @@ struct ChatDetailView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(spacing: 8) {
+                    // 分页加载更早消息（不同设备同步的历史记录）
+                    if store.hasMoreMessages(for: conversation.id) {
+                        Button {
+                            Task {
+                                await store.loadEarlierMessages(conversationID: conversation.id)
+                            }
+                        } label: {
+                            Label("加载更早消息", systemImage: "arrow.up.circle")
+                                .font(.caption)
+                                .foregroundStyle(Theme.primary)
+                                .padding(.vertical, 8)
+                        }
+                    }
                     ForEach(store.messages(for: conversation.id)) { message in
                         messageBubble(message)
                     }

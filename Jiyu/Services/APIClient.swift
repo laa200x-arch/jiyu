@@ -152,9 +152,16 @@ final class APIClient {
         return response.conversation
     }
 
-    func fetchMessages(conversationId: String) async throws -> [ServerMessage] {
-        let response: MessagesResponse = try await request("/api/conversations/\(conversationId)/messages")
-        return response.messages
+    /// 拉取会话历史消息（分页：默认最近 50 条；before 加载更早）
+    /// 返回 (消息, 是否还有更早)
+    func fetchMessages(conversationId: String, limit: Int = 50, before: String? = nil) async throws -> ([ServerMessage], Bool) {
+        var query: [String: String] = ["limit": String(limit)]
+        if let before { query["before"] = before }
+        let response: MessagesResponse = try await request(
+            "/api/conversations/\(conversationId)/messages",
+            query: query
+        )
+        return (response.messages, response.hasMore ?? false)
     }
 
     func markConversationRead(conversationId: String) async throws {

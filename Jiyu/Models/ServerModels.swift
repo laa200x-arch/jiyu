@@ -231,7 +231,10 @@ struct UsersResponse: Decodable { let users: [ServerUser] }
 struct MatchesResponse: Decodable { let matches: [ServerMatch] }
 struct ConversationsResponse: Decodable { let conversations: [ServerConversation] }
 struct ConversationResponse: Decodable { let conversation: ServerConversation }
-struct MessagesResponse: Decodable { let messages: [ServerMessage] }
+struct MessagesResponse: Decodable {
+    let messages: [ServerMessage]
+    let hasMore: Bool?
+}
 struct DynamicsResponse: Decodable { let dynamics: [ServerDynamic] }
 struct RecordsResponse: Decodable { let records: [ServerExchangeRecord] }
 struct AgreementsResponse: Decodable { let agreements: [ServerAgreement] }

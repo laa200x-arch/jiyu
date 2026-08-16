@@ -15,6 +15,7 @@ struct MineView: View {
     @State private var showAlert = false
     @State private var alertTitle = ""
     @State private var alertMessage = ""
+    @AppStorage("jiyu.syncHistory") private var syncHistory = true
 
     var body: some View {
         ScrollView {
@@ -24,6 +25,7 @@ struct MineView: View {
                 skillSection(title: "我想学", skills: store.currentUser.wantSkills, action: { showEdit = true })
                 exposureCard
                 exchangeSection
+                settingsSection
                 toolsSection
             }
             .padding(16)
@@ -300,6 +302,33 @@ struct MineView: View {
         case .completed: return Theme.success
         case .cancelled: return Theme.danger
         }
+    }
+
+    // MARK: - 设置（聊天记录同步）
+
+    private var settingsSection: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 12) {
+                Image(systemName: "clock.arrow.circlepath")
+                    .foregroundStyle(Theme.primary)
+                    .frame(width: 22)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("聊天记录同步")
+                        .font(.subheadline)
+                        .foregroundStyle(Theme.textPrimary)
+                    Text("不同设备登录同一账号可同步历史聊天；关闭后仅显示新消息")
+                        .font(.caption2)
+                        .foregroundStyle(Theme.textSecondary)
+                }
+                Spacer()
+                Toggle("", isOn: $syncHistory)
+                    .labelsHidden()
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 13)
+        }
+        .background(RoundedRectangle(cornerRadius: 16).fill(Theme.cardBg))
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Theme.divider, lineWidth: 1))
     }
 
     // MARK: - 工具
