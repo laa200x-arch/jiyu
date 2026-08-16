@@ -41,6 +41,7 @@
 		A00000000000000000000020 /* MatchMapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000011E /* MatchMapView.swift */; };
 		A00000000000000000000021 /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0000000000000000000011F /* NotificationService.swift */; };
 		A00000000000000000000022 /* UserProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000120 /* UserProfileView.swift */; };
+		A00000000000000000000023 /* LaunchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000121 /* LaunchView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -76,6 +77,7 @@
 		A0000000000000000000011E /* MatchMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MatchMapView.swift; sourceTree = "<group>"; };
 		A0000000000000000000011F /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
 		A00000000000000000000120 /* UserProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserProfileView.swift; sourceTree = "<group>"; };
+		A00000000000000000000121 /* LaunchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchView.swift; sourceTree = "<group>"; };
 		A00000000000000000000124 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A00000000000000000000125 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A00000000000000000000126 /* Jiyu.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Jiyu.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -197,6 +199,7 @@
 			isa = PBXGroup;
 			children = (
 				A0000000000000000000011D /* LoginView.swift */,
+				A00000000000000000000121 /* LaunchView.swift */,
 			);
 			path = Auth;
 			sourceTree = "<group>";
@@ -370,6 +373,7 @@
 				A00000000000000000000020 /* MatchMapView.swift in Sources */,
 				A00000000000000000000021 /* NotificationService.swift in Sources */,
 				A00000000000000000000022 /* UserProfileView.swift in Sources */,
+				A00000000000000000000023 /* LaunchView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

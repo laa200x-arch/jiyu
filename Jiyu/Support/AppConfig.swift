@@ -11,17 +11,27 @@ enum AppConfig {
 @MainActor
 final class AppState: ObservableObject {
     @Published var isLoggedIn: Bool
+    /// 启动恢复中（有 token 时先显示加载页，避免闪现演示数据）
+    @Published var isLaunching: Bool
 
     init() {
-        isLoggedIn = TokenStore.token != nil
+        let hasToken = TokenStore.token != nil
+        isLoggedIn = hasToken
+        isLaunching = hasToken
     }
 
     func loginSucceeded() {
         isLoggedIn = true
+        isLaunching = false
+    }
+
+    func finishLaunch() {
+        isLaunching = false
     }
 
     func logout() {
         MockDataStore.shared.logout()
         isLoggedIn = false
+        isLaunching = false
     }
 }

@@ -9,7 +9,9 @@ struct JiyuApp: App {
     var body: some Scene {
         WindowGroup {
             Group {
-                if appState.isLoggedIn {
+                if appState.isLaunching {
+                    LaunchView()
+                } else if appState.isLoggedIn {
                     ContentView()
                         .environmentObject(MockDataStore.shared)
                 } else {
@@ -18,9 +20,11 @@ struct JiyuApp: App {
             }
             .environmentObject(appState)
             .task {
-                // 有持久化 Token 时自动登录并拉取账号数据；token 失效则回登录页
-                if appState.isLoggedIn {
+                // 有持久化 Token：先显示加载页，恢复账号数据后再进主界面
+                // 恢复失败（token 失效/网络异常）→ 回登录页，绝不展示演示数据冒充账号
+                if appState.isLaunching {
                     let sessionOK = await MockDataStore.shared.autoLogin()
+                    appState.finishLaunch()
                     if !sessionOK {
                         appState.logout()
                     }

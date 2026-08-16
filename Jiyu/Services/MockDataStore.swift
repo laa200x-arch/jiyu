@@ -93,8 +93,8 @@ final class MockDataStore: ObservableObject {
     }
 
     /// 自动登录：App 启动时若存在持久化 Token，从服务器拉取该账号数据
-    /// - 返回 true：会话有效（或网络异常保留会话兜底）
-    /// - 返回 false：token 已失效，需要重新登录
+    /// - 返回 true：会话有效，已恢复账号数据
+    /// - 返回 false：token 失效或网络异常 → 回登录页（避免展示演示数据冒充账号）
     @discardableResult
     func autoLogin() async -> Bool {
         guard TokenStore.token != nil else { return false }
@@ -102,17 +102,12 @@ final class MockDataStore: ObservableObject {
             let user = try await APIClient.shared.fetchMe()
             try await activateServerSession(user)
             return true
-        } catch let error as APIError {
-            if error == .unauthorized {
-                // token 失效：彻底登出
-                TokenStore.token = nil
-                serverUserID = nil
-                RealtimeClient.shared.disconnect()
-                return false
-            }
-            return true // 网络异常：保留会话，演示数据兜底
         } catch {
-            return true
+            // 无论 401 还是网络异常，都回到登录页（登录页可一键重试已保存账号）
+            TokenStore.token = nil
+            serverUserID = nil
+            RealtimeClient.shared.disconnect()
+            return false
         }
     }
 
