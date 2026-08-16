@@ -119,7 +119,7 @@ export function chatRouter(db, bus = { io: null }) {
     if (convo.user_a !== senderId && convo.user_b !== senderId) {
       return { error: '无权访问该会话', status: 403 }
     }
-    const preview = content || (mediaType === 'video' ? '[视频]' : '[图片]')
+    const preview = content || (mediaType === 'video' ? '[视频]' : mediaType === 'audio' ? '[语音]' : '[图片]')
     const risk = checkTextRisk(content)
     if (risk.isIllegal) {
       // 原文不发送，追加系统提示（方案 2.3.6）

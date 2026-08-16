@@ -2,6 +2,7 @@ import SwiftUI
 import PhotosUI
 import UniformTypeIdentifiers
 import AVKit
+import AVFoundation
 
 /// 消息列表（方案 2.3.3 线上交换：内置 IM）
 struct MessageView: View {
@@ -91,6 +92,16 @@ struct ChatDetailView: View {
     @State private var pickerItem: PhotosPickerItem?
     @State private var isUploading = false
     @State private var playingItem: IdentifiableURL?
+    @State private var viewingImageItem: IdentifiableURL?
+    // 拍照
+    @State private var showCamera = false
+    @State private var capturedImage: UIImage?
+    @State private var showPhotoConfirm = false
+    // 语音
+    @State private var isRecording = false
+    @State private var audioRecorder: AVAudioRecorder?
+    @State private var audioPlayer: AVAudioPlayer?
+    @State private var playingAudioURL: URL?
     @FocusState private var inputFocused: Bool
 
     init(conversation: Conversation) {
@@ -146,6 +157,21 @@ struct ChatDetailView: View {
         .fullScreenCover(item: $playingItem) { item in
             VideoPlayerView(url: item.url)
                 .ignoresSafeArea()
+        }
+        .fullScreenCover(item: $viewingImageItem) { item in
+            ImageViewer(url: item.url)
+        }
+        .sheet(isPresented: $showCamera) {
+            CameraPicker { image in
+                capturedImage = image
+                showPhotoConfirm = true
+            }
+            .ignoresSafeArea()
+        }
+        .overlay {
+            if showPhotoConfirm, let capturedImage {
+                photoConfirmView(capturedImage)
+            }
         }
     }
 
@@ -210,11 +236,39 @@ struct ChatDetailView: View {
     private func inputBar(_ conversation: Conversation) -> some View {
         HStack(spacing: 8) {
             PhotosPicker(selection: $pickerItem, matching: .any(of: [.images, .videos])) {
-                Image(systemName: "plus.circle.fill")
-                    .font(.system(size: 26))
+                Image(systemName: "photo.on.rectangle")
+                    .font(.system(size: 20))
                     .foregroundStyle(isUploading ? Theme.textSecondary : Theme.primary)
             }
             .disabled(isUploading)
+            Menu {
+                Button {
+                    showCamera = true
+                } label: {
+                    Label("拍照", systemImage: "camera")
+                }
+                Button {
+                    toggleRecording()
+                } label: {
+                    Label(isRecording ? "停止录音并发送" : "语音消息", systemImage: "mic.fill")
+                }
+            } label: {
+                Image(systemName: isRecording ? "stop.circle.fill" : "plus.circle")
+                    .font(.system(size: 20))
+                    .foregroundStyle(isRecording ? Theme.danger : Theme.primary)
+            }
+            .disabled(isUploading)
+            if isRecording {
+                HStack(spacing: 5) {
+                    Circle().fill(Theme.danger).frame(width: 8, height: 8)
+                    Text("录音中")
+                        .font(.caption)
+                        .foregroundStyle(Theme.danger)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
+                .background(RoundedRectangle(cornerRadius: 14).fill(Theme.danger.opacity(0.10)))
+            }
             TextField("发送消息（严禁金钱交易内容）", text: $inputText, axis: .vertical)
                 .textFieldStyle(.plain)
                 .font(.subheadline)
@@ -289,29 +343,34 @@ struct ChatDetailView: View {
         }
     }
 
-    /// 媒体消息气泡（图片显示 / 视频点击播放）
+    /// 媒体消息气泡（图片点击放大 / 视频点击播放 / 语音点击播放）
     @ViewBuilder
     private func mediaBubble(mediaType: String, mediaUrl: String) -> some View {
         if let url = URL(string: AppConfig.serverBase + mediaUrl) {
             if mediaType == "image" {
-                AsyncImage(url: url) { phase in
-                    if let image = phase.image {
-                        image
-                            .resizable()
-                            .scaledToFit()
-                            .frame(maxWidth: 190)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                    } else if phase.error != nil {
-                        Image(systemName: "photo")
-                            .font(.largeTitle)
-                            .foregroundStyle(.gray)
-                            .frame(width: 120, height: 90)
-                    } else {
-                        ProgressView()
-                            .frame(width: 120, height: 90)
+                Button {
+                    viewingImageItem = IdentifiableURL(url: url)
+                } label: {
+                    AsyncImage(url: url) { phase in
+                        if let image = phase.image {
+                            image
+                                .resizable()
+                                .scaledToFit()
+                                .frame(maxWidth: 190)
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                        } else if phase.error != nil {
+                            Image(systemName: "photo")
+                                .font(.largeTitle)
+                                .foregroundStyle(.gray)
+                                .frame(width: 120, height: 90)
+                        } else {
+                            ProgressView()
+                                .frame(width: 120, height: 90)
+                        }
                     }
+                    .frame(maxWidth: 190)
                 }
-                .frame(maxWidth: 190)
+                .buttonStyle(.plain)
             } else if mediaType == "video" {
                 Button {
                     playingItem = IdentifiableURL(url: url)
@@ -329,6 +388,28 @@ struct ChatDetailView: View {
                                 .foregroundStyle(.white.opacity(0.85))
                         }
                     }
+                }
+                .buttonStyle(.plain)
+            } else if mediaType == "audio" {
+                Button {
+                    toggleAudioPlay(url: url)
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: playingAudioURL == url ? "stop.circle.fill" : "play.circle.fill")
+                            .font(.system(size: 22))
+                        Text("语音消息")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                        Image(systemName: "waveform")
+                            .font(.caption2)
+                            .opacity(0.7)
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+                    .background(
+                        RoundedRectangle(cornerRadius: 14)
+                            .fill(Color.black.opacity(0.85))
+                    )
                 }
                 .buttonStyle(.plain)
             }
@@ -412,7 +493,203 @@ struct ChatDetailView: View {
         }
     }
 
-    /// 压缩图片至最长边 1280px（控制上传体积）
+    // MARK: - 语音消息
+
+    /// 点击语音按钮：未录音则开始录音，录音中则停止并发送
+    private func toggleRecording() {
+        if isRecording {
+            stopAndSendRecording()
+        } else {
+            startRecording()
+        }
+    }
+
+    private func startRecording() {
+        let session = AVAudioSession.sharedInstance()
+        try? session.setCategory(.playAndRecord, mode: .default)
+        try? session.setActive(true)
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("voice-\(UUID().uuidString).m4a")
+        let settings: [String: Any] = [
+            AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
+            AVSampleRateKey: 44100,
+            AVNumberOfChannelsKey: 1,
+            AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue
+        ]
+        do {
+            let recorder = try AVAudioRecorder(url: url, settings: settings)
+            recorder.record()
+            audioRecorder = recorder
+            isRecording = true
+        } catch {
+            blockedBanner = "无法开始录音，请检查麦克风权限"
+        }
+    }
+
+    private func stopAndSendRecording() {
+        guard let recorder = audioRecorder else { return }
+        recorder.stop()
+        audioRecorder = nil
+        isRecording = false
+        let url = recorder.url
+        Task {
+            guard let conversation else { return }
+            guard let data = try? Data(contentsOf: url) else {
+                blockedBanner = "录音读取失败"
+                return
+            }
+            isUploading = true
+            defer { isUploading = false }
+            guard let mediaURL = try? await APIClient.shared.uploadMedia(
+                data: data, fileName: "voice.m4a", mimeType: "audio/mp4"
+            ) else {
+                blockedBanner = "语音上传失败，请检查网络"
+                return
+            }
+            let result = await store.sendMediaMessage(
+                conversationID: conversation.id, mediaType: "audio", mediaUrl: mediaURL
+            )
+            switch result {
+            case .blocked(let warning), .failed(let warning):
+                blockedBanner = warning
+            case .sent:
+                break
+            }
+            if store.isServerMode {
+                await store.loadMessages(conversationID: conversation.id)
+            }
+        }
+    }
+
+    /// 播放/停止语音（AVAudioPlayer 需本地数据，先下载）
+    private func toggleAudioPlay(url: URL) {
+        if playingAudioURL == url, let player = audioPlayer, player.isPlaying {
+            player.stop()
+            playingAudioURL = nil
+            audioPlayer = nil
+            return
+        }
+        Task {
+            guard let data = try? Data(contentsOf: url) else {
+                blockedBanner = "语音加载失败"
+                return
+            }
+            try? AVAudioSession.sharedInstance().setCategory(.playback)
+            try? AVAudioSession.sharedInstance().setActive(true)
+            if let player = try? AVAudioPlayer(data: data) {
+                audioPlayer?.stop()
+                player.play()
+                audioPlayer = player
+                playingAudioURL = url
+            } else {
+                blockedBanner = "语音播放失败"
+            }
+        }
+    }
+
+    // MARK: - 拍照发送（发送前确认）
+
+    private func photoConfirmView(_ image: UIImage) -> some View {
+        ZStack {
+            Color.black.opacity(0.55).ignoresSafeArea()
+            VStack(spacing: 16) {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFit()
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                    .padding(.horizontal, 20)
+                Text("确认发送这张照片？")
+                    .font(.headline)
+                    .foregroundStyle(.white)
+                HStack(spacing: 14) {
+                    Button {
+                        capturedImage = nil
+                        showPhotoConfirm = false
+                        showCamera = true // 重拍
+                    } label: {
+                        Text("重拍")
+                            .font(.subheadline)
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 11)
+                            .background(Capsule().fill(Color.white.opacity(0.2)))
+                    }
+                    Button {
+                        sendCapturedPhoto()
+                    } label: {
+                        Text("发送")
+                            .font(.subheadline)
+                            .bold()
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 11)
+                            .background(Capsule().fill(Theme.primary))
+                    }
+                }
+                .padding(.horizontal, 20)
+                Button {
+                    capturedImage = nil
+                    showPhotoConfirm = false
+                } label: {
+                    Text("取消")
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.8))
+                }
+            }
+            .padding(20)
+        }
+    }
+
+    private func sendCapturedPhoto() {
+        guard let image = capturedImage else { return }
+        capturedImage = nil
+        showPhotoConfirm = false
+        Task {
+            guard let conversation else { return }
+            guard let jpeg = downscaledJPEG(image) else {
+                blockedBanner = "照片处理失败"
+                return
+            }
+            isUploading = true
+            defer { isUploading = false }
+            guard let mediaURL = try? await APIClient.shared.uploadMedia(
+                data: jpeg, fileName: "photo.jpg", mimeType: "image/jpeg"
+            ) else {
+                blockedBanner = "照片上传失败，请检查网络"
+                return
+            }
+            let result = await store.sendMediaMessage(
+                conversationID: conversation.id, mediaType: "image", mediaUrl: mediaURL
+            )
+            switch result {
+            case .blocked(let warning), .failed(let warning):
+                blockedBanner = warning
+            case .sent:
+                break
+            }
+            if store.isServerMode {
+                await store.loadMessages(conversationID: conversation.id)
+            }
+        }
+    }
+
+    /// 压缩图片至最长边 1280px 并转 JPEG（控制上传体积）
+    private func downscaledJPEG(_ image: UIImage) -> Data? {
+        let maxSide: CGFloat = 1280
+        let size = image.size
+        var target = image
+        if max(size.width, size.height) > maxSide {
+            let scale = maxSide / max(size.width, size.height)
+            let newSize = CGSize(width: size.width * scale, height: size.height * scale)
+            let renderer = UIGraphicsImageRenderer(size: newSize)
+            target = renderer.image { _ in
+                image.draw(in: CGRect(origin: .zero, size: newSize))
+            }
+        }
+        return target.jpegData(compressionQuality: 0.7)
+    }
+
+    /// 压缩图片至最长边 1280px（相册图片）
     private func downscaleImage(_ data: Data) -> UIImage {
         guard let image = UIImage(data: data) else { return UIImage() }
         let maxSide: CGFloat = 1280
@@ -436,17 +713,106 @@ struct ChatDetailView: View {
     }
 }
 
-/// 视频播放器包装（AVKit）
+/// 视频播放器包装（AVKit，进入即自动播放）
 private struct VideoPlayerView: UIViewControllerRepresentable {
     let url: URL
 
     func makeUIViewController(context: Context) -> AVPlayerViewController {
         let controller = AVPlayerViewController()
-        controller.player = AVPlayer(url: url)
+        let player = AVPlayer(url: url)
+        controller.player = player
+        player.play()
         return controller
     }
 
     func updateUIViewController(_ uiViewController: AVPlayerViewController, context: Context) {}
+}
+
+/// 相机拍照（UIImagePickerController 包装）
+private struct CameraPicker: UIViewControllerRepresentable {
+    let onImage: (UIImage) -> Void
+
+    func makeUIViewController(context: Context) -> UIImagePickerController {
+        let picker = UIImagePickerController()
+        picker.sourceType = .camera
+        picker.delegate = context.coordinator
+        return picker
+    }
+
+    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onImage: onImage)
+    }
+
+    final class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
+        let onImage: (UIImage) -> Void
+
+        init(onImage: @escaping (UIImage) -> Void) {
+            self.onImage = onImage
+        }
+
+        func imagePickerController(
+            _ picker: UIImagePickerController,
+            didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]
+        ) {
+            if let image = info[.originalImage] as? UIImage {
+                onImage(image)
+            }
+            picker.dismiss(animated: true)
+        }
+
+        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+            picker.dismiss(animated: true)
+        }
+    }
+}
+
+/// 全屏图片查看器（黑底 + 捏合缩放 + 关闭）
+private struct ImageViewer: View {
+    let url: URL
+    @Environment(\.dismiss) private var dismiss
+    @State private var scale: CGFloat = 1
+
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            Color.black.ignoresSafeArea()
+            AsyncImage(url: url) { phase in
+                if let image = phase.image {
+                    image
+                        .resizable()
+                        .scaledToFit()
+                        .scaleEffect(scale)
+                        .gesture(
+                            MagnificationGesture()
+                                .onChanged { value in
+                                    scale = value
+                                }
+                        )
+                } else if phase.error != nil {
+                    VStack(spacing: 8) {
+                        Image(systemName: "photo")
+                            .font(.largeTitle)
+                            .foregroundStyle(.gray)
+                        Text("图片加载失败")
+                            .font(.caption)
+                            .foregroundStyle(.gray)
+                    }
+                } else {
+                    ProgressView()
+                        .tint(.white)
+                }
+            }
+            Button {
+                dismiss()
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 30))
+                    .foregroundStyle(.white)
+                    .padding()
+            }
+        }
+    }
 }
 
 /// 可播放 URL（fullScreenCover item 需要 Identifiable）
