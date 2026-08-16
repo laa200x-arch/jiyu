@@ -43,6 +43,7 @@
 		A00000000000000000000022 /* UserProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000120 /* UserProfileView.swift */; };
 		A00000000000000000000023 /* LaunchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000121 /* LaunchView.swift */; };
 		A00000000000000000000024 /* MyDynamicsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000122 /* MyDynamicsView.swift */; };
+		A00000000000000000000025 /* PetTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000123 /* PetTabView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -80,6 +81,7 @@
 		A00000000000000000000120 /* UserProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserProfileView.swift; sourceTree = "<group>"; };
 		A00000000000000000000121 /* LaunchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchView.swift; sourceTree = "<group>"; };
 		A00000000000000000000122 /* MyDynamicsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MyDynamicsView.swift; sourceTree = "<group>"; };
+		A00000000000000000000123 /* PetTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetTabView.swift; sourceTree = "<group>"; };
 		A00000000000000000000124 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A00000000000000000000125 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A00000000000000000000126 /* Jiyu.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Jiyu.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -192,9 +194,18 @@
 				A00000000000000000000214 /* Profile */,
 				A00000000000000000000215 /* Agreement */,
 				A00000000000000000000216 /* Evaluate */,
+				A00000000000000000000218 /* Pet */,
 				A00000000000000000000217 /* Auth */,
 			);
 			path = Views;
+			sourceTree = "<group>";
+		};
+		A00000000000000000000218 /* Pet */ = {
+			isa = PBXGroup;
+			children = (
+				A00000000000000000000123 /* PetTabView.swift */,
+			);
+			path = Pet;
 			sourceTree = "<group>";
 		};
 		A00000000000000000000217 /* Auth */ = {
@@ -378,6 +389,7 @@
 				A00000000000000000000022 /* UserProfileView.swift in Sources */,
 				A00000000000000000000023 /* LaunchView.swift in Sources */,
 				A00000000000000000000024 /* MyDynamicsView.swift in Sources */,
+				A00000000000000000000025 /* PetTabView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

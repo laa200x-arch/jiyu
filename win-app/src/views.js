@@ -1010,9 +1010,248 @@ function showNewMessagePopup(msg, conv) {
   setTimeout(() => box.remove(), 6000)
 }
 
+/* ============================================================
+ * 宠物护理域（旧巡六迁移：宠物档案 + 服务目录 + 互换预约）
+ * ============================================================ */
+let careOptions = { dogBehaviors: [], catBehaviors: [], homeReactions: [], weightOptions: [] }
+
+async function renderPet() {
+  const v = document.getElementById('view')
+  v.innerHTML = `
+    <div class="row" style="margin-bottom:12px">
+      <span class="section-title" style="margin:0;flex:1">🐾 宠物护理（互换语义 · 零金钱）</span>
+      <button class="btn btn-primary btn-sm" id="pet-add">＋ 添加宠物</button>
+    </div>
+    <div class="card">
+      <div class="card-title">我的宠物</div>
+      <div id="pet-list" class="skill-grid"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">护理服务目录 <span class="card-sub">以技能互换换取看护</span></div>
+      <div class="filter-bar" style="margin-bottom:10px">
+        <button class="chip active" data-cat="">全部</button>
+        <button class="chip" data-cat="overnight">过夜</button>
+        <button class="chip" data-cat="day">当日</button>
+        <button class="chip" data-cat="other">其他</button>
+      </div>
+      <div id="service-list"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">我的预约</div>
+      <div id="booking-list"></div>
+    </div>`
+  v.querySelector('#pet-add').addEventListener('click', showPetAdd)
+  v.querySelectorAll('.chip').forEach((c) => c.addEventListener('click', () => {
+    v.querySelectorAll('.chip').forEach((x) => x.classList.remove('active'))
+    c.classList.add('active')
+    renderServices(c.dataset.cat)
+  }))
+
+  await Promise.all([
+    fetchCareServices().then((r) => { careOptions = r.options; renderServices('') }),
+    fetchPets().then(renderPets),
+    fetchBookings().then(renderBookings)
+  ])
+}
+
+function renderPets() {
+  const el = document.getElementById('pet-list')
+  if (!App.state.pets.length) {
+    el.innerHTML = '<span class="card-sub">还没有宠物档案，点击右上角「添加宠物」创建</span>'
+    return
+  }
+  el.innerHTML = App.state.pets.map((p) => `
+    <div class="card" style="width:200px;margin:0">
+      <div class="row">
+        ${p.photoUrl ? `<img class="avatar avatar-img" src="${mediaUrl(p.photoUrl)}">` : `<div class="avatar">${p.petType === 'dog' ? '🐕' : p.petType === 'cat' ? '🐈' : '🐾'}</div>`}
+        <div style="flex:1;min-width:0">
+          <div class="convo-name">${esc(p.name)}</div>
+          <div class="card-sub">${esc(p.petType === 'dog' ? '🐕 狗' : p.petType === 'cat' ? '🐈 猫' : '🐾 其他')} · ${esc(p.breed)} · ${p.ageMonths} 月${p.weightKg ? ' · ' + p.weightKg + 'kg' : ''}</div>
+          <div class="card-sub">${p.neutered ? '已绝育' : '未绝育'} · ${p.gender === 'male' ? '公' : '母'}</div>
+        </div>
+        <button class="btn btn-danger btn-sm" data-delpet="${p.id}" title="删除">✕</button>
+      </div>
+      ${p.behaviors && p.behaviors.length ? '<div style="margin-top:8px">' + p.behaviors.map((b) => `<span class="tag tag-skilled">${esc(b)}</span>`).join(' ') + '</div>' : ''}
+      ${p.notes ? `<div class="card-sub" style="margin-top:6px">📝 ${esc(p.notes)}</div>` : ''}
+    </div>`).join('')
+  el.querySelectorAll('[data-delpet]').forEach((b) => b.addEventListener('click', async () => {
+    if (!confirm('删除宠物 ' + App.state.pets.find((p) => p.id === b.dataset.delpet)?.name + '？')) return
+    try { await deletePet(b.dataset.delpet); renderPets() } catch (e) { toast(e.message) }
+  }))
+}
+
+function renderServices(category) {
+  const el = document.getElementById('service-list')
+  if (!el) return
+  const services = App.state.careServices || []
+  const list = category ? services.filter((s) => s.category === category) : services
+  el.innerHTML = list.length ? list.map((s) => `
+    <div class="card" style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
+      <div style="flex:1">
+        <div class="convo-name">${esc(s.name)} <span class="tag tag-verified">${esc(catName(s.category))}</span></div>
+        <div class="card-sub">${esc(s.desc)} · ${esc(s.duration)}</div>
+      </div>
+      <button class="btn btn-primary btn-sm" data-service='${JSON.stringify(s)}'>发起互换</button>
+    </div>`).join('')
+    : '<div class="card-sub">该分类暂无服务</div>'
+  el.querySelectorAll('[data-service]').forEach((b) => b.addEventListener('click', () => {
+    showBookingForm(JSON.parse(b.dataset.service))
+  }))
+}
+function catName(c) { return { overnight: '过夜', day: '当日', other: '其他' }[c] || c }
+
+/* 添加宠物（F-21~F-24：结构化档案 + 校验） */
+function showPetAdd() {
+  openModal(`
+    <div class="modal-title">添加宠物</div>
+    <div class="form-row">
+      <div class="form-field"><label>宠物名称 *</label><input id="p-name" placeholder="如：豆豆"></div>
+      <div class="form-field"><label>类型 *</label>
+        <select id="p-type"><option value="dog">🐕 狗</option><option value="cat">🐈 猫</option><option value="other">🐾 其他</option></select>
+      </div>
+      <div class="form-field"><label>品种 *</label><input id="p-breed" placeholder="如：柯基"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-field"><label>年龄（月，0-180）*</label><input id="p-age" type="number" min="0" max="180" placeholder="如：24"></div>
+      <div class="form-field"><label>性别 *</label>
+        <select id="p-gender"><option value="male">公</option><option value="female">母</option></select>
+      </div>
+      <div class="form-field"><label>绝育 *</label>
+        <select id="p-neutered"><option value="1">已绝育</option><option value="0">未绝育</option></select>
+      </div>
+      <div class="form-field"><label>体重 kg（猫必填）</label><input id="p-weight" type="number" step="0.1" placeholder="如：5.5"></div>
+    </div>
+    <div class="form-field"><label>行为特点</label><div id="p-behaviors" class="skill-grid"></div></div>
+    <div class="form-field"><label>家中反应</label><div id="p-reactions" class="skill-grid"></div></div>
+    <div class="form-row">
+      <div class="form-field"><label>照片</label><input type="file" id="p-photo" accept="image/*"></div>
+      <div class="form-field"><label>备注（≤2000 字）</label><input id="p-notes" placeholder="如：喜欢玩球，怕打雷"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal()">取消</button>
+      <button class="btn btn-primary" id="p-save">保存宠物</button>
+    </div>
+  `, (box) => {
+    const renderBehavior = () => {
+      const type = box.querySelector('#p-type').value
+      const opts = type === 'dog' ? careOptions.dogBehaviors : type === 'cat' ? careOptions.catBehaviors : careOptions.dogBehaviors
+      box.querySelector('#p-behaviors').innerHTML = opts.map((b) =>
+        `<span class="chip" data-b="${esc(b)}">${esc(b)}</span>`).join('')
+      box.querySelector('#p-reactions').innerHTML = careOptions.homeReactions.map((b) =>
+        `<span class="chip" data-r="${esc(b)}">${esc(b)}</span>`).join('')
+      box.querySelectorAll('.chip').forEach((c) => c.addEventListener('click', () => c.classList.toggle('active')))
+    }
+    renderBehavior()
+    box.querySelector('#p-type').addEventListener('change', renderBehavior)
+
+    let photoUrl = null
+    box.querySelector('#p-photo').addEventListener('change', async (e) => {
+      const file = e.target.files[0]
+      if (!file) return
+      try {
+        const blob = await compressImage(file)
+        photoUrl = await uploadMedia(await blob.arrayBuffer(), 'pet.jpg', 'image/jpeg')
+        toast('✓ 照片已上传')
+      } catch (err) { toast(err.message) }
+    })
+
+    box.querySelector('#p-save').addEventListener('click', async () => {
+      const body = {
+        name: box.querySelector('#p-name').value.trim(),
+        petType: box.querySelector('#p-type').value,
+        breed: box.querySelector('#p-breed').value.trim(),
+        ageMonths: Number(box.querySelector('#p-age').value),
+        gender: box.querySelector('#p-gender').value,
+        neutered: box.querySelector('#p-neutered').value === '1',
+        weightKg: box.querySelector('#p-weight').value ? Number(box.querySelector('#p-weight').value) : undefined,
+        behaviors: [...box.querySelectorAll('#p-behaviors .chip.active')].map((c) => c.dataset.b),
+        homeReactions: [...box.querySelectorAll('#p-reactions .chip.active')].map((c) => c.dataset.r),
+        photoUrl,
+        notes: box.querySelector('#p-notes').value.trim()
+      }
+      try {
+        await addPet(body)
+        closeModal()
+        toast('✅ 宠物档案已创建')
+        renderPets()
+      } catch (e) { toast('保存失败：' + e.message) }
+    })
+  })
+}
+
+/* 发起看护互换（F-08/F-13/F-14：选宠物 → 选看护人 → 时间地点） */
+function showBookingForm(service) {
+  const pets = App.state.pets
+  if (!pets.length) return toast('请先添加宠物档案')
+  const providers = App.state.users.filter((u) => u.id !== App.state.user.id)
+  openModal(`
+    <div class="modal-title">发起互换 · ${esc(service.name)}</div>
+    <div class="card-sub" style="margin-bottom:12px">以技能互换换取看护，平台全程零金钱交易</div>
+    <div class="form-field"><label>宠物 *</label>
+      <select id="b-pet">${pets.map((p) => `<option value="${p.id}">${esc(p.name)}（${esc(p.breed)}）</option>`).join('')}</select>
+    </div>
+    <div class="form-field"><label>看护人 *（信用分供参考）</label>
+      <select id="b-provider">${providers.map((u) => `<option value="${u.id}">${esc(u.userName)}（信用 ${Math.round(u.creditScore)} · ${esc(u.locationLabel)}）</option>`).join('')}</select>
+    </div>
+    <div class="form-row">
+      <div class="form-field"><label>约定时间 *</label><input id="b-time" placeholder="如：本周六 18:00"></div>
+      <div class="form-field"><label>地点 *（公共场所）</label><input id="b-location" placeholder="如：小区门口/图书馆旁"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal()">取消</button>
+      <button class="btn btn-primary" id="b-submit">发起互换</button>
+    </div>
+  `, (box) => {
+    box.querySelector('#b-submit').addEventListener('click', async () => {
+      const scheduledTime = box.querySelector('#b-time').value.trim()
+      const location = box.querySelector('#b-location').value.trim()
+      if (!scheduledTime || !location) return toast('请填写时间与地点（公共场所）')
+      try {
+        await createBooking({
+          petId: box.querySelector('#b-pet').value,
+          serviceId: service.id,
+          providerId: box.querySelector('#b-provider').value,
+          scheduledTime,
+          location
+        })
+        closeModal()
+        toast('✅ 互换预约已发出')
+        renderBookings()
+      } catch (e) { toast('发起失败：' + e.message) }
+    })
+  })
+}
+
+function renderBookings() {
+  const el = document.getElementById('booking-list')
+  if (!el) return
+  if (!App.state.bookings.length) {
+    el.innerHTML = '<div class="card-sub">暂无预约，从服务目录发起第一次互换吧</div>'
+    return
+  }
+  el.innerHTML = App.state.bookings.map((b) => `
+    <div class="card" style="margin-bottom:8px">
+      <div class="row">
+        <div style="flex:1">
+          <div class="convo-name">${esc(b.serviceName)} <span class="tag tag-verified">${esc(b.pet ? b.pet.name : '')}</span></div>
+          <div class="card-sub">🕐 ${esc(b.scheduledTime)} · 📍 ${esc(b.location)}</div>
+          <div class="card-sub">看护人：${esc(b.provider ? b.provider.userName : '—')}（信用 ${b.provider ? Math.round(b.provider.creditScore) : '—'}）</div>
+        </div>
+        <span class="exchange-status ${b.status}">${statusText(b.status)}</span>
+      </div>
+      ${b.status === 'pending' || b.status === 'ongoing'
+        ? `<div class="row" style="margin-top:8px"><span class="spacer"></span><button class="btn btn-outline btn-sm" data-done="${b.id}">标记完成</button></div>`
+        : ''}
+    </div>`).join('')
+  el.querySelectorAll('[data-done]').forEach((b) => b.addEventListener('click', async () => {
+    await completeBooking(b.dataset.done)
+    renderBookings()
+  }))
+}
+
 /* 注册视图入口（供 app.js 调用） */
 App.views = {
-  renderMatch, renderFeed, renderMessage, renderMine, renderLogin,
+  renderMatch, renderFeed, renderMessage, renderMine, renderPet, renderLogin,
   onMessage: (cid) => { if (App.state.activeConversation === cid) renderMessages(App.state.conversations.find((c) => c.id === cid)) },
   onConversationUpdate: () => renderConvoList(),
   onNewMessage: showNewMessagePopup,

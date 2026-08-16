@@ -36,12 +36,6 @@
   <div id="app" class="hidden">
     <header class="topbar">
       <div class="topbar-brand"><span class="brand-icon-small">⇄</span> 技遇</div>
-      <nav class="tabs">
-        <button class="tab active" data-view="match">技能匹配</button>
-        <button class="tab" data-view="feed">互换动态</button>
-        <button class="tab" data-view="message">消息 <span id="msg-badge" class="badge hidden"></span></button>
-        <button class="tab" data-view="mine">我的</button>
-      </nav>
       <div class="topbar-user">
         <span id="topbar-user-name"></span>
         <button id="logout-btn" class="btn-link" title="切换账号 / 退出登录">切换账号</button>
@@ -49,6 +43,15 @@
     </header>
 
     <main id="view" class="view"></main>
+
+    <!-- 底部导航（匹配/动态/消息/宠物/我的） -->
+    <nav class="bottombar">
+      <button class="tab active" data-view="match"><span class="tab-icon">⚡</span><span>匹配</span></button>
+      <button class="tab" data-view="feed"><span class="tab-icon">📢</span><span>动态</span></button>
+      <button class="tab" data-view="message"><span class="tab-icon">💬</span><span>消息</span><span id="msg-badge" class="badge hidden"></span></button>
+      <button class="tab" data-view="pet"><span class="tab-icon">🐾</span><span>宠物</span></button>
+      <button class="tab" data-view="mine"><span class="tab-icon">👤</span><span>我的</span></button>
+    </nav>
   </div>
 
   <!-- 全局弹窗 -->

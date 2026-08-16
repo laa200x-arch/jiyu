@@ -329,6 +329,40 @@ final class APIClient {
         let _: OkResponse = try await request("/api/me/skills/\(kind)/\(id)", method: "DELETE")
     }
 
+    // MARK: - 宠物护理域（旧巡六迁移）
+
+    func fetchCareServices() async throws -> ([ServerCareService], CareOptions) {
+        let response: CareServicesResponse = try await request("/api/care-services")
+        return (response.services, response.options)
+    }
+
+    func fetchPets() async throws -> [ServerPet] {
+        let response: PetsResponse = try await request("/api/pets")
+        return response.pets
+    }
+
+    func addPet(_ body: [String: Any]) async throws -> ServerPet {
+        let response: PetResponse = try await request("/api/pets", method: "POST", body: body)
+        return response.pet
+    }
+
+    func deletePet(id: String) async throws {
+        let _: OkResponse = try await request("/api/pets/\(id)", method: "DELETE")
+    }
+
+    func fetchBookings() async throws -> [ServerBooking] {
+        let response: BookingsResponse = try await request("/api/bookings")
+        return response.bookings
+    }
+
+    func createBooking(_ body: [String: Any]) async throws {
+        let _: OkResponse = try await request("/api/bookings", method: "POST", body: body)
+    }
+
+    func completeBooking(id: String) async throws {
+        let _: OkResponse = try await request("/api/bookings/\(id)/complete", method: "POST")
+    }
+
     // MARK: - 版本检查
 
     func fetchVersion() async throws -> ServerVersion {

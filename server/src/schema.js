@@ -102,6 +102,36 @@ CREATE TABLE IF NOT EXISTS messages (
   is_system_note INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS pets (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  name TEXT NOT NULL,
+  pet_type TEXT NOT NULL,
+  breed TEXT NOT NULL DEFAULT '',
+  age_months INTEGER NOT NULL,
+  gender TEXT NOT NULL DEFAULT 'male',
+  neutered INTEGER NOT NULL DEFAULT 0,
+  weight_kg REAL,
+  behaviors TEXT,
+  home_reactions TEXT,
+  photo_url TEXT,
+  notes TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS bookings (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  provider_id INTEGER NOT NULL,
+  pet_id INTEGER NOT NULL,
+  service_id TEXT NOT NULL,
+  service_name TEXT NOT NULL,
+  scheduled_time TEXT NOT NULL,
+  location TEXT,
+  status TEXT NOT NULL DEFAULT 'pending',
+  created_at TEXT NOT NULL
+);
 `
 
 export const MYSQL_DDL = `
@@ -200,6 +230,36 @@ CREATE TABLE IF NOT EXISTS messages (
   media_type VARCHAR(16) NULL,
   media_url VARCHAR(255) NULL,
   is_system_note TINYINT(1) NOT NULL DEFAULT 0,
+  created_at DATETIME NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS pets (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  name VARCHAR(64) NOT NULL,
+  pet_type VARCHAR(16) NOT NULL,
+  breed VARCHAR(64) NOT NULL DEFAULT '',
+  age_months INT NOT NULL,
+  gender VARCHAR(8) NOT NULL DEFAULT 'male',
+  neutered TINYINT(1) NOT NULL DEFAULT 0,
+  weight_kg DOUBLE NULL,
+  behaviors VARCHAR(500) NULL,
+  home_reactions VARCHAR(500) NULL,
+  photo_url VARCHAR(255) NULL,
+  notes VARCHAR(2000) NOT NULL DEFAULT '',
+  created_at DATETIME NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS bookings (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  provider_id INT NOT NULL,
+  pet_id INT NOT NULL,
+  service_id VARCHAR(32) NOT NULL,
+  service_name VARCHAR(64) NOT NULL,
+  scheduled_time VARCHAR(128) NOT NULL,
+  location VARCHAR(255) NULL,
+  status ENUM('pending','ongoing','completed','cancelled') NOT NULL DEFAULT 'pending',
   created_at DATETIME NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 `

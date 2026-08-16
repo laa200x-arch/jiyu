@@ -87,21 +87,32 @@ body {
 /* ── 主框架 ── */
 #app { position: absolute; inset: 0; display: flex; flex-direction: column; }
 .topbar {
-  height: 52px; background: var(--card); border-bottom: 1px solid var(--divider);
+  height: 48px; background: var(--card); border-bottom: 1px solid var(--divider);
   display: flex; align-items: center; padding: 0 18px; gap: 24px; flex-shrink: 0;
 }
 .topbar-brand { font-weight: 700; font-size: 16px; }
-.tabs { display: flex; gap: 4px; flex: 1; }
-.tab {
-  border: none; background: none; padding: 8px 16px; font-size: 14px; cursor: pointer;
-  color: var(--text-2); border-radius: 8px; font-family: inherit;
-}
-.tab.active { color: var(--primary); font-weight: 700; background: rgba(51, 179, 204, 0.1); }
-.topbar-user { font-size: 13px; color: var(--text-2); display: flex; align-items: center; gap: 10px; }
+.topbar-user { font-size: 13px; color: var(--text-2); display: flex; align-items: center; gap: 10px; margin-left: auto; }
 .badge {
   background: var(--danger); color: #fff; border-radius: 9px; font-size: 10px;
-  padding: 1px 6px; margin-left: 2px;
+  padding: 1px 6px; margin-left: 2px; position: absolute; top: 2px; right: -6px;
 }
+
+.view { flex: 1; overflow-y: auto; padding: 16px; padding-bottom: 76px; }
+
+/* 底部导航（移动端风格） */
+.bottombar {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 58px;
+  background: var(--card); border-top: 1px solid var(--divider);
+  display: flex; align-items: stretch; z-index: 50;
+}
+.bottombar .tab {
+  flex: 1; border: none; background: none; cursor: pointer; color: var(--text-2);
+  font-size: 11px; font-family: inherit; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 3px; position: relative;
+}
+.bottombar .tab .tab-icon { font-size: 19px; line-height: 1; }
+.bottombar .tab.active { color: var(--primary); font-weight: 700; }
+.bottombar .tab.active .tab-icon { transform: scale(1.12); }
 
 .view { flex: 1; overflow-y: auto; padding: 16px; }
 

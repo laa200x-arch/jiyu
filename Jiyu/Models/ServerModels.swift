@@ -218,6 +218,60 @@ struct ServerAgreement: Decodable {
     let signedAt: Date
 }
 
+// MARK: - 宠物护理域 DTO（旧巡六迁移，互换语义）
+
+struct ServerCareService: Decodable, Identifiable {
+    let id: String
+    let name: String
+    let category: String
+    let desc: String
+    let duration: String
+}
+
+struct CareOptions: Decodable {
+    let dogBehaviors: [String]
+    let catBehaviors: [String]
+    let homeReactions: [String]
+    let weightOptions: [String]
+}
+
+struct CareServicesResponse: Decodable {
+    let services: [ServerCareService]
+    let options: CareOptions
+}
+
+struct ServerPet: Decodable, Identifiable {
+    let id: String
+    let name: String
+    let petType: String
+    let breed: String
+    let ageMonths: Int
+    let gender: String
+    let neutered: Bool
+    let weightKg: Double?
+    let behaviors: [String]?
+    let homeReactions: [String]?
+    let photoUrl: String?
+    let notes: String
+}
+
+struct PetsResponse: Decodable { let pets: [ServerPet] }
+struct PetResponse: Decodable { let pet: ServerPet }
+
+struct ServerBooking: Decodable, Identifiable {
+    let id: String
+    let petId: String
+    let serviceId: String
+    let serviceName: String
+    let scheduledTime: String
+    let location: String?
+    var status: String
+    let pet: ServerPet?
+    let provider: ServerUser?
+}
+
+struct BookingsResponse: Decodable { let bookings: [ServerBooking] }
+
 // MARK: - 响应包装
 
 struct ServerVersion: Decodable {

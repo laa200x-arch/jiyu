@@ -16,7 +16,7 @@ function switchView(name) {
   }
   document.getElementById('login-page').classList.add('hidden')
   document.getElementById('app').classList.remove('hidden')
-  const map = { match: views.renderMatch, feed: views.renderFeed, message: views.renderMessage, mine: views.renderMine }
+  const map = { match: views.renderMatch, feed: views.renderFeed, message: views.renderMessage, pet: views.renderPet, mine: views.renderMine }
   map[name]()
 }
 

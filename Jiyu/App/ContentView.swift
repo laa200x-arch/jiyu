@@ -38,12 +38,20 @@ struct ContentView: View {
             .tag(2)
 
             NavigationStack {
+                PetTabView()
+            }
+            .tabItem {
+                Label("宠物", systemImage: "pawprint")
+            }
+            .tag(3)
+
+            NavigationStack {
                 MineView()
             }
             .tabItem {
                 Label("我的", systemImage: "person")
             }
-            .tag(3)
+            .tag(4)
         }
         .tint(Theme.primary)
         .task {

@@ -32,6 +32,12 @@ final class MockDataStore: ObservableObject {
     @Published var dynamics: [DynamicModel]
     @Published var currentExposurePackage: ExposurePackage?
 
+    /// 宠物护理域（旧巡六迁移）
+    @Published var pets: [ServerPet] = []
+    @Published var bookings: [ServerBooking] = []
+    @Published var careServices: [ServerCareService] = []
+    @Published var careOptions: CareOptions?
+
     /// 当前打开中的会话（用于实时消息未读计数）
     var activeConversationID: UUID?
 
@@ -606,6 +612,45 @@ final class MockDataStore: ObservableObject {
         case .want: currentUser.wantSkills.remove(atOffsets: offsets)
         }
         syncCurrentUserInAllUsers()
+    }
+
+    // MARK: - 宠物护理域（方案：旧巡六迁移，互换语义零金钱）
+
+    func refreshPetData() async {
+        guard isServerMode else { return }
+        do {
+            let (services, options) = try await APIClient.shared.fetchCareServices()
+            careServices = services
+            careOptions = options
+            pets = try await APIClient.shared.fetchPets()
+            bookings = try await APIClient.shared.fetchBookings()
+        } catch {
+            print("[store] 宠物数据加载失败: \(error)")
+        }
+    }
+
+    func addPet(_ pet: [String: Any]) async throws {
+        let created = try await APIClient.shared.addPet(pet)
+        pets.insert(created, at: 0)
+    }
+
+    func deletePet(id: String) async {
+        guard isServerMode else { return }
+        try? await APIClient.shared.deletePet(id: id)
+        pets.removeAll { $0.id == id }
+    }
+
+    func createBooking(_ body: [String: Any]) async throws {
+        try await APIClient.shared.createBooking(body)
+        bookings = try await APIClient.shared.fetchBookings()
+    }
+
+    func completeBooking(id: String) async {
+        guard isServerMode else { return }
+        try? await APIClient.shared.completeBooking(id: id)
+        if let idx = bookings.firstIndex(where: { $0.id == id }) {
+            bookings[idx].status = "completed"
+        }
     }
 
     // MARK: - 互换动态（方案 2.3.6 动态区风控）

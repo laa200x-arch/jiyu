@@ -132,6 +132,38 @@ async function main() {
     check('删除动态', after.length === 0)
   } catch (e) { check('我的动态历史', false, e.message) }
 
+  // 12. 宠物护理域（旧巡六迁移）
+  try {
+    const petsApi = require('./src/api.js')
+    const svc = await petsApi.api('/api/care-services')
+    check('服务目录', svc.services.length === 7, `7 种 · ${svc.options.dogBehaviors.length} 狗行为`)
+    // 添加宠物
+    const pet = await petsApi.api('/api/pets', { method: 'POST', body: {
+      name: '测试宠物', petType: 'cat', breed: '英短', ageMonths: 18,
+      gender: 'female', neutered: true, weightKg: 4.2,
+      behaviors: ['亲人', '胆小'], homeReactions: ['作息规律'], notes: '测试'
+    } })
+    check('添加宠物', !!pet.pet.id, pet.pet.name)
+    // 校验：猫缺体重
+    try {
+      await petsApi.api('/api/pets', { method: 'POST', body: { name: 'x', petType: 'cat', breed: 'x', ageMonths: 12, gender: 'female', neutered: false } })
+      check('宠物校验（猫体重必填）', false)
+    } catch (e) { check('宠物校验（猫体重必填）', e.message.includes('体重'), e.message.slice(0, 20)) }
+    // 发起预约
+    const bk = await petsApi.api('/api/bookings', { method: 'POST', body: {
+      petId: pet.pet.id, serviceId: 'overnight', providerId: 2,
+      scheduledTime: '本周六 18:00', location: '小区门口'
+    } })
+    check('发起看护预约', !!bk.booking && bk.booking.status === 'pending')
+    // 预约列表
+    const list = await petsApi.api('/api/bookings')
+    check('预约列表', list.bookings.length > 0 && list.bookings[0].pet, list.bookings[0]?.serviceName)
+    // 删除宠物（清理）
+    await petsApi.api('/api/pets/' + pet.pet.id, { method: 'DELETE' })
+    const after = await petsApi.api('/api/pets')
+    check('删除宠物', !after.pets.some((p) => p.id === pet.pet.id))
+  } catch (e) { check('宠物护理域', false, e.message) }
+
   logout()
   console.log(`\n══════ 结果：${passed} 通过 / ${failed} 失败 ══════`)
   process.exit(failed > 0 ? 1 : 0)

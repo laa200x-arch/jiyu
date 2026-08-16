@@ -17,6 +17,7 @@ import { profileRouter } from './routes/profile.js'
 import { matchRouter } from './routes/match.js'
 import { socialRouter } from './routes/social.js'
 import { chatRouter } from './routes/chat.js'
+import { petsRouter } from './routes/pets.js'
 import { setupSocket } from './socket.js'
 
 async function main() {
@@ -102,6 +103,8 @@ async function main() {
 
   // 社交路由（需要 io 推送）
   app.use('/api', socialRouter(db, io))
+  // 宠物护理域（旧巡六迁移）
+  app.use('/api', petsRouter(db))
 
   // 404
   app.use((req, res) => {

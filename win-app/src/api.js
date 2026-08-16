@@ -24,6 +24,8 @@ const App = {
     dynamics: [],
     records: [],             // 互换记录
     agreements: [],
+    pets: [],                // 宠物档案（宠物护理域）
+    bookings: [],            // 看护预约
     syncHistory: storage.getItem('jiyu.syncHistory') !== '0',
     syncChosen: storage.getItem('jiyu.syncChosen') === '1',
     activeConversation: null,
@@ -291,6 +293,42 @@ function normalizeMessage(msg, isMe) {
     mediaType: msg.mediaType || null, mediaUrl: msg.mediaUrl || null,
     time: msg.time, isSystemNote: !!msg.isSystemNote
   }
+}
+
+/* ---------- 宠物护理域（旧巡六迁移，互换语义零金钱） ---------- */
+async function fetchCareServices() {
+  const data = await api('/api/care-services')
+  App.state.careServices = data.services
+  return { services: data.services, options: data.options }
+}
+async function fetchPets() {
+  const data = await api('/api/pets')
+  App.state.pets = data.pets
+  return data.pets
+}
+async function addPet(pet) {
+  const data = await api('/api/pets', { method: 'POST', body: pet })
+  App.state.pets.unshift(data.pet)
+  return data.pet
+}
+async function deletePet(id) {
+  await api('/api/pets/' + id, { method: 'DELETE' })
+  App.state.pets = App.state.pets.filter((p) => p.id !== String(id))
+}
+async function fetchBookings() {
+  const data = await api('/api/bookings')
+  App.state.bookings = data.bookings
+  return data.bookings
+}
+async function createBooking(payload) {
+  const data = await api('/api/bookings', { method: 'POST', body: payload })
+  await fetchBookings()
+  return data.booking
+}
+async function completeBooking(id) {
+  await api('/api/bookings/' + id + '/complete', { method: 'POST' })
+  const b = App.state.bookings.find((x) => x.id === String(id))
+  if (b) b.status = 'completed'
 }
 
 /* ---------- 版本检查 ---------- */
