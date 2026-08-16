@@ -102,6 +102,9 @@ struct ChatDetailView: View {
     @State private var audioRecorder: AVAudioRecorder?
     @State private var audioPlayer: AVAudioPlayer?
     @State private var playingAudioURL: URL?
+    // 订单引用（聊天卡片）
+    @State private var showOrderPicker = false
+    @State private var viewingOrderRef: OrderRef?
     // 聊天记录同步开关（不同设备登录同一账号可同步历史聊天；关闭则不自动加载历史）
     @AppStorage("jiyu.syncHistory") private var syncHistory = true
     @FocusState private var inputFocused: Bool
@@ -169,6 +172,14 @@ struct ChatDetailView: View {
                 showPhotoConfirm = true
             }
             .ignoresSafeArea()
+        }
+        .sheet(isPresented: $showOrderPicker) {
+            orderPickerSheet
+        }
+        .sheet(item: $viewingOrderRef) { ref in
+            NavigationStack {
+                OrderDetailView(orderId: ref.orderId)
+            }
         }
         .overlay {
             if showPhotoConfirm, let capturedImage {
@@ -252,75 +263,150 @@ struct ChatDetailView: View {
     }
 
     private func inputBar(_ conversation: Conversation) -> some View {
-        HStack(spacing: 8) {
-            PhotosPicker(selection: $pickerItem, matching: .any(of: [.images, .videos])) {
-                Image(systemName: "photo.on.rectangle")
-                    .font(.system(size: 20))
-                    .foregroundStyle(isUploading ? Theme.textSecondary : Theme.primary)
-            }
-            .disabled(isUploading)
-            Menu {
-                Button {
-                    showCamera = true
-                } label: {
-                    Label("拍照", systemImage: "camera")
-                }
-                Button {
-                    toggleRecording()
-                } label: {
-                    Label(isRecording ? "停止录音并发送" : "语音消息", systemImage: "mic.fill")
-                }
-            } label: {
-                Image(systemName: isRecording ? "stop.circle.fill" : "plus.circle")
-                    .font(.system(size: 20))
-                    .foregroundStyle(isRecording ? Theme.danger : Theme.primary)
-            }
-            .disabled(isUploading)
-            if isRecording {
-                HStack(spacing: 5) {
-                    Circle().fill(Theme.danger).frame(width: 8, height: 8)
-                    Text("录音中")
+        VStack(spacing: 8) {
+            if let draft = store.orderDraft {
+                HStack(spacing: 6) {
+                    Image(systemName: "ticket.fill")
+                        .foregroundStyle(Theme.primary)
+                    Text("引用订单：\(draft.serviceName) · ¥\(yuanText(draft.priceYuan))（\(draft.pet?.name ?? "")）")
                         .font(.caption)
-                        .foregroundStyle(Theme.danger)
+                        .bold()
+                        .foregroundStyle(Theme.primary)
+                        .lineLimit(1)
+                    Spacer()
+                    Button {
+                        store.orderDraft = nil
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(Theme.textSecondary)
+                    }
                 }
                 .padding(.horizontal, 10)
-                .padding(.vertical, 8)
-                .background(RoundedRectangle(cornerRadius: 14).fill(Theme.danger.opacity(0.10)))
+                .padding(.vertical, 7)
+                .background(RoundedRectangle(cornerRadius: 10).fill(Theme.primary.opacity(0.10)))
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Theme.primary.opacity(0.45), style: StrokeStyle(lineWidth: 1, dash: [4])))
             }
-            TextField("发送消息（严禁金钱交易内容）", text: $inputText, axis: .vertical)
-                .textFieldStyle(.plain)
-                .font(.subheadline)
-                .lineLimit(1...4)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(RoundedRectangle(cornerRadius: 18).fill(Color(.systemGray6)))
-                .focused($inputFocused)
-                .id(editorID) // 发送后强制重建输入框，修复多行输入框清空不生效的问题
-            Button {
-                send(conversation)
-            } label: {
-                if isUploading {
-                    ProgressView()
-                        .tint(.white)
-                        .frame(width: 38, height: 38)
-                } else {
-                    Image(systemName: "paperplane.fill")
-                        .font(.system(size: 15))
-                        .foregroundStyle(.white)
-                        .frame(width: 38, height: 38)
-                        .background(Circle().fill(
-                            inputText.trimmingCharacters(in: .whitespaces).isEmpty
-                                ? Theme.primary.opacity(0.4) : Theme.primary
-                        ))
+            HStack(spacing: 8) {
+                Button {
+                    showOrderPicker = true
+                } label: {
+                    Image(systemName: "ticket.fill")
+                        .font(.system(size: 19))
+                        .foregroundStyle(store.orderDraft == nil ? Theme.primary : Theme.primary.opacity(0.4))
                 }
+                .disabled(store.orderDraft != nil)
+                PhotosPicker(selection: $pickerItem, matching: .any(of: [.images, .videos])) {
+                    Image(systemName: "photo.on.rectangle")
+                        .font(.system(size: 20))
+                        .foregroundStyle(isUploading ? Theme.textSecondary : Theme.primary)
+                }
+                .disabled(isUploading)
+                Menu {
+                    Button {
+                        showCamera = true
+                    } label: {
+                        Label("拍照", systemImage: "camera")
+                    }
+                    Button {
+                        toggleRecording()
+                    } label: {
+                        Label(isRecording ? "停止录音并发送" : "语音消息", systemImage: "mic.fill")
+                    }
+                } label: {
+                    Image(systemName: isRecording ? "stop.circle.fill" : "plus.circle")
+                        .font(.system(size: 20))
+                        .foregroundStyle(isRecording ? Theme.danger : Theme.primary)
+                }
+                .disabled(isUploading)
+                if isRecording {
+                    HStack(spacing: 5) {
+                        Circle().fill(Theme.danger).frame(width: 8, height: 8)
+                        Text("录音中")
+                            .font(.caption)
+                            .foregroundStyle(Theme.danger)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 8)
+                    .background(RoundedRectangle(cornerRadius: 14).fill(Theme.danger.opacity(0.10)))
+                }
+                TextField("发送消息（严禁金钱交易内容）", text: $inputText, axis: .vertical)
+                    .textFieldStyle(.plain)
+                    .font(.subheadline)
+                    .lineLimit(1...4)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(RoundedRectangle(cornerRadius: 18).fill(Color(.systemGray6)))
+                    .focused($inputFocused)
+                    .id(editorID) // 发送后强制重建输入框，修复多行输入框清空不生效的问题
+                Button {
+                    send(conversation)
+                } label: {
+                    if isUploading {
+                        ProgressView()
+                            .tint(.white)
+                            .frame(width: 38, height: 38)
+                    } else {
+                        Image(systemName: "paperplane.fill")
+                            .font(.system(size: 15))
+                            .foregroundStyle(.white)
+                            .frame(width: 38, height: 38)
+                            .background(Circle().fill(
+                                inputText.trimmingCharacters(in: .whitespaces).isEmpty && store.orderDraft == nil
+                                    ? Theme.primary.opacity(0.4) : Theme.primary
+                            ))
+                    }
+                }
+                .disabled((inputText.trimmingCharacters(in: .whitespaces).isEmpty && store.orderDraft == nil) || isUploading)
             }
-            .disabled(inputText.trimmingCharacters(in: .whitespaces).isEmpty || isUploading)
         }
         .padding(10)
         .background(Theme.cardBg)
         .overlay(alignment: .top) { Rectangle().fill(Theme.divider).frame(height: 1) }
         .onChange(of: pickerItem) { _ in
             handleMediaSelection(conversation)
+        }
+    }
+
+    /// 引用订单选择器（列出我相关订单：我发布或我接单）
+    private var orderPickerSheet: some View {
+        NavigationStack {
+            List {
+                if store.bookings.isEmpty {
+                    Text("暂无相关订单（我发布或我接单）。先到「宠物」Tab 发起一笔订单吧")
+                        .font(.caption)
+                        .foregroundStyle(Theme.textSecondary)
+                }
+                ForEach(store.bookings) { booking in
+                    Button {
+                        store.orderDraft = booking
+                        showOrderPicker = false
+                    } label: {
+                        VStack(alignment: .leading, spacing: 3) {
+                            HStack {
+                                Text(booking.serviceName)
+                                    .font(.subheadline)
+                                    .bold()
+                                    .foregroundStyle(Theme.textPrimary)
+                                Spacer()
+                                Text("¥\(yuanText(booking.priceYuan))")
+                                    .font(.caption)
+                                    .bold()
+                                    .foregroundStyle(Theme.warning)
+                            }
+                            Text("\(booking.pet?.name ?? "") · \(orderStatusName(booking.status)) · 🕐 \(booking.scheduledTime)")
+                                .font(.caption)
+                                .foregroundStyle(Theme.textSecondary)
+                        }
+                    }
+                }
+            }
+            .navigationTitle("引用订单")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("取消") { showOrderPicker = false }
+                }
+            }
         }
     }
 
@@ -341,13 +427,18 @@ struct ChatDetailView: View {
                     if let mediaType = message.mediaType, let mediaUrl = message.mediaUrl {
                         mediaBubble(mediaType: mediaType, mediaUrl: mediaUrl)
                     }
+                    if let orderId = message.orderId {
+                        MessageOrderCard(orderId: orderId) {
+                            viewingOrderRef = OrderRef(orderId: orderId)
+                        }
+                    }
                     if !message.text.isEmpty {
                         Text(message.text)
                             .font(.subheadline)
                             .foregroundStyle(message.senderIsMe ? .white : Theme.textPrimary)
                     }
                 }
-                .padding(message.text.isEmpty ? 2 : 10)
+                .padding(message.text.isEmpty && message.mediaUrl == nil ? 2 : 10)
                 .background(
                     RoundedRectangle(cornerRadius: 14)
                         .fill(message.senderIsMe ? Theme.primary : Theme.cardBg)
@@ -438,12 +529,14 @@ struct ChatDetailView: View {
 
     private func send(_ conversation: Conversation) {
         let text = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty else { return }
+        let draft = store.orderDraft
+        guard !text.isEmpty || draft != nil else { return }
         inputFocused = false
         inputText = ""
         editorID += 1 // 强制重建输入框，确保文字清空
+        store.orderDraft = nil
         Task {
-            let result = await store.sendMessage(conversationID: conversation.id, text: text)
+            let result = await store.sendMessage(conversationID: conversation.id, text: text, orderId: draft?.id)
             switch result {
             case .blocked(let warning), .failed(let warning):
                 blockedBanner = warning
@@ -837,4 +930,78 @@ private struct ImageViewer: View {
 private struct IdentifiableURL: Identifiable {
     let id = UUID()
     let url: URL
+}
+
+/// 聊天里的订单引用卡片（点击查看订单详情）
+private struct MessageOrderCard: View {
+    @EnvironmentObject private var store: MockDataStore
+    let orderId: String
+    let onTap: () -> Void
+    @State private var booking: ServerBooking?
+
+    var body: some View {
+        Button(action: onTap) {
+            VStack(alignment: .leading, spacing: 4) {
+                if let booking {
+                    Text("🐾 宠物护理订单")
+                        .font(.caption2)
+                        .bold()
+                        .foregroundStyle(Theme.warning)
+                    HStack(spacing: 6) {
+                        Text(booking.serviceName)
+                            .font(.caption)
+                            .bold()
+                            .foregroundStyle(Theme.textPrimary)
+                        Text("¥\(yuanText(booking.priceYuan))")
+                            .font(.caption)
+                            .bold()
+                            .foregroundStyle(Theme.warning)
+                        Spacer()
+                        Text(orderStatusName(booking.status))
+                            .font(.caption2)
+                            .bold()
+                            .foregroundStyle(Theme.primary)
+                    }
+                    Text("\(booking.pet?.name ?? "") · 🕐 \(booking.scheduledTime)")
+                        .font(.caption2)
+                        .foregroundStyle(Theme.textSecondary)
+                } else {
+                    HStack(spacing: 6) {
+                        ProgressView()
+                            .controlSize(.mini)
+                        Text("订单卡片加载中…")
+                            .font(.caption2)
+                            .foregroundStyle(Theme.textSecondary)
+                    }
+                }
+            }
+            .padding(9)
+            .frame(minWidth: 180, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: 10).fill(Theme.bg))
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Theme.divider, lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+        .task {
+            if booking == nil {
+                booking = await store.bookingDetail(id: orderId)
+            }
+        }
+    }
+}
+
+/// 订单引用（sheet item 需要 Identifiable）
+private struct OrderRef: Identifiable {
+    let id = UUID()
+    let orderId: String
+}
+
+// MARK: - 文件级工具（金额/订单状态显示）
+
+private func yuanText(_ v: Double) -> String {
+    let s = String(format: "%.1f", v)
+    return s.hasSuffix(".0") ? String(s.dropLast(2)) : s
+}
+
+private func orderStatusName(_ s: String) -> String {
+    ["open": "待接单", "assigned": "已接单", "ongoing": "进行中", "completed": "已完成", "cancelled": "已取消"][s] ?? s
 }

@@ -177,6 +177,7 @@ struct ServerMessage: Decodable {
     let text: String
     let mediaType: String?
     let mediaUrl: String?
+    let orderId: String?
     let time: Date
     let isSystemNote: Bool
 }
@@ -272,6 +273,7 @@ struct BookingUser: Decodable {
     let avatarUrl: String?
     let creditScore: Double
     let locationLabel: String?
+    let distanceKm: Double?
 }
 
 struct ServerBooking: Decodable, Identifiable {
@@ -288,11 +290,14 @@ struct ServerBooking: Decodable, Identifiable {
     let commissionYuan: Double
     let workerIncome: Double
     let openToFeed: Bool
+    let distanceKm: Double?
     let pet: ServerPet?
+    let initiator: BookingUser?
     let provider: BookingUser?
 }
 
 struct BookingsResponse: Decodable { let bookings: [ServerBooking] }
+struct BookingResponse: Decodable { let booking: ServerBooking }
 
 // MARK: - 响应包装
 
@@ -382,6 +387,7 @@ extension ChatMessage {
             text: server.text,
             mediaType: server.mediaType,
             mediaUrl: server.mediaUrl,
+            orderId: server.orderId,
             time: server.time,
             isSystemNote: server.isSystemNote
         )

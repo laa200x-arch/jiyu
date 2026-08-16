@@ -196,6 +196,54 @@ async function main() {
     petsApi.logout()
   } catch (e) { check('宠物护理域', false, e.message) }
 
+  // 13. 订单详情 + 聊天引用订单
+  try {
+    const petsApi = require('./src/api.js')
+    await petsApi.login('aqing', '123456')
+    const conv = await petsApi.api('/api/conversations/open', { method: 'POST', body: { partnerId: 2 } })
+    const convId = conv.conversation.id
+    const pet = await petsApi.api('/api/pets', { method: 'POST', body: {
+      name: '详情测试狗', petType: 'dog', breed: '柯基', ageMonths: 30, gender: 'male', neutered: false, notes: '喜欢玩球'
+    } })
+    const bk = await petsApi.api('/api/bookings', { method: 'POST', body: {
+      petId: pet.pet.id, serviceId: 'walk', providerId: 2, scheduledTime: '本周六 9:00', location: '公园门口'
+    } })
+    // 订单详情（宠物信息 + 距离）
+    const detail = await petsApi.api('/api/bookings/' + bk.booking.id)
+    const db_ = detail.booking
+    check('订单详情（宠物/距离/下单人）',
+      !!db_.pet && db_.pet.name === '详情测试狗' && db_.pet.behaviors && db_.pet.notes.includes('玩球') &&
+      db_.distanceKm === 0 && db_.initiator.userName === '阿青' && db_.provider.userName === '林晓',
+      `pet=${db_.pet?.name} distance=${db_.distanceKm} init=${db_.initiator?.userName}`)
+    // 聊天引用订单（文本 + 订单卡片）
+    const ref = await petsApi.api('/api/messages', { method: 'POST', body: { conversationId: convId, text: '看看这个订单', orderId: bk.booking.id } })
+    check('聊天引用订单', ref.message.orderId === bk.booking.id && ref.message.text === '看看这个订单')
+    // 引用无关订单被拒：注册临时用户 C 建订单，aqing 引用 → 403
+    const c = await petsApi.api('/api/auth/register', { method: 'POST', body: { username: 'tempc' + Date.now(), password: '123456', nickname: '临时C' } })
+    petsApi.App.state.token = c.token
+    const cPet = await petsApi.api('/api/pets', { method: 'POST', body: {
+      name: 'C狗', petType: 'dog', breed: 'x', ageMonths: 12, gender: 'male', neutered: false
+    } })
+    const cBk = await petsApi.api('/api/bookings', { method: 'POST', body: {
+      petId: cPet.pet.id, serviceId: 'feeding', scheduledTime: '周一', location: '小区', openToFeed: true
+    } })
+    petsApi.logout()
+    await petsApi.login('aqing', '123456')
+    try {
+      await petsApi.api('/api/messages', { method: 'POST', body: { conversationId: convId, text: '', orderId: cBk.booking.id } })
+      check('引用无关订单被拒', false)
+    } catch (e) { check('引用无关订单被拒', e.message.includes('引用') || e.message.includes('相关'), e.message.slice(0, 20)) }
+    // 历史消息回读带 orderId
+    const { messages } = await loadMessages(convId)
+    check('历史回读订单引用', messages.some((m) => m.orderId === bk.booking.id))
+    // 清理
+    await petsApi.api('/api/pets/' + pet.pet.id, { method: 'DELETE' })
+    petsApi.logout()
+    await petsApi.login(c.user.username, '123456')
+    await petsApi.api('/api/pets/' + cPet.pet.id, { method: 'DELETE' })
+    petsApi.logout()
+  } catch (e) { check('订单详情/引用', false, e.message) }
+
   logout()
   console.log(`\n══════ 结果：${passed} 通过 / ${failed} 失败 ══════`)
   process.exit(failed > 0 ? 1 : 0)

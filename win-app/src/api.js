@@ -30,7 +30,9 @@ const App = {
     syncChosen: storage.getItem('jiyu.syncChosen') === '1',
     activeConversation: null,
     savedAccounts: JSON.parse(storage.getItem('jiyu.accounts') || '[]'),
-    socket: null
+    socket: null,
+    orderDraft: null,   // 聊天输入框待发送的订单引用（来自订单详情/引用按钮）
+    orderCache: {}      // orderId → 订单详情（聊天卡片渲染缓存）
   },
   views: {} // 由 views.js 注册
 }
@@ -112,6 +114,11 @@ function logout() {
   App.state.dynamics = []
   App.state.records = []
   App.state.agreements = []
+  App.state.pets = []
+  App.state.bookings = []
+  App.state.careServices = []
+  App.state.orderDraft = null
+  App.state.orderCache = {}
 }
 
 /* ---------- 多账号 ---------- */
@@ -221,8 +228,8 @@ async function loadMessages(conversationId, before) {
 async function markRead(conversationId) {
   try { await api('/api/conversations/' + conversationId + '/read', { method: 'POST' }) } catch (e) { /* ignore */ }
 }
-async function sendMessageRest(conversationId, text, mediaType, mediaUrl) {
-  return api('/api/messages', { method: 'POST', body: { conversationId, text, mediaType, mediaUrl } })
+async function sendMessageRest(conversationId, text, mediaType, mediaUrl, orderId) {
+  return api('/api/messages', { method: 'POST', body: { conversationId, text, mediaType, mediaUrl, orderId } })
 }
 
 /* ---------- 文件上传 ---------- */
@@ -281,17 +288,18 @@ function connectSocket() {
   })
   App.state.socket = socket
 }
-function socketSend(conversationId, text) {
+function socketSend(conversationId, text, orderId) {
   return new Promise((resolve) => {
     const socket = App.state.socket
     if (!socket || !socket.connected) return resolve({ ok: false, blocked: false, error: '未连接' })
-    socket.emit('chat:send', { conversationId, text }, (ack) => resolve(ack || {}))
+    socket.emit('chat:send', { conversationId, text, orderId }, (ack) => resolve(ack || {}))
   })
 }
 function normalizeMessage(msg, isMe) {
   return {
     id: msg.id, senderIsMe: isMe, text: msg.text || '',
     mediaType: msg.mediaType || null, mediaUrl: msg.mediaUrl || null,
+    orderId: msg.orderId || null,
     time: msg.time, isSystemNote: !!msg.isSystemNote
   }
 }
@@ -336,6 +344,12 @@ async function acceptBooking(id) {
   await fetchBookings()
   return data
 }
+async function fetchBooking(id) {
+  if (App.state.orderCache[id]) return App.state.orderCache[id]
+  const data = await api('/api/bookings/' + id)
+  App.state.orderCache[id] = data.booking
+  return data.booking
+}
 
 /* ---------- 版本检查 ---------- */
 async function fetchVersion() {
@@ -344,5 +358,5 @@ async function fetchVersion() {
 
 /* Node 环境导出（测试用） */
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { App, api, login, register, loginWithSaved, autoLogin, logout, refreshAll, fetchMatches, fetchUser, openConversation, loadMessages, sendMessageRest, uploadMedia, postDynamic, signAgreement, completeExchange, submitEvaluation, fetchVersion }
+  module.exports = { App, api, login, register, loginWithSaved, autoLogin, logout, refreshAll, fetchMatches, fetchUser, openConversation, loadMessages, sendMessageRest, uploadMedia, postDynamic, signAgreement, completeExchange, submitEvaluation, fetchVersion, fetchBooking }
 }

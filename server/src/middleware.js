@@ -72,6 +72,7 @@ export function serializeMessage(row) {
     text: row.text,
     mediaType: row.media_type || null,
     mediaUrl: row.media_url || null,
+    orderId: row.order_id || null,
     time: row.created_at,
     isSystemNote: !!row.is_system_note
   }

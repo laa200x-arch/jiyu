@@ -280,7 +280,7 @@ async function renderFeed() {
       const canAccept = d.orderId && orderStatus === 'open' && !isOwnOrder
         && (App.state.user.creditScore >= 75 && App.state.user.verification !== 'none')
       const orderBlock = d.orderId ? `
-            <div style="margin-top:10px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+            <div class="feed-order-bar" data-order-detail="${esc(d.orderId)}" style="margin-top:10px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;cursor:pointer" title="查看订单详情">
               <span class="tag tag-vip">💰 收费订单 ¥${orderPrice} · 佣金 10%</span>
               <span class="card-sub">${esc(orderService)}</span>
               <span class="spacer"></span>
@@ -324,9 +324,94 @@ async function renderFeed() {
         renderFeed()
       } catch (e) { toast('接单失败：' + e.message) }
     }))
+    // 订单详情（查看狗狗信息/位置距离/私聊）
+    list.querySelectorAll('[data-order-detail]').forEach((el) => el.addEventListener('click', (e) => {
+      if (e.target.closest('[data-accept]')) return
+      showOrderDetail(el.dataset.orderDetail)
+    }))
   } catch (e) {
     list.innerHTML = `<div class="empty">加载失败：${esc(e.message)}</div>`
   }
+}
+
+/* 订单详情（宠物信息 / 位置距离 / 金额 / 私聊下单人或看护人） */
+async function showOrderDetail(orderId) {
+  let b
+  try { b = await fetchBooking(orderId) }
+  catch (e) { return toast('订单加载失败：' + e.message) }
+  const pet = b.pet
+  const isMeInvolved = b.userId === App.state.user.id || b.providerId === App.state.user.id
+  const petInfo = pet ? `
+    <div class="order-detail-block">
+      <div class="card-sub" style="margin-bottom:6px">🐕 宠物信息</div>
+      <div class="order-detail-line"><b>${esc(pet.name)}</b> · ${pet.petType === 'dog' ? '狗' : pet.petType === 'cat' ? '猫' : '其他'} · ${esc(pet.breed)} · ${pet.ageMonths} 月</div>
+      <div class="card-sub">${pet.neutered ? '已绝育' : '未绝育'} · ${pet.gender === 'male' ? '公' : '母'}${pet.weightKg ? ' · ' + pet.weightKg + 'kg' : ''}</div>
+      ${pet.behaviors && pet.behaviors.length ? `<div class="card-sub">行为：${esc(pet.behaviors.join('、'))}</div>` : ''}
+      ${pet.homeReactions && pet.homeReactions.length ? `<div class="card-sub">家中反应：${esc(pet.homeReactions.join('、'))}</div>` : ''}
+      ${pet.notes ? `<div class="card-sub">📝 ${esc(pet.notes)}</div>` : ''}
+    </div>` : ''
+  const initiatorBlock = b.initiator ? `
+    <div class="order-detail-block">
+      <div class="card-sub" style="margin-bottom:6px">👤 下单人</div>
+      <div class="row">
+        ${avatarHtml(b.initiator, 'avatar avatar-sm')}
+        <div style="flex:1">
+          <div class="order-detail-line"><b>${esc(b.initiator.userName)}</b>（信用 ${Math.round(b.initiator.creditScore)}）</div>
+          <div class="card-sub">${esc(b.initiator.locationLabel || '未填位置')}${b.distanceKm != null ? ' · 距离你约 ' + b.distanceKm + ' km' : ''}</div>
+        </div>
+      </div>
+    </div>` : ''
+  const providerBlock = b.provider ? `
+    <div class="order-detail-block">
+      <div class="card-sub" style="margin-bottom:6px">🧑‍⚕️ 看护人</div>
+      <div class="row">
+        ${avatarHtml(b.provider, 'avatar avatar-sm')}
+        <div style="flex:1">
+          <div class="order-detail-line"><b>${esc(b.provider.userName)}</b>（信用 ${Math.round(b.provider.creditScore)}）</div>
+          <div class="card-sub">${esc(b.provider.locationLabel || '未填位置')}${b.provider.distanceKm != null ? ' · 距离你约 ' + b.provider.distanceKm + ' km' : ''}</div>
+        </div>
+      </div>
+    </div>` : (b.status === 'open' ? '<div class="order-detail-block card-sub">⏳ 待接单：信用 ≥75 且完成认证的用户可接单</div>' : '')
+  openModal(`
+    <div class="modal-title">订单详情 · ${esc(b.serviceName)}</div>
+    <div class="row" style="margin-bottom:10px">
+      <span class="tag tag-vip">💰 ¥${b.priceYuan}/次</span>
+      <span class="exchange-status ${b.status}">${orderStatusText(b.status)}</span>
+      <span class="spacer"></span>
+      <span class="card-sub">${esc(b.scheduledTime)}</span>
+    </div>
+    <div class="order-detail-block">
+      <div class="card-sub" style="margin-bottom:6px">📍 服务地点</div>
+      <div class="order-detail-line">${esc(b.location || '线上')}</div>
+    </div>
+    <div class="order-detail-block">
+      <div class="card-sub" style="margin-bottom:6px">💰 金额结算</div>
+      <div class="order-detail-line">服务费 ¥${b.priceYuan} · 平台佣金 ¥${b.commissionYuan}（10%） · 服务人员得 ¥${b.workerIncome}</div>
+    </div>
+    ${petInfo}
+    ${initiatorBlock}
+    ${providerBlock}
+    <div class="modal-actions" style="flex-wrap:wrap">
+      ${b.initiator && b.initiator.id !== App.state.user.id ? `<button class="btn btn-primary" id="od-chat-initiator">💬 私聊下单人</button>` : ''}
+      ${b.provider && b.provider.id !== App.state.user.id ? `<button class="btn btn-primary" id="od-chat-provider">💬 私聊看护人</button>` : ''}
+      <button class="btn btn-outline" onclick="closeModal()">关闭</button>
+    </div>
+  `, (box) => {
+    const chatWith = async (user) => {
+      closeModal()
+      try {
+        const conv = await openConversation(user.id)
+        App.state.orderDraft = b
+        await renderMessage()
+        showChat(conv)
+        switchTab('message')
+      } catch (e) { toast('无法创建会话：' + e.message) }
+    }
+    const bi = box.querySelector('#od-chat-initiator')
+    if (bi) bi.addEventListener('click', () => chatWith(b.initiator))
+    const bp = box.querySelector('#od-chat-provider')
+    if (bp) bp.addEventListener('click', () => chatWith(b.provider))
+  })
 }
 
 /* 用户资料（动态作者/私信入口） */
@@ -485,6 +570,10 @@ function renderMessages(conv) {
   msgs.innerHTML =
     (App.state.hasMore[conv.id] ? '<button class="load-earlier" id="load-earlier">↑ 加载更早消息</button>' : '') +
     list.map((m) => messageHtml(m)).join('')
+  // 填充订单引用卡片
+  msgs.querySelectorAll('.msg-order-card[data-order-id]').forEach((el) => {
+    fillOrderCard(el, el.dataset.orderId)
+  })
   const btn = msgs.querySelector('#load-earlier')
   if (btn) btn.addEventListener('click', async () => {
     const list2 = (await loadMessages(conv.id, list[0].id)).messages
@@ -507,8 +596,25 @@ function messageHtml(m) {
   } else if (m.mediaType === 'audio' && m.mediaUrl) {
     media = `<div class="msg-media-card" onclick="playAudio('${mediaUrl(m.mediaUrl)}')">🔊 语音消息</div>`
   }
-  const bubble = media + (m.text ? `<div>${esc(m.text)}</div>` : '')
+  const orderCard = m.orderId
+    ? `<div class="msg-order-card" data-order-id="${esc(m.orderId)}"><span class="card-sub">订单卡片加载中…</span></div>`
+    : ''
+  const bubble = media + orderCard + (m.text ? `<div>${esc(m.text)}</div>` : '')
   return `<div class="msg ${m.senderIsMe ? 'me' : 'them'}"><div class="msg-bubble">${bubble}</div></div>`
+}
+
+/* 异步填充聊天里的订单卡片（fetchBooking → 缓存 → 渲染） */
+async function fillOrderCard(el, orderId) {
+  try {
+    const b = await fetchBooking(orderId)
+    el.innerHTML = `
+      <div class="order-card-head">🐾 宠物护理订单</div>
+      <div class="order-card-line">${esc(b.serviceName)} · <b style="color:#d97b2e">¥${b.priceYuan}</b></div>
+      <div class="card-sub">${esc(b.pet ? b.pet.name : '')} · ${orderStatusText(b.status)} · 佣金 10%</div>`
+    el.addEventListener('click', () => showOrderDetail(orderId))
+  } catch (e) {
+    el.innerHTML = '<span class="card-sub">订单卡片加载失败</span>'
+  }
 }
 
 function playAudio(url) {
@@ -518,6 +624,7 @@ function playAudio(url) {
 function buildChatInput(conv) {
   return `
     <div class="chat-tools">
+      <button class="icon-btn" id="ci-order" title="引用订单卡片">🧾</button>
       <button class="icon-btn" id="ci-image" title="发送图片">🖼</button>
       <button class="icon-btn" id="ci-video" title="发送视频">🎬</button>
       <button class="icon-btn" id="ci-camera" title="拍照发送">📷</button>
@@ -526,8 +633,54 @@ function buildChatInput(conv) {
       <input type="file" id="ci-video-file" accept="video/*" hidden>
       <span id="ci-recording" class="recording-indicator hidden"><span class="recording-dot"></span>录音中…</span>
     </div>
+    <div id="ci-order-chip" class="order-chip hidden"></div>
     <textarea id="ci-text" placeholder="发送消息（严禁金钱交易内容）" rows="1"></textarea>
     <button class="btn btn-primary" id="ci-send" disabled>发送</button>`
+}
+
+function renderOrderChip(conv) {
+  const chip = document.getElementById('ci-order-chip')
+  if (!chip) return
+  const draft = App.state.orderDraft
+  if (!draft) { chip.classList.add('hidden'); chip.innerHTML = ''; return }
+  chip.classList.remove('hidden')
+  chip.innerHTML = `
+    <span>🧾 引用订单：${esc(draft.serviceName)} · ¥${draft.priceYuan}（${esc(draft.pet ? draft.pet.name : '')}）</span>
+    <button class="icon-btn" id="ci-order-remove" title="移除引用">✕</button>`
+  chip.querySelector('#ci-order-remove').addEventListener('click', () => {
+    App.state.orderDraft = null
+    renderOrderChip(conv)
+    document.getElementById('ci-send').disabled = !document.getElementById('ci-text').value.trim()
+  })
+}
+
+/* 引用订单选择器（列出我相关订单；从订单详情进入时已自动带上草稿） */
+function showOrderPicker(conv) {
+  const orders = App.state.bookings
+  if (!orders.length) return toast('暂无相关订单（下单或接单），先到「宠物」Tab 发起一笔订单吧')
+  openModal(`
+    <div class="modal-title">引用订单</div>
+    <div class="card-sub" style="margin-bottom:12px">选择一笔与你相关的订单（我发布或我接单）</div>
+    ${orders.map((b) => `
+      <div class="card order-pick" data-oid="${esc(b.id)}" style="margin-bottom:8px;cursor:pointer">
+        <div class="row">
+          <div style="flex:1;min-width:0">
+            <div class="row"><span class="convo-name">${esc(b.serviceName)}</span><span class="spacer"></span><span class="tag tag-vip">¥${b.priceYuan}</span></div>
+            <div class="card-sub">${esc(b.pet ? b.pet.name : '')} · ${orderStatusText(b.status)} · 🕐 ${esc(b.scheduledTime)}</div>
+          </div>
+        </div>
+      </div>`).join('')}
+    <div class="modal-actions"><button class="btn btn-outline" onclick="closeModal()">取消</button></div>
+  `, (box) => {
+    box.querySelectorAll('.order-pick').forEach((el) => el.addEventListener('click', () => {
+      const b = App.state.bookings.find((x) => x.id === el.dataset.oid)
+      if (!b) return
+      App.state.orderDraft = b
+      closeModal()
+      renderOrderChip(conv)
+      document.getElementById('ci-send').disabled = false
+    }))
+  })
 }
 
 function bindChatInput(conv) {
@@ -536,11 +689,13 @@ function bindChatInput(conv) {
   const recording = document.getElementById('ci-recording')
   const fileImage = document.getElementById('ci-image-file')
   const fileVideo = document.getElementById('ci-video-file')
-  text.addEventListener('input', () => { sendBtn.disabled = !text.value.trim() })
+  renderOrderChip(conv)
+  text.addEventListener('input', () => { sendBtn.disabled = !text.value.trim() && !App.state.orderDraft })
   text.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() }
   })
   sendBtn.addEventListener('click', send)
+  document.getElementById('ci-order').addEventListener('click', () => showOrderPicker(conv))
 
   document.getElementById('ci-image').addEventListener('click', () => fileImage.click())
   document.getElementById('ci-video').addEventListener('click', () => fileVideo.click())
@@ -574,11 +729,14 @@ function bindChatInput(conv) {
 
   async function send() {
     const content = text.value.trim()
-    if (!content) return
+    const orderDraft = App.state.orderDraft
+    if (!content && !orderDraft) return
     text.value = ''
+    App.state.orderDraft = null
+    renderOrderChip(conv)
     sendBtn.disabled = true
     // Socket 实时发送，失败 REST 兜底
-    const ack = await socketSend(conv.id, content)
+    const ack = await socketSend(conv.id, content, orderDraft ? orderDraft.id : null)
     if (ack.blocked) {
       showBlocked(ack.warning)
       const list = (await loadMessages(conv.id)).messages
@@ -586,7 +744,7 @@ function bindChatInput(conv) {
       renderMessages(conv)
     } else if (!ack.ok) {
       try {
-        const r = await sendMessageRest(conv.id, content)
+        const r = await sendMessageRest(conv.id, content, null, null, orderDraft ? orderDraft.id : null)
         if (r.blocked) showBlocked(r.warning)
         const list = (await loadMessages(conv.id)).messages
         App.state.messages[conv.id] = list.map((m) => normalizeMessage(m, m.senderIsMe))

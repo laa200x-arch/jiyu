@@ -114,41 +114,48 @@ export function petsRouter(db) {
     res.json({ ok: true })
   })
 
+  /** 订单序列化（列表与详情共用；viewerId 用于计算下单人与查看者的距离） */
+  function serializeBooking(row, viewerId = null) {
+    const initiator = db.get('SELECT id, nickname, avatar_symbol, avatar_url, credit_score, location_label, distance_km FROM users WHERE id = ?', [row.user_id])
+    const provider = row.provider_id ? db.get('SELECT id, nickname, avatar_symbol, avatar_url, credit_score, location_label, distance_km FROM users WHERE id = ?', [row.provider_id]) : null
+    const distanceKm = initiator ? (Number(viewerId) === row.user_id ? 0 : initiator.distance_km ?? null) : null
+    return {
+      id: String(row.id),
+      userId: String(row.user_id),
+      providerId: row.provider_id ? String(row.provider_id) : null,
+      petId: String(row.pet_id),
+      serviceId: row.service_id,
+      serviceName: row.service_name,
+      scheduledTime: row.scheduled_time,
+      location: row.location || null,
+      status: row.status,
+      priceYuan: row.price_yuan,
+      commissionRate: row.commission_rate,
+      commissionYuan: row.commission_yuan,
+      workerIncome: row.worker_income,
+      openToFeed: !!row.open_to_feed,
+      createdAt: row.created_at,
+      pet: (() => {
+        const p = db.get('SELECT * FROM pets WHERE id = ?', [row.pet_id])
+        return p ? serializePet(p) : null
+      })(),
+      initiator: initiator ? { id: String(initiator.id), userName: initiator.nickname, avatarSymbol: initiator.avatar_symbol, avatarUrl: initiator.avatar_url || null, creditScore: initiator.credit_score, locationLabel: initiator.location_label, distanceKm: initiator.distance_km } : null,
+      provider: provider ? { id: String(provider.id), userName: provider.nickname, avatarSymbol: provider.avatar_symbol, avatarUrl: provider.avatar_url || null, creditScore: provider.credit_score, locationLabel: provider.location_label, distanceKm: provider.distance_km } : null,
+      distanceKm
+    }
+  }
+
   // 我的看护订单（我发布 + 我接单）
   router.get('/bookings', (req, res) => {
     const rows = db.all('SELECT * FROM bookings WHERE user_id = ? OR provider_id = ? ORDER BY id DESC', [req.userId, req.userId])
-    res.json({
-      bookings: rows.map((row) => ({
-        id: String(row.id),
-        userId: String(row.user_id),
-        providerId: row.provider_id ? String(row.provider_id) : null,
-        petId: String(row.pet_id),
-        serviceId: row.service_id,
-        serviceName: row.service_name,
-        scheduledTime: row.scheduled_time,
-        location: row.location || null,
-        status: row.status,
-        priceYuan: row.price_yuan,
-        commissionRate: row.commission_rate,
-        commissionYuan: row.commission_yuan,
-        workerIncome: row.worker_income,
-        openToFeed: !!row.open_to_feed,
-        createdAt: row.created_at,
-        pet: (() => {
-          const p = db.get('SELECT * FROM pets WHERE id = ?', [row.pet_id])
-          return p ? serializePet(p) : null
-        })(),
-        initiator: (() => {
-          const u = db.get('SELECT id, nickname, avatar_symbol, avatar_url, credit_score, location_label FROM users WHERE id = ?', [row.user_id])
-          return u ? { id: String(u.id), userName: u.nickname, avatarSymbol: u.avatar_symbol, avatarUrl: u.avatar_url || null, creditScore: u.credit_score, locationLabel: u.location_label } : null
-        })(),
-        provider: (() => {
-          if (!row.provider_id) return null
-          const u = db.get('SELECT id, nickname, avatar_symbol, avatar_url, credit_score, location_label FROM users WHERE id = ?', [row.provider_id])
-          return u ? { id: String(u.id), userName: u.nickname, avatarSymbol: u.avatar_symbol, avatarUrl: u.avatar_url || null, creditScore: u.credit_score, locationLabel: u.location_label } : null
-        })()
-      }))
-    })
+    res.json({ bookings: rows.map((row) => serializeBooking(row, req.userId)) })
+  })
+
+  // 订单详情（动态区公开可见：接单人可查看宠物信息、位置、距离；登录即可）
+  router.get('/bookings/:id', (req, res) => {
+    const row = db.get('SELECT * FROM bookings WHERE id = ?', [req.params.id])
+    if (!row) return res.status(404).json({ error: '订单不存在' })
+    res.json({ booking: serializeBooking(row, req.userId) })
   })
 
   // 发起看护订单（收费模式：价格 = 服务定价；平台佣金 10%，其余归服务人员）

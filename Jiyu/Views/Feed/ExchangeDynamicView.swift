@@ -89,7 +89,10 @@ struct ExchangeDynamicView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
                 if item.orderId != nil {
-                    orderBlock(item)
+                    NavigationLink(destination: OrderDetailView(orderId: item.orderId!)) {
+                        orderBlock(item)
+                    }
+                    .buttonStyle(.plain)
                 }
             }
         }

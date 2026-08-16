@@ -226,7 +226,7 @@ body {
   display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 13px;
 }
 .msg-media-card:hover { background: #333; }
-.chat-input { display: flex; gap: 8px; padding: 10px 14px; border-top: 1px solid var(--divider); align-items: flex-end; }
+.chat-input { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px 14px; border-top: 1px solid var(--divider); align-items: flex-end; }
 .chat-input textarea {
   flex: 1; border: none; outline: none; resize: none; font-family: inherit; font-size: 13px;
   background: #f2f4f6; border-radius: 16px; padding: 9px 14px; min-height: 38px; max-height: 96px;
@@ -239,6 +239,27 @@ body {
 .recording-indicator { color: var(--danger); font-size: 12px; display: flex; align-items: center; gap: 5px; }
 .recording-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--danger); animation: blink 1s infinite; }
 @keyframes blink { 50% { opacity: 0.2; } }
+/* 聊天订单引用 */
+.order-chip {
+  width: 100%; display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--primary);
+  background: rgba(90, 170, 205, 0.10); border: 1px dashed var(--primary); border-radius: 10px; padding: 7px 12px;
+}
+.order-chip .icon-btn { font-size: 13px; padding: 2px 6px; }
+.msg-order-card {
+  background: #fff; border: 1px solid var(--divider); border-radius: 12px; padding: 9px 12px;
+  margin-bottom: 6px; cursor: pointer; min-width: 180px; text-align: left;
+}
+.msg.me .msg-order-card { background: rgba(255, 255, 255, 0.92); }
+.msg-order-card:hover { border-color: var(--primary); }
+.order-card-head { font-size: 12px; font-weight: 700; color: var(--warning); margin-bottom: 3px; }
+.order-card-line { font-size: 13px; color: var(--text); }
+/* 订单详情弹窗 */
+.order-detail-block {
+  background: #f7f9fa; border: 1px solid var(--divider); border-radius: 12px; padding: 10px 12px; margin-bottom: 10px;
+}
+.order-detail-line { font-size: 13px; color: var(--text); margin-bottom: 3px; }
+.feed-order-bar:hover { background: rgba(90, 170, 205, 0.06); border-radius: 10px; }
+.order-pick:hover { border-color: var(--primary); }
 .blocked-banner {
   background: rgba(242, 158, 77, 0.12); color: var(--warning); font-size: 11px;
   border-radius: 8px; padding: 7px 12px; margin: 0 12px 4px;

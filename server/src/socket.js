@@ -31,14 +31,15 @@ export function setupSocket(httpServer, db, chatApi) {
     socket.join(`user:${userId}`)
     console.log(`[socket] 用户 ${userId} 已连接 (${socket.id})`)
 
-    // 实时发送消息（走与 REST 相同风控与落库）
+    // 实时发送消息（走与 REST 相同风控与落库；支持 orderId 订单引用）
     socket.on('chat:send', (payload, ack) => {
       const conversationId = payload?.conversationId
       const text = payload?.text || ''
       const mediaType = payload?.mediaType || null
       const mediaUrl = payload?.mediaUrl || null
-      console.log(`[socket] user=${userId} chat:send conv=${conversationId} text="${String(text).slice(0, 20)}" media=${mediaType || 'none'}`)
-      const result = chatApi.saveMessage(userId, conversationId, { text, mediaType, mediaUrl })
+      const orderId = payload?.orderId || null
+      console.log(`[socket] user=${userId} chat:send conv=${conversationId} text="${String(text).slice(0, 20)}" media=${mediaType || 'none'} order=${orderId || 'none'}`)
+      const result = chatApi.saveMessage(userId, conversationId, { text, mediaType, mediaUrl, orderId })
       console.log(`[socket] user=${userId} chat:send 结果: ${result.error || (result.blocked ? 'blocked' : 'ok')}`)
       if (ack) ack({ ok: !result.error && !result.blocked, ...result })
     })

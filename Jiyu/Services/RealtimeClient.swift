@@ -17,6 +17,7 @@ final class RealtimeClient {
         let text: String
         let mediaType: String?
         let mediaUrl: String?
+        let orderId: String?
         let time: Date
         let senderId: String
     }
@@ -71,12 +72,15 @@ final class RealtimeClient {
     }
 
     /// 发送消息（服务端同 REST 风控），completion(ok, blocked, warning)
-    func send(conversationId: String, text: String, completion: @escaping (Bool, Bool, String?) -> Void) {
+    /// orderId：引用宠物护理订单卡片（可空）
+    func send(conversationId: String, text: String, orderId: String? = nil, completion: @escaping (Bool, Bool, String?) -> Void) {
         guard let socket, socket.status == .connected else {
             completion(false, false, "实时通道未连接")
             return
         }
-        socket.emitWithAck("chat:send", ["conversationId": conversationId, "text": text])
+        var payload: [String: Any] = ["conversationId": conversationId, "text": text]
+        if let orderId { payload["orderId"] = orderId }
+        socket.emitWithAck("chat:send", payload)
             .timingOut(after: 5) { data in
                 let ack = data.first as? [String: Any]
                 let ok = ack?["ok"] as? Bool ?? false
@@ -106,6 +110,7 @@ final class RealtimeClient {
             text: text,
             mediaType: payload["mediaType"] as? String,
             mediaUrl: payload["mediaUrl"] as? String,
+            orderId: payload["orderId"] as? String,
             time: time,
             senderId: senderId
         )

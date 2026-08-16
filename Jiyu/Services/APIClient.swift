@@ -168,11 +168,12 @@ final class APIClient {
         let _: OkResponse = try await request("/api/conversations/\(conversationId)/read", method: "POST")
     }
 
-    /// REST 发送消息（Socket 失败时的兜底通道，服务端同一套风控；支持媒体消息）
-    func sendMessage(conversationId: String, text: String, mediaType: String? = nil, mediaUrl: String? = nil) async throws -> MessageSendResponse {
+    /// REST 发送消息（Socket 失败时的兜底通道，服务端同一套风控；支持媒体消息与订单引用）
+    func sendMessage(conversationId: String, text: String, mediaType: String? = nil, mediaUrl: String? = nil, orderId: String? = nil) async throws -> MessageSendResponse {
         var body: [String: Any] = ["conversationId": conversationId, "text": text]
         if let mediaType { body["mediaType"] = mediaType }
         if let mediaUrl { body["mediaUrl"] = mediaUrl }
+        if let orderId { body["orderId"] = orderId }
         return try await request("/api/messages", method: "POST", body: body)
     }
 
@@ -366,6 +367,12 @@ final class APIClient {
     /// 接单（动态区订单；服务端校验信用 ≥75 且已完成认证）
     func acceptBooking(id: String) async throws {
         let _: OkResponse = try await request("/api/bookings/\(id)/accept", method: "POST")
+    }
+
+    /// 订单详情（动态区公开可见：宠物信息/位置距离；登录即可）
+    func fetchBooking(id: String) async throws -> ServerBooking {
+        let response: BookingResponse = try await request("/api/bookings/\(id)")
+        return response.booking
     }
 
     // MARK: - 版本检查

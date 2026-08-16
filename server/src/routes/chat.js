@@ -113,9 +113,10 @@ export function chatRouter(db, bus = { io: null }) {
   })
 
   // 发送消息（REST 兜底，与 Socket.io 同一套风控与落库逻辑）
+  // orderId：引用宠物护理订单（卡片消息；订单须属于会话双方之一）
   router.post('/messages', (req, res) => {
-    const { conversationId, text, mediaType, mediaUrl } = req.body || {}
-    const result = saveMessage(req.userId, conversationId, { text, mediaType, mediaUrl })
+    const { conversationId, text, mediaType, mediaUrl, orderId } = req.body || {}
+    const result = saveMessage(req.userId, conversationId, { text, mediaType, mediaUrl, orderId })
     if (result.error) return res.status(result.status || 400).json({ error: result.error, blocked: result.blocked })
     res.status(201).json({
       message: result.message,
@@ -127,17 +128,31 @@ export function chatRouter(db, bus = { io: null }) {
   /**
    * 消息落库核心（风控拦截 + 会话预览更新 + 实时广播）
    * 支持文本与媒体消息（mediaType: image/video，mediaUrl: 上传后的相对路径）
+   * 支持订单引用（orderId：渲染订单卡片；订单须与会话双方之一相关）
    * 供 REST 与 Socket.io 共用
    */
-  function saveMessage(senderId, conversationId, { text = '', mediaType = null, mediaUrl = null } = {}) {
+  function saveMessage(senderId, conversationId, { text = '', mediaType = null, mediaUrl = null, orderId = null } = {}) {
     const content = String(text || '').trim()
-    if (!content && !mediaUrl) return { error: '消息不能为空', status: 400 }
+    const orderRef = orderId ? String(orderId) : null
+    if (!content && !mediaUrl && !orderRef) return { error: '消息不能为空', status: 400 }
     const convo = db.get('SELECT * FROM conversations WHERE id = ?', [conversationId])
     if (!convo) return { error: '会话不存在', status: 404 }
     if (convo.user_a !== senderId && convo.user_b !== senderId) {
       return { error: '无权访问该会话', status: 403 }
     }
-    const preview = content || (mediaType === 'video' ? '[视频]' : mediaType === 'audio' ? '[语音]' : '[图片]')
+    // 校验引用的订单：存在，且订单的下单人/看护人是会话双方之一
+    let orderPreview = null
+    if (orderRef) {
+      const order = db.get('SELECT id, user_id, provider_id, service_name, price_yuan, status FROM bookings WHERE id = ?', [orderRef])
+      if (!order) return { error: '订单不存在或已删除', status: 404 }
+      const partnerId = convo.user_a === senderId ? convo.user_b : convo.user_a
+      if (order.user_id !== senderId && order.user_id !== partnerId &&
+          order.provider_id !== senderId && order.provider_id !== partnerId) {
+        return { error: '只能引用自己相关（下单/接单）的订单', status: 403 }
+      }
+      orderPreview = `[订单] ${order.service_name} ¥${order.price_yuan}`
+    }
+    const preview = orderPreview || content || (mediaType === 'video' ? '[视频]' : mediaType === 'audio' ? '[语音]' : '[图片]')
     const risk = checkTextRisk(content)
     if (risk.isIllegal) {
       // 原文不发送，追加系统提示（方案 2.3.6）
@@ -157,20 +172,20 @@ export function chatRouter(db, bus = { io: null }) {
       }
     }
     const r = db.run(
-      `INSERT INTO messages (conversation_id, sender_id, text, media_type, media_url, is_system_note, created_at) VALUES (?,?,?,?,?,?,?)`,
-      [convo.id, senderId, content, mediaType, mediaUrl, 0, now()]
+      `INSERT INTO messages (conversation_id, sender_id, text, media_type, media_url, order_id, is_system_note, created_at) VALUES (?,?,?,?,?,?,?,?)`,
+      [convo.id, senderId, content, mediaType, mediaUrl, orderRef, 0, now()]
     )
-    updatePreviewAndBroadcast(convo, senderId, preview, r.lastInsertRowid, mediaType, mediaUrl)
+    updatePreviewAndBroadcast(convo, senderId, preview, r.lastInsertRowid, mediaType, mediaUrl, orderRef)
     return {
       message: serializeMessage({
         id: r.lastInsertRowid, conversation_id: convo.id, sender_id: senderId,
-        text: content, media_type: mediaType, media_url: mediaUrl,
+        text: content, media_type: mediaType, media_url: mediaUrl, order_id: orderRef,
         is_system_note: 0, created_at: now(), sender_is_me: true
       })
     }
   }
 
-  function updatePreviewAndBroadcast(convo, senderId, text, messageId, mediaType = null, mediaUrl = null) {
+  function updatePreviewAndBroadcast(convo, senderId, text, messageId, mediaType = null, mediaUrl = null, orderId = null) {
     const nowIso = now()
     if (convo.user_a === senderId) {
       db.run('UPDATE conversations SET last_message_text = ?, last_time = ?, unread_b = unread_b + 1 WHERE id = ?',
@@ -185,6 +200,7 @@ export function chatRouter(db, bus = { io: null }) {
       text,
       mediaType: mediaType || undefined,
       mediaUrl: mediaUrl || undefined,
+      orderId: orderId || undefined,
       time: nowIso,
       senderId: String(senderId)
     }

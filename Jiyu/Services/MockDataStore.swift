@@ -32,11 +32,17 @@ final class MockDataStore: ObservableObject {
     @Published var dynamics: [DynamicModel]
     @Published var currentExposurePackage: ExposurePackage?
 
-    /// 宠物护理域（旧巡六迁移）
+    /// 宠物护理域（旧巡六迁移 → 收费订单）
     @Published var pets: [ServerPet] = []
     @Published var bookings: [ServerBooking] = []
     @Published var careServices: [ServerCareService] = []
     @Published var careOptions: CareOptions?
+
+    /// 聊天输入框待发送的订单引用（从订单详情「私聊」进入自动带上；可在输入框移除）
+    @Published var orderDraft: ServerBooking?
+
+    /// 订单详情缓存（聊天订单卡片渲染）
+    private var orderDetailCache: [String: ServerBooking] = [:]
 
     /// 当前打开中的会话（用于实时消息未读计数）
     var activeConversationID: UUID?
@@ -310,14 +316,15 @@ final class MockDataStore: ObservableObject {
 
     /// 发送消息（前置风控拦截，方案 2.3.6）
     /// 服务端模式：Socket.io 实时发送（服务端风控），失败自动 REST 兜底保证必达
+    /// orderId：引用宠物护理订单卡片（可空；仅订单引用时 text 可为空）
     @discardableResult
-    func sendMessage(conversationID: UUID, text: String) async -> MessageSendResult {
+    func sendMessage(conversationID: UUID, text: String, orderId: String? = nil) async -> MessageSendResult {
         if isServerMode {
             guard let serverID = conversationID.serverIDString else {
                 return .failed(warning: "会话未同步，请返回消息列表重新进入")
             }
             // 1) Socket 实时发送
-            let socketResult = await sendViaSocket(serverID: serverID, text: text)
+            let socketResult = await sendViaSocket(serverID: serverID, text: text, orderId: orderId)
             switch socketResult {
             case .sent:
                 return .sent
@@ -328,7 +335,7 @@ final class MockDataStore: ObservableObject {
             }
             // 2) REST 兜底（服务端同一套风控与落库，消息必达服务器）
             do {
-                let response = try await APIClient.shared.sendMessage(conversationId: serverID, text: text)
+                let response = try await APIClient.shared.sendMessage(conversationId: serverID, text: text, orderId: orderId)
                 if response.blocked == true {
                     return .blocked(warning: response.warning ?? "内容违规，已被拦截")
                 }
@@ -350,7 +357,7 @@ final class MockDataStore: ObservableObject {
             updateConversationPreview(conversationID, text: note.text, time: note.time)
             return .blocked(warning: risk.warning)
         }
-        let msg = ChatMessage(senderIsMe: true, text: text)
+        let msg = ChatMessage(senderIsMe: true, text: text, orderId: orderId)
         appendMessage(conversationID, msg)
         updateConversationPreview(conversationID, text: text, time: msg.time)
         return .sent
@@ -379,9 +386,9 @@ final class MockDataStore: ObservableObject {
     }
 
     /// Socket 实时发送（失败返回 .failed，由调用方决定 REST 兜底）
-    private func sendViaSocket(serverID: String, text: String) async -> MessageSendResult {
+    private func sendViaSocket(serverID: String, text: String, orderId: String? = nil) async -> MessageSendResult {
         await withCheckedContinuation { continuation in
-            RealtimeClient.shared.send(conversationId: serverID, text: text) { ok, blocked, warning in
+            RealtimeClient.shared.send(conversationId: serverID, text: text, orderId: orderId) { ok, blocked, warning in
                 Task { @MainActor in
                     if blocked {
                         continuation.resume(returning: .blocked(warning: warning ?? "内容违规，已被拦截"))
@@ -405,6 +412,7 @@ final class MockDataStore: ObservableObject {
             text: payload.text,
             mediaType: payload.mediaType,
             mediaUrl: payload.mediaUrl,
+            orderId: payload.orderId,
             time: payload.time,
             isSystemNote: false
         )
@@ -662,6 +670,32 @@ final class MockDataStore: ObservableObject {
         if let dyns = try? await APIClient.shared.fetchDynamics() {
             dynamics = dyns.map { DynamicModel(server: $0) }
         }
+    }
+
+    /// 订单详情（带缓存；聊天卡片与详情页共用）
+    func bookingDetail(id: String) async -> ServerBooking? {
+        if let cached = orderDetailCache[id] { return cached }
+        guard let booking = try? await APIClient.shared.fetchBooking(id: id) else { return nil }
+        orderDetailCache[id] = booking
+        return booking
+    }
+
+    /// 订单用户摘要 → 完整用户模型（用于「私聊下单人/看护人」创建会话）
+    func userModel(from bookingUser: BookingUser) -> UserModel {
+        UserModel(
+            id: UUID(serverID: bookingUser.id) ?? UUID(),
+            userName: bookingUser.userName,
+            avatarSymbol: bookingUser.avatarSymbol,
+            avatarUrl: bookingUser.avatarUrl,
+            bio: "",
+            locationLabel: bookingUser.locationLabel ?? "",
+            distanceKm: bookingUser.distanceKm,
+            creditScore: bookingUser.creditScore,
+            verification: .none,
+            mySkills: [],
+            wantSkills: [],
+            isExposureVip: false
+        )
     }
 
     // MARK: - 互换动态（方案 2.3.6 动态区风控）
