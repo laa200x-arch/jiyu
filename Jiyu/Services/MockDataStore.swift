@@ -80,6 +80,18 @@ final class MockDataStore: ObservableObject {
         }
     }
 
+    /// 用已保存账号的 token 直接登录（切换账号免输密码）
+    func loginWithSavedAccount(_ account: SavedAccount) async throws {
+        TokenStore.token = account.token
+        do {
+            let user = try await APIClient.shared.fetchMe()
+            try await activateServerSession(user)
+        } catch {
+            TokenStore.token = nil
+            throw error
+        }
+    }
+
     /// 自动登录：App 启动时若存在持久化 Token，从服务器拉取该账号数据
     /// - 返回 true：会话有效（或网络异常保留会话兜底）
     /// - 返回 false：token 已失效，需要重新登录
@@ -107,6 +119,15 @@ final class MockDataStore: ObservableObject {
     private func activateServerSession(_ user: ServerUser) async throws {
         serverUserID = user.id
         currentUser = UserModel(server: user)
+        // 保存账号到本机（切换账号时免输密码，手动删除前一直保留）
+        if let token = TokenStore.token {
+            TokenStore.saveAccount(SavedAccount(
+                username: user.username,
+                nickname: user.userName,
+                avatarSymbol: user.avatarSymbol,
+                token: token
+            ))
+        }
         try await refreshAll()
         NotificationService.requestPermission()
         RealtimeClient.shared.onMessage = { [weak self] payload in

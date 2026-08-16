@@ -142,6 +142,7 @@ struct ServerSkill: Decodable {
 
 struct ServerUser: Decodable {
     let id: String
+    let username: String
     let userName: String
     let avatarSymbol: String
     let bio: String

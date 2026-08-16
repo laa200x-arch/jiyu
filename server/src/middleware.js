@@ -29,6 +29,7 @@ export function serializeUser(row, { skills = null } = {}) {
   if (!row) return null
   return {
     id: String(row.id),
+    username: row.username,
     userName: row.nickname,
     avatarSymbol: row.avatar_symbol,
     bio: row.bio,

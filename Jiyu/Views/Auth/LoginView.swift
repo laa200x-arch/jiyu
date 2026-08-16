@@ -1,6 +1,7 @@
 import SwiftUI
 
 /// 登录 / 注册（服务端模式入口）
+/// 支持：已保存账号一键切换（免输密码）、注册、手动删除账号
 struct LoginView: View {
     @EnvironmentObject private var appState: AppState
 
@@ -10,6 +11,7 @@ struct LoginView: View {
     @State private var isRegister = false
     @State private var isLoading = false
     @State private var errorMessage: String?
+    @State private var savedAccounts: [SavedAccount] = []
 
     var body: some View {
         VStack(spacing: 18) {
@@ -32,6 +34,10 @@ struct LoginView: View {
                 Text("纯公益 · 无金钱交易的技能互换平台")
                     .font(.caption)
                     .foregroundStyle(Theme.textSecondary)
+            }
+
+            if !savedAccounts.isEmpty {
+                savedAccountsSection
             }
 
             VStack(spacing: 12) {
@@ -98,6 +104,83 @@ struct LoginView: View {
             .padding(.bottom, 24)
         }
         .background(Theme.bg)
+        .task {
+            savedAccounts = TokenStore.savedAccounts()
+        }
+    }
+
+    // MARK: - 已保存账号
+
+    private var savedAccountsSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("已保存的账号（点击切换，无需密码）")
+                .font(.caption2)
+                .foregroundStyle(Theme.textSecondary)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 16) {
+                    ForEach(savedAccounts) { account in
+                        savedAccountCard(account)
+                    }
+                }
+                .padding(.horizontal, 4)
+            }
+        }
+        .padding(.horizontal, 24)
+    }
+
+    private func savedAccountCard(_ account: SavedAccount) -> some View {
+        VStack(spacing: 6) {
+            ZStack(alignment: .topTrailing) {
+                ZStack {
+                    Circle()
+                        .fill(Theme.gradient)
+                        .frame(width: 54, height: 54)
+                    Image(systemName: account.avatarSymbol)
+                        .font(.system(size: 22))
+                        .foregroundStyle(.white)
+                }
+                Button {
+                    deleteAccount(account)
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 18))
+                        .foregroundStyle(Theme.danger.opacity(0.85))
+                        .background(Circle().fill(.white))
+                }
+            }
+            Text(account.nickname)
+                .font(.caption)
+                .fontWeight(.medium)
+                .foregroundStyle(Theme.textPrimary)
+                .lineLimit(1)
+        }
+        .frame(width: 76)
+        .onTapGesture {
+            loginWithSaved(account)
+        }
+        .accessibilityLabel("切换到账号 \(account.nickname)")
+    }
+
+    private func loginWithSaved(_ account: SavedAccount) {
+        Task {
+            isLoading = true
+            errorMessage = nil
+            defer { isLoading = false }
+            do {
+                try await MockDataStore.shared.loginWithSavedAccount(account)
+                appState.loginSucceeded()
+            } catch {
+                // token 失效：移除该账号，提示重新输入密码
+                TokenStore.removeAccount(username: account.username)
+                savedAccounts = TokenStore.savedAccounts()
+                errorMessage = "账号「\(account.nickname)」登录已过期，请重新输入密码"
+            }
+        }
+    }
+
+    private func deleteAccount(_ account: SavedAccount) {
+        TokenStore.removeAccount(username: account.username)
+        savedAccounts = TokenStore.savedAccounts()
     }
 
     private func submit() {
