@@ -44,7 +44,7 @@
 		A00000000000000000000023 /* LaunchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000121 /* LaunchView.swift */; };
 		A00000000000000000000024 /* MyDynamicsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000122 /* MyDynamicsView.swift */; };
 		A00000000000000000000025 /* PetTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000123 /* PetTabView.swift */; };
-		A00000000000000000000026 /* OrderDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000124 /* OrderDetailView.swift */; };
+		A00000000000000000000026 /* OrderDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000127 /* OrderDetailView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -83,7 +83,7 @@
 		A00000000000000000000121 /* LaunchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchView.swift; sourceTree = "<group>"; };
 		A00000000000000000000122 /* MyDynamicsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MyDynamicsView.swift; sourceTree = "<group>"; };
 		A00000000000000000000123 /* PetTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PetTabView.swift; sourceTree = "<group>"; };
-		A00000000000000000000124 /* OrderDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrderDetailView.swift; sourceTree = "<group>"; };
+		A00000000000000000000127 /* OrderDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrderDetailView.swift; sourceTree = "<group>"; };
 		A00000000000000000000124 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A00000000000000000000125 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A00000000000000000000126 /* Jiyu.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Jiyu.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -206,7 +206,7 @@
 			isa = PBXGroup;
 			children = (
 				A00000000000000000000123 /* PetTabView.swift */,
-				A00000000000000000000124 /* OrderDetailView.swift */,
+				A00000000000000000000127 /* OrderDetailView.swift */,
 			);
 			path = Pet;
 			sourceTree = "<group>";
