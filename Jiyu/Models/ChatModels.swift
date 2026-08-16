@@ -3,7 +3,7 @@ import Foundation
 /// 会话（内置 IM，方案 2.3.3 线上交换）
 struct Conversation: Codable, Identifiable, Hashable {
     let id: UUID
-    let partner: UserModel
+    var partner: UserModel
     var lastMessageText: String
     var lastTime: Date
     var unreadCount: Int
