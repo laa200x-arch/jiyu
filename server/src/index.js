@@ -11,7 +11,7 @@ import { config } from './config.js'
 import { initDb, closeDb } from './db.js'
 import { SQLITE_DDL, MYSQL_DDL } from './schema.js'
 import { seed, ensureEveryoneHasDynamics } from './seed.js'
-import { requireAuth } from './middleware.js'
+import { requireAuth, serializeUser } from './middleware.js'
 import { authRouter } from './routes/auth.js'
 import { profileRouter } from './routes/profile.js'
 import { matchRouter } from './routes/match.js'
@@ -74,6 +74,14 @@ async function main() {
     res.status(201).json({ url: `/uploads/${req.file.filename}` })
   })
   app.use('/uploads', express.static(uploadDir, { maxAge: '7d' }))
+
+  // 我的资料（客户端自动登录/一键切换账号使用；挂载在 /api 而非 /api/auth）
+  app.get('/api/me', requireAuth, (req, res) => {
+    const row = db.get('SELECT * FROM users WHERE id = ?', [req.userId])
+    if (!row) return res.status(404).json({ error: '用户不存在' })
+    const skills = db.all('SELECT * FROM skills WHERE user_id = ?', [req.userId])
+    res.json({ user: serializeUser(row, { skills }) })
+  })
 
   // 路由
   app.use('/api/auth', authRouter(db))

@@ -21,12 +21,12 @@ struct JiyuApp: App {
             .environmentObject(appState)
             .task {
                 // 有持久化 Token：先显示加载页，恢复账号数据后再进主界面
-                // 恢复失败（token 失效/网络异常）→ 回登录页，绝不展示演示数据冒充账号
+                // 恢复失败 → 回登录页（401 清 token；网络异常保留 token 便于重试）
                 if appState.isLaunching {
                     let sessionOK = await MockDataStore.shared.autoLogin()
                     appState.finishLaunch()
                     if !sessionOK {
-                        appState.logout()
+                        appState.showLogin()
                     }
                 }
             }

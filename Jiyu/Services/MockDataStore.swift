@@ -81,20 +81,23 @@ final class MockDataStore: ObservableObject {
     }
 
     /// 用已保存账号的 token 直接登录（切换账号免输密码）
+    /// 401（token 真失效）→ 清 token 抛错；网络异常 → 保留 token 与账号（登录页可重试）
     func loginWithSavedAccount(_ account: SavedAccount) async throws {
         TokenStore.token = account.token
         do {
             let user = try await APIClient.shared.fetchMe()
             try await activateServerSession(user)
-        } catch {
-            TokenStore.token = nil
+        } catch let error as APIError {
+            if error == .unauthorized {
+                TokenStore.token = nil
+            }
             throw error
         }
     }
 
     /// 自动登录：App 启动时若存在持久化 Token，从服务器拉取该账号数据
     /// - 返回 true：会话有效，已恢复账号数据
-    /// - 返回 false：token 失效或网络异常 → 回登录页（避免展示演示数据冒充账号）
+    /// - 返回 false：回登录页（401 清 token；网络异常保留 token 与账号，可重试）
     @discardableResult
     func autoLogin() async -> Bool {
         guard TokenStore.token != nil else { return false }
@@ -102,9 +105,15 @@ final class MockDataStore: ObservableObject {
             let user = try await APIClient.shared.fetchMe()
             try await activateServerSession(user)
             return true
+        } catch let error as APIError {
+            serverUserID = nil
+            RealtimeClient.shared.disconnect()
+            if error == .unauthorized {
+                // token 真失效：清除
+                TokenStore.token = nil
+            }
+            return false
         } catch {
-            // 无论 401 还是网络异常，都回到登录页（登录页可一键重试已保存账号）
-            TokenStore.token = nil
             serverUserID = nil
             RealtimeClient.shared.disconnect()
             return false

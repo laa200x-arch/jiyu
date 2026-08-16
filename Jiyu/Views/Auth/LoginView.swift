@@ -169,11 +169,18 @@ struct LoginView: View {
             do {
                 try await MockDataStore.shared.loginWithSavedAccount(account)
                 appState.loginSucceeded()
+            } catch let error as APIError {
+                if error == .unauthorized {
+                    // token 真失效：移除该账号，提示重新输入密码
+                    TokenStore.removeAccount(username: account.username)
+                    savedAccounts = TokenStore.savedAccounts()
+                    errorMessage = "账号「\(account.nickname)」登录已过期，请重新输入密码"
+                } else {
+                    // 网络异常：保留账号，可稍后重试
+                    errorMessage = "网络异常，账号已保留，请检查网络后重试"
+                }
             } catch {
-                // token 失效：移除该账号，提示重新输入密码
-                TokenStore.removeAccount(username: account.username)
-                savedAccounts = TokenStore.savedAccounts()
-                errorMessage = "账号「\(account.nickname)」登录已过期，请重新输入密码"
+                errorMessage = "登录失败，请重试"
             }
         }
     }

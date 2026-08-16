@@ -29,6 +29,12 @@ final class AppState: ObservableObject {
         isLaunching = false
     }
 
+    /// 仅切换到登录页（不清 token/账号，用于网络异常时保留重试机会）
+    func showLogin() {
+        isLoggedIn = false
+        isLaunching = false
+    }
+
     func logout() {
         MockDataStore.shared.logout()
         isLoggedIn = false
