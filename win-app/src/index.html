@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' http://43.157.17.88:3000 data: blob:; img-src 'self' http://43.157.17.88:3000 data: blob:; media-src 'self' http://43.157.17.88:3000 blob:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self' http://43.157.17.88:3000 ws://43.157.17.88:3000">
+  <title>技遇</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- 登录页 -->
+  <div id="login-page" class="page center-page hidden">
+    <div class="login-card">
+      <div class="brand-icon">⇄</div>
+      <h1 class="brand-title">技遇</h1>
+      <p class="brand-subtitle">纯公益 · 无金钱交易的技能互换平台</p>
+
+      <div id="saved-accounts" class="saved-accounts hidden"></div>
+
+      <div class="field">
+        <input id="login-username" type="text" placeholder="用户名" autocomplete="off">
+      </div>
+      <div class="field">
+        <input id="login-password" type="password" placeholder="密码（至少 6 位）">
+      </div>
+      <div id="register-field" class="field hidden">
+        <input id="login-nickname" type="text" placeholder="昵称">
+      </div>
+      <div id="login-error" class="error-text hidden"></div>
+      <button id="login-submit" class="btn btn-primary btn-block">登 录</button>
+      <button id="login-toggle" class="btn-link">没有账号？注册一个</button>
+      <p class="hint">服务地址：http://43.157.17.88:3000（演示账号 aqing / 123456）</p>
+    </div>
+  </div>
+
+  <!-- 主界面 -->
+  <div id="app" class="hidden">
+    <header class="topbar">
+      <div class="topbar-brand"><span class="brand-icon-small">⇄</span> 技遇</div>
+      <nav class="tabs">
+        <button class="tab active" data-view="match">技能匹配</button>
+        <button class="tab" data-view="feed">互换动态</button>
+        <button class="tab" data-view="message">消息 <span id="msg-badge" class="badge hidden"></span></button>
+        <button class="tab" data-view="mine">我的</button>
+      </nav>
+      <div class="topbar-user">
+        <span id="topbar-user-name"></span>
+        <button id="logout-btn" class="btn-link" title="切换账号 / 退出登录">切换账号</button>
+      </div>
+    </header>
+
+    <main id="view" class="view"></main>
+  </div>
+
+  <!-- 全局弹窗 -->
+  <div id="modal-mask" class="modal-mask hidden">
+    <div id="modal-box" class="modal-box"></div>
+  </div>
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="../node_modules/socket.io-client/dist/socket.io.min.js"></script>
+  <script src="api.js"></script>
+  <script src="views.js"></script>
+  <script src="map.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

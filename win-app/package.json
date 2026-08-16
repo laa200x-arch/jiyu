@@ -1,0 +1,32 @@
+{
+  "name": "jiyu-win",
+  "version": "1.0.0",
+  "description": "技遇 - 纯公益技能互换平台 Windows 桌面版（与 iOS 端共用服务器，功能一致）",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "pack": "electron-builder --win portable",
+    "dist": "electron-builder --win nsis"
+  },
+  "author": "jiyu",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3"
+  },
+  "dependencies": {
+    "leaflet": "^1.9.4",
+    "socket.io-client": "^4.7.5"
+  },
+  "build": {
+    "appId": "com.jiyu.exchange",
+    "productName": "技遇",
+    "files": [
+      "main.js",
+      "src/**/*"
+    ],
+    "win": {
+      "target": "portable"
+    }
+  }
+}

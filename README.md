@@ -1,21 +1,38 @@
-# 技遇 · iOS 技能互换平台（SwiftUI 工程）
+# 技遇 · 技能互换平台（iOS + Windows 双端）
 
-> **技遇** —— 纯公益、无金钱交易的技能互换 iOS 平台。
+> **技遇** —— 纯公益、无金钱交易的技能互换平台。
 > 以技能换技能：用自己的特长兑换他人专长，零成本提升自我。
 
-本项目由《技遇 全流程落地方案》落地为**可直接导入 Xcode 运行的完整 iOS 工程**，覆盖方案中的 5 大核心模块。
+本项目由《技遇 全流程落地方案》落地为**完整可运行的三端工程**：
+
+| 端 | 技术栈 | 状态 |
+|---|---|---|
+| **iOS**（`Jiyu.xcodeproj`） | SwiftUI + Swift 5.9，云端 CI 打包 | ✅ 可构建可安装（含全部功能） |
+| **Windows**（`win-app/`） | Electron + 原生 JS，本机直接运行 | ✅ 可运行可打包 exe，19 项核心测试通过 |
+| **服务器**（`server/`） | Node.js + Express + SQLite/MySQL + Socket.io | ✅ 已部署上线（43.157.17.88:3000） |
+
+**三端完全互联**：iOS 与 Windows 共用同一服务器与账号体系，聊天记录、动态、互换、信用分实时同步。
 
 ---
 
 ## 一、快速开始
+
+### Windows 版（本机直接跑，最快）
+
+```bash
+cd win-app
+npm install
+npm start            # 打开「技遇」桌面应用（已连接线上服务器）
+```
+
+### iOS 版
 
 1. 将整个 `D:\AI\exchange` 目录拷贝到 Mac（本工程在 Windows 上编写，未在本机编译）。
 2. 双击打开 `Jiyu.xcodeproj`（需要 **Xcode 15+**，部署目标 **iOS 16.0+**）。
 3. 选择模拟器（iPhone 14 及以上机型），点击 **Run** 即可运行，无需配置任何账号。
    - 真机运行：在 Signing & Capabilities 中勾选 Automatically manage signing 并选择你的开发团队。
 
-> ⚠️ 本工程当前使用 `MockDataStore`（内存示例数据）运行，不依赖任何后端。
-> 后端（Node.js + Express + MySQL + Socket.io）接口接入点已在代码注释中标注。
+> ⚠️ iOS 工程已接入真实后端（登录页，演示账号 `aqing / 123456`）；Windows 版直接连接线上服务器，无需任何配置。
 
 ### 真机测试（在自己 iPhone 上运行）
 
@@ -97,6 +114,10 @@ exchange/
 │   ├── src/                   # 路由/匹配算法/风控/聊天/推送（32 项测试全部通过）
 │   ├── test/smoke.mjs         # 端到端冒烟测试
 │   └── README.md              # 启动/部署/API 文档
+├── win-app/                   # Windows 桌面版（Electron，与 iOS 功能一致）
+│   ├── src/                   # 登录/匹配/动态/消息/我的 + 同城地图 + 拍照/语音
+│   ├── test-core.js           # 核心逻辑测试（19 项全过，真实服务器）
+│   └── README.md              # 运行/打包/功能文档
 ├── docs/
 │   └── 方案文档.md            # 原始落地方案全文
 └── README.md

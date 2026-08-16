@@ -1,0 +1,170 @@
+/* ============================================================
+ * 技遇 Windows 版 - 应用启动与导航
+ * ============================================================ */
+'use strict'
+
+const views = App.views
+
+function switchView(name) {
+  App.views.current = name
+  document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('active', t.dataset.view === name))
+  if (name === 'login') {
+    document.getElementById('app').classList.add('hidden')
+    document.getElementById('login-page').classList.remove('hidden')
+    views.renderLogin()
+    return
+  }
+  document.getElementById('login-page').classList.add('hidden')
+  document.getElementById('app').classList.remove('hidden')
+  const map = { match: views.renderMatch, feed: views.renderFeed, message: views.renderMessage, mine: views.renderMine }
+  map[name]()
+}
+
+function switchTab(name) {
+  switchView(name)
+}
+
+/* ---------- 登录页事件 ---------- */
+function bindLogin() {
+  let isRegister = false
+  const page = document.getElementById('login-page')
+
+  page.querySelector('#login-toggle').addEventListener('click', () => {
+    isRegister = !isRegister
+    document.getElementById('login-toggle').textContent = isRegister ? '已有账号？去登录' : '没有账号？注册一个'
+    document.getElementById('register-field').classList.toggle('hidden', !isRegister)
+    document.getElementById('login-submit').textContent = isRegister ? '注册并登录' : '登 录'
+  })
+
+  page.querySelector('#login-submit').addEventListener('click', async () => {
+    const username = document.getElementById('login-username').value.trim()
+    const password = document.getElementById('login-password').value
+    const nickname = document.getElementById('login-nickname').value.trim()
+    const err = document.getElementById('login-error')
+    if (!username || !password) return show(err, '请输入用户名和密码')
+    if (isRegister && !nickname) return show(err, '请输入昵称')
+    hide(err)
+    const btn = document.getElementById('login-submit')
+    btn.disabled = true
+    btn.textContent = '登录中…'
+    try {
+      if (isRegister) await register(username, password, nickname)
+      else await login(username, password)
+      afterEnterApp()
+    } catch (e) {
+      show(err, e.message)
+    } finally {
+      btn.disabled = false
+      btn.textContent = isRegister ? '注册并登录' : '登 录'
+    }
+  })
+
+  // 已保存账号：点击切换 / 删除
+  page.addEventListener('click', async (e) => {
+    const remove = e.target.closest('[data-remove]')
+    if (remove) {
+      e.stopPropagation()
+      removeAccount(remove.dataset.remove)
+      views.renderLogin()
+      return
+    }
+    const acc = e.target.closest('.saved-account')
+    if (!acc) return
+    const account = App.state.savedAccounts.find((a) => a.username === acc.dataset.username)
+    if (!account) return
+    hide(document.getElementById('login-error'))
+    try {
+      await loginWithSaved(account)
+      afterEnterApp()
+    } catch (err) {
+      if (err.status === 401) {
+        removeAccount(account.username)
+        views.renderLogin()
+        show(document.getElementById('login-error'), '账号「' + account.nickname + '」登录已过期，请重新输入密码')
+      } else {
+        show(document.getElementById('login-error'), '网络异常，账号已保留，请重试')
+      }
+    }
+  })
+
+  document.getElementById('login-password').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') document.getElementById('login-submit').click()
+  })
+}
+
+function show(el, msg) { el.textContent = msg; el.classList.remove('hidden') }
+function hide(el) { el.classList.add('hidden') }
+
+/* ---------- 登录成功后的进入流程 ---------- */
+function afterEnterApp() {
+  document.getElementById('topbar-user-name').textContent = App.state.user.userName
+  switchView('match')
+  // 版本检查
+  checkVersion()
+  // 首次选择聊天记录同步
+  if (!App.state.syncChosen && App.state.user) {
+    App.state.syncChosen = true
+    localStorage.setItem('jiyu.syncChosen', '1')
+    openModal(`<div class="modal-title">同步聊天记录</div>
+      <div class="card-sub" style="line-height:1.8">不同设备登录同一账号时，可同步之前的聊天记录。<br>你可以随时在「我的 → 聊天记录同步」中修改。</div>
+      <div class="modal-actions">
+        <button class="btn btn-primary" id="sync-yes">自动加载历史记录（推荐）</button>
+        <button class="btn btn-outline" id="sync-no">不自动加载，仅新消息</button>
+      </div>`, (box) => {
+      box.querySelector('#sync-yes').addEventListener('click', () => { App.state.syncHistory = true; localStorage.setItem('jiyu.syncHistory', '1'); closeModal() })
+      box.querySelector('#sync-no').addEventListener('click', () => { App.state.syncHistory = false; localStorage.setItem('jiyu.syncHistory', '0'); closeModal() })
+    })
+  }
+}
+
+async function checkVersion() {
+  const v = await fetchVersion()
+  if (!v) return
+  if (v.current !== '1.0') {
+    openModal(`<div class="modal-title">发现新版本 ${esc(v.current)}</div>
+      <div class="card-sub" style="line-height:1.8">${esc(v.updateMessage)}</div>
+      <div class="modal-actions">
+        <button class="btn btn-primary" id="ver-goto">去下载</button>
+        <button class="btn btn-outline" onclick="closeModal()">稍后再说</button>
+      </div>`, (box) => {
+      box.querySelector('#ver-goto').addEventListener('click', () => {
+        const win = window.open('', '_blank')
+        if (win) win.location = v.downloadUrl
+      })
+    })
+  }
+}
+
+/* ---------- Tab 切换 ---------- */
+function bindTabs() {
+  document.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', () => {
+    switchView(t.dataset.view)
+  }))
+  document.getElementById('logout-btn').addEventListener('click', () => {
+    if (confirm('退出当前账号？退出后可在登录页一键切换其他账号')) {
+      logout()
+      switchView('login')
+    }
+  })
+}
+
+/* ---------- 启动 ---------- */
+async function bootstrap() {
+  bindLogin()
+  bindTabs()
+  // 请求桌面通知权限（消息推送）
+  if ('Notification' in window && Notification.permission === 'default') {
+    try { Notification.requestPermission() } catch (e) { /* ignore */ }
+  }
+  if (App.state.token) {
+    // 有持久化 Token：尝试自动登录
+    const ok = await autoLogin()
+    if (ok) {
+      afterEnterApp()
+      return
+    }
+  }
+  switchView('login')
+}
+
+document.addEventListener('DOMContentLoaded', bootstrap)
