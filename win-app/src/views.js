@@ -270,7 +270,29 @@ async function renderFeed() {
       list.innerHTML = '<div class="empty"><div class="empty-icon">📢</div>暂无动态</div>'
       return
     }
-    list.innerHTML = App.state.dynamics.map((d) => `
+    list.innerHTML = App.state.dynamics.map((d) => {
+      // 订单卡片：优先用动态自带字段（第三方也能看到），回退查自己的订单列表
+      const own = d.orderId ? App.state.bookings.find((b) => b.id === d.orderId) : null
+      const orderStatus = d.orderStatus || (own ? own.status : null)
+      const orderPrice = d.orderPriceYuan ?? (own ? own.priceYuan : null)
+      const orderService = d.orderService || (own ? own.serviceName : '')
+      const isOwnOrder = d.orderId && String(d.userId) === String(App.state.user.id)
+      const canAccept = d.orderId && orderStatus === 'open' && !isOwnOrder
+        && (App.state.user.creditScore >= 75 && App.state.user.verification !== 'none')
+      const orderBlock = d.orderId ? `
+            <div style="margin-top:10px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+              <span class="tag tag-vip">💰 收费订单 ¥${orderPrice} · 佣金 10%</span>
+              <span class="card-sub">${esc(orderService)}</span>
+              <span class="spacer"></span>
+              ${orderStatus === 'open'
+                ? (canAccept
+                    ? `<button class="btn btn-primary btn-sm" data-accept="${esc(d.orderId)}">接单</button>`
+                    : (isOwnOrder
+                        ? '<span class="card-sub">等待接单中…</span>'
+                        : '<span class="card-sub" title="接单需信用≥75且完成认证">🔒 有资历者接单</span>'))
+                : `<span class="tag tag-verified">已接单</span>`}
+            </div>` : ''
+      return `
       <div class="card feed-item">
         ${avatarHtml({ avatarSymbol: d.avatarSymbol }, 'avatar avatar-sm')}
         <div class="feed-body">
@@ -281,8 +303,10 @@ async function renderFeed() {
           </div>
           <div class="feed-content">${esc(d.content)}</div>
           ${d.imageBase64 ? `<img class="feed-image" src="data:image/jpeg;base64,${d.imageBase64}" onclick="openFullscreen('<img src=&quot;data:image/jpeg;base64,${d.imageBase64}&quot;>')">` : ''}
+          ${orderBlock}
         </div>
-      </div>`).join('')
+      </div>`
+    }).join('')
     list.querySelectorAll('.feed-author').forEach((el) => el.addEventListener('click', async () => {
       const uid = el.dataset.author
       if (!uid || el.textContent === '平台') return
@@ -290,6 +314,15 @@ async function renderFeed() {
         const u = await fetchUser(uid)
         showUserProfile(u)
       } catch (e) { toast('加载失败') }
+    }))
+    // 订单接单
+    list.querySelectorAll('[data-accept]').forEach((b) => b.addEventListener('click', async () => {
+      if (!confirm('确认接下这笔订单？服务完成后费用按订单结算（平台收取 10% 佣金）')) return
+      try {
+        await acceptBooking(b.dataset.accept)
+        toast('✅ 接单成功，可在「宠物 → 我的订单」查看')
+        renderFeed()
+      } catch (e) { toast('接单失败：' + e.message) }
     }))
   } catch (e) {
     list.innerHTML = `<div class="empty">加载失败：${esc(e.message)}</div>`
@@ -1091,7 +1124,11 @@ function renderServices(category) {
         <div class="convo-name">${esc(s.name)} <span class="tag tag-verified">${esc(catName(s.category))}</span></div>
         <div class="card-sub">${esc(s.desc)} · ${esc(s.duration)}</div>
       </div>
-      <button class="btn btn-primary btn-sm" data-service='${JSON.stringify(s)}'>发起互换</button>
+      <div style="text-align:center">
+        <div style="font-weight:700;color:#d97b2e">¥${s.priceYuan}</div>
+        <div class="card-sub" style="font-size:10px">平台佣金 10%</div>
+      </div>
+      <button class="btn btn-primary btn-sm" data-service='${JSON.stringify(s)}'>发起订单</button>
     </div>`).join('')
     : '<div class="card-sub">该分类暂无服务</div>'
   el.querySelectorAll('[data-service]').forEach((b) => b.addEventListener('click', () => {
@@ -1179,45 +1216,63 @@ function showPetAdd() {
   })
 }
 
-/* 发起看护互换（F-08/F-13/F-14：选宠物 → 选看护人 → 时间地点） */
+/* 发起看护订单（两种模式：指定认识的看护人 / 发布到动态让有资历的人接单） */
 function showBookingForm(service) {
   const pets = App.state.pets
   if (!pets.length) return toast('请先添加宠物档案')
   const providers = App.state.users.filter((u) => u.id !== App.state.user.id)
   openModal(`
-    <div class="modal-title">发起互换 · ${esc(service.name)}</div>
-    <div class="card-sub" style="margin-bottom:12px">以技能互换换取看护，平台全程零金钱交易</div>
+    <div class="modal-title">发起订单 · ${esc(service.name)}</div>
+    <div class="card-sub" style="margin-bottom:12px">服务价 <b style="color:#d97b2e">¥${service.priceYuan}</b> · 平台佣金 10% · 其余归服务人员</div>
     <div class="form-field"><label>宠物 *</label>
       <select id="b-pet">${pets.map((p) => `<option value="${p.id}">${esc(p.name)}（${esc(p.breed)}）</option>`).join('')}</select>
     </div>
-    <div class="form-field"><label>看护人 *（信用分供参考）</label>
+    <div class="form-field"><label>接单方式 *</label>
+      <select id="b-mode">
+        <option value="direct">指定认识的看护人</option>
+        <option value="feed">发布到互换动态，让有资历的人接单</option>
+      </select>
+    </div>
+    <div class="form-field" id="b-provider-wrap"><label>看护人 *（信用分供参考）</label>
       <select id="b-provider">${providers.map((u) => `<option value="${u.id}">${esc(u.userName)}（信用 ${Math.round(u.creditScore)} · ${esc(u.locationLabel)}）</option>`).join('')}</select>
     </div>
     <div class="form-row">
       <div class="form-field"><label>约定时间 *</label><input id="b-time" placeholder="如：本周六 18:00"></div>
       <div class="form-field"><label>地点 *（公共场所）</label><input id="b-location" placeholder="如：小区门口/图书馆旁"></div>
     </div>
+    <div class="card-sub" style="color:#f29e4d">⚠️ 宠物服务可收费，价格与佣金以订单为准；其他技能互换仍坚持零金钱</div>
     <div class="modal-actions">
       <button class="btn btn-outline" onclick="closeModal()">取消</button>
-      <button class="btn btn-primary" id="b-submit">发起互换</button>
+      <button class="btn btn-primary" id="b-submit">发布订单</button>
     </div>
   `, (box) => {
+    const modeWrap = box.querySelector('#b-provider-wrap')
+    box.querySelector('#b-mode').addEventListener('change', (e) => {
+      modeWrap.style.display = e.target.value === 'direct' ? '' : 'none'
+    })
     box.querySelector('#b-submit').addEventListener('click', async () => {
       const scheduledTime = box.querySelector('#b-time').value.trim()
       const location = box.querySelector('#b-location').value.trim()
+      const mode = box.querySelector('#b-mode').value
       if (!scheduledTime || !location) return toast('请填写时间与地点（公共场所）')
+      const body = {
+        petId: box.querySelector('#b-pet').value,
+        serviceId: service.id,
+        scheduledTime,
+        location
+      }
+      if (mode === 'direct') {
+        body.providerId = box.querySelector('#b-provider').value
+      } else {
+        body.openToFeed = true
+      }
       try {
-        await createBooking({
-          petId: box.querySelector('#b-pet').value,
-          serviceId: service.id,
-          providerId: box.querySelector('#b-provider').value,
-          scheduledTime,
-          location
-        })
+        await createBooking(body)
         closeModal()
-        toast('✅ 互换预约已发出')
+        toast(mode === 'direct' ? '✅ 订单已发给看护人' : '✅ 订单已发布到动态区，等待有资历的人接单')
         renderBookings()
-      } catch (e) { toast('发起失败：' + e.message) }
+        if (mode === 'feed') renderFeed()
+      } catch (e) { toast('发布失败：' + e.message) }
     })
   })
 }
@@ -1226,27 +1281,34 @@ function renderBookings() {
   const el = document.getElementById('booking-list')
   if (!el) return
   if (!App.state.bookings.length) {
-    el.innerHTML = '<div class="card-sub">暂无预约，从服务目录发起第一次互换吧</div>'
+    el.innerHTML = '<div class="card-sub">暂无订单，从服务目录发起第一笔订单吧</div>'
     return
   }
-  el.innerHTML = App.state.bookings.map((b) => `
+  el.innerHTML = App.state.bookings.map((b) => {
+    const isMine = String(b.userId) === String(App.state.user.id)
+    return `
     <div class="card" style="margin-bottom:8px">
       <div class="row">
         <div style="flex:1">
           <div class="convo-name">${esc(b.serviceName)} <span class="tag tag-verified">${esc(b.pet ? b.pet.name : '')}</span></div>
           <div class="card-sub">🕐 ${esc(b.scheduledTime)} · 📍 ${esc(b.location)}</div>
-          <div class="card-sub">看护人：${esc(b.provider ? b.provider.userName : '—')}（信用 ${b.provider ? Math.round(b.provider.creditScore) : '—'}）</div>
+          <div class="card-sub">${isMine ? '看护人：' + esc(b.provider ? b.provider.userName : '待接单…') : '下单人：' + esc(b.initiator ? b.initiator.userName : '—')}</div>
+          ${b.priceYuan != null ? `<div class="card-sub">💰 服务费 <b style="color:#d97b2e">¥${b.priceYuan}</b> · 平台佣金 ¥${b.commissionYuan} · 服务人员所得 ¥${b.workerIncome}</div>` : ''}
         </div>
-        <span class="exchange-status ${b.status}">${statusText(b.status)}</span>
+        <span class="exchange-status ${b.status}">${orderStatusText(b.status)}</span>
       </div>
-      ${b.status === 'pending' || b.status === 'ongoing'
+      ${(b.status === 'assigned' || b.status === 'ongoing') && (isMine || String(b.providerId) === String(App.state.user.id))
         ? `<div class="row" style="margin-top:8px"><span class="spacer"></span><button class="btn btn-outline btn-sm" data-done="${b.id}">标记完成</button></div>`
         : ''}
-    </div>`).join('')
+    </div>`
+  }).join('')
   el.querySelectorAll('[data-done]').forEach((b) => b.addEventListener('click', async () => {
     await completeBooking(b.dataset.done)
     renderBookings()
   }))
+}
+function orderStatusText(s) {
+  return { open: '待接单', assigned: '已接单', ongoing: '服务中', completed: '已完成', cancelled: '已取消' }[s] || s
 }
 
 /* 注册视图入口（供 app.js 调用） */

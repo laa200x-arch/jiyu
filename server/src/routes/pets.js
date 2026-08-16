@@ -8,16 +8,22 @@ import { Router } from 'express'
 import { requireAuth } from '../middleware.js'
 import { checkTextRisk } from '../risk.js'
 
-// 服务目录（F-11/F-12：目录 KEEP，定价 REDESIGN 为互换语义）
+// 服务目录（7 种，含定价；平台佣金率 10%，其余归服务人员）
 export const CARE_SERVICES = [
-  { id: 'overnight', name: '宠物寄养过夜', category: 'overnight', desc: '家庭式寄养，含每日喂养与遛弯', duration: '1 晚起' },
-  { id: 'overnight-care', name: '家庭式过夜看护', category: 'overnight', desc: '上门或接送到家过夜陪伴', duration: '1 晚起' },
-  { id: 'daycare', name: '当日寄养', category: 'day', desc: '白天托管，晚间接回', duration: '8:00-20:00' },
-  { id: 'walk', name: '遛狗', category: 'day', desc: '每日 1-2 次户外遛弯', duration: '30-60 分钟/次' },
-  { id: 'feeding', name: '上门喂食', category: 'day', desc: '上门喂食换水，可视频确认', duration: '20 分钟/次' },
-  { id: 'bath', name: '宠物洗澡', category: 'other', desc: '温和洗护 + 吹干', duration: '约 1 小时' },
-  { id: 'groom', name: '美容护理', category: 'other', desc: '修剪/梳毛/指甲护理', duration: '约 1.5 小时' }
+  { id: 'overnight', name: '宠物寄养过夜', category: 'overnight', desc: '家庭式寄养，含每日喂养与遛弯', duration: '1 晚起', priceYuan: 45 },
+  { id: 'overnight-care', name: '家庭式过夜看护', category: 'overnight', desc: '上门或接送到家过夜陪伴', duration: '1 晚起', priceYuan: 50 },
+  { id: 'daycare', name: '当日寄养', category: 'day', desc: '白天托管，晚间接回', duration: '8:00-20:00', priceYuan: 35 },
+  { id: 'walk', name: '遛狗', category: 'day', desc: '每日 1-2 次户外遛弯', duration: '30-60 分钟/次', priceYuan: 20 },
+  { id: 'feeding', name: '上门喂食', category: 'day', desc: '上门喂食换水，可视频确认', duration: '20 分钟/次', priceYuan: 15 },
+  { id: 'bath', name: '宠物洗澡', category: 'other', desc: '温和洗护 + 吹干', duration: '约 1 小时', priceYuan: 30 },
+  { id: 'groom', name: '美容护理', category: 'other', desc: '修剪/梳毛/指甲护理', duration: '约 1.5 小时', priceYuan: 40 }
 ]
+
+// 平台佣金率（宠物服务收费模式；其余归服务人员）
+export const COMMISSION_RATE = 0.1
+
+// 接单资历门槛（"有资历的人可以接单"：信用 ≥75 且已完成任意认证）
+export const ACCEPT_REQUIREMENT = { minCredit: 75 }
 
 // 宠物档案字典（F-23：狗 8 行为 / 猫 10 行为 / 家中反应 4 / 体重分级 4）
 export const PET_OPTIONS = {
@@ -108,20 +114,25 @@ export function petsRouter(db) {
     res.json({ ok: true })
   })
 
-  // 我的看护预约（我发起 + 我做看护人）
+  // 我的看护订单（我发布 + 我接单）
   router.get('/bookings', (req, res) => {
     const rows = db.all('SELECT * FROM bookings WHERE user_id = ? OR provider_id = ? ORDER BY id DESC', [req.userId, req.userId])
     res.json({
       bookings: rows.map((row) => ({
         id: String(row.id),
         userId: String(row.user_id),
-        providerId: String(row.provider_id),
+        providerId: row.provider_id ? String(row.provider_id) : null,
         petId: String(row.pet_id),
         serviceId: row.service_id,
         serviceName: row.service_name,
         scheduledTime: row.scheduled_time,
         location: row.location || null,
         status: row.status,
+        priceYuan: row.price_yuan,
+        commissionRate: row.commission_rate,
+        commissionYuan: row.commission_yuan,
+        workerIncome: row.worker_income,
+        openToFeed: !!row.open_to_feed,
         createdAt: row.created_at,
         pet: (() => {
           const p = db.get('SELECT * FROM pets WHERE id = ?', [row.pet_id])
@@ -132,6 +143,7 @@ export function petsRouter(db) {
           return u ? { id: String(u.id), userName: u.nickname, avatarSymbol: u.avatar_symbol, avatarUrl: u.avatar_url || null, creditScore: u.credit_score, locationLabel: u.location_label } : null
         })(),
         provider: (() => {
+          if (!row.provider_id) return null
           const u = db.get('SELECT id, nickname, avatar_symbol, avatar_url, credit_score, location_label FROM users WHERE id = ?', [row.provider_id])
           return u ? { id: String(u.id), userName: u.nickname, avatarSymbol: u.avatar_symbol, avatarUrl: u.avatar_url || null, creditScore: u.credit_score, locationLabel: u.location_label } : null
         })()
@@ -139,35 +151,71 @@ export function petsRouter(db) {
     })
   })
 
-  // 发起看护预约（互换语义，零金钱；线下需公共场所）
+  // 发起看护订单（收费模式：价格 = 服务定价；平台佣金 10%，其余归服务人员）
+  // 两种方式：providerId 指定认识的看护人；或 openToFeed 发布到互换动态让有资历的人接单
   router.post('/bookings', (req, res) => {
-    const { petId, serviceId, providerId, scheduledTime, location } = req.body || {}
-    if (!petId || !serviceId || !providerId || !scheduledTime) {
-      return res.status(400).json({ error: 'petId/serviceId/providerId/scheduledTime 必填' })
+    const { petId, serviceId, providerId, scheduledTime, location, openToFeed } = req.body || {}
+    if (!petId || !serviceId || !scheduledTime) {
+      return res.status(400).json({ error: 'petId/serviceId/scheduledTime 必填' })
     }
-    if (Number(providerId) === req.userId) return res.status(400).json({ error: '不能预约自己' })
+    if (!providerId && !openToFeed) {
+      return res.status(400).json({ error: '请选择看护人，或发布到动态区等待接单' })
+    }
+    if (providerId && Number(providerId) === req.userId) return res.status(400).json({ error: '不能下单给自己' })
     const pet = db.get('SELECT * FROM pets WHERE id = ? AND user_id = ?', [petId, req.userId])
     if (!pet) return res.status(404).json({ error: '宠物不存在' })
     const service = CARE_SERVICES.find((s) => s.id === serviceId)
     if (!service) return res.status(404).json({ error: '服务不存在' })
-    const provider = db.get('SELECT id FROM users WHERE id = ?', [providerId])
-    if (!provider) return res.status(404).json({ error: '看护人不存在' })
+    if (providerId) {
+      const provider = db.get('SELECT id FROM users WHERE id = ?', [providerId])
+      if (!provider) return res.status(404).json({ error: '看护人不存在' })
+    }
     if (!location) return res.status(400).json({ error: '请填写服务地点（公共场所）' })
 
+    // 金额结算：平台佣金 = 价格 × 佣金率；服务人员所得 = 价格 - 佣金
+    const price = service.priceYuan
+    const commission = Math.round(price * COMMISSION_RATE * 100) / 100
+    const workerIncome = Math.round((price - commission) * 100) / 100
+    const status = openToFeed ? 'open' : 'assigned'
+
     const r = db.run(
-      `INSERT INTO bookings (user_id, provider_id, pet_id, service_id, service_name, scheduled_time, location, status, created_at)
-       VALUES (?,?,?,?,?,?,?,?,?)`,
-      [req.userId, providerId, petId, serviceId, service.name, scheduledTime, location, 'pending', now()]
+      `INSERT INTO bookings (user_id, provider_id, pet_id, service_id, service_name, scheduled_time, location, status, price_yuan, commission_rate, commission_yuan, worker_income, open_to_feed, created_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      [req.userId, providerId || null, petId, serviceId, service.name, scheduledTime, location, status,
+        price, COMMISSION_RATE, commission, workerIncome, openToFeed ? 1 : 0, now()]
     )
-    const row = db.get('SELECT * FROM bookings WHERE id = ?', [r.lastInsertRowid])
-    res.status(201).json({ booking: { id: String(row.id), status: 'pending' } })
+    const orderId = r.lastInsertRowid
+
+    // 发布到互换动态：生成订单卡片（结构化数据，不经过文本风控）
+    if (openToFeed) {
+      db.run(
+        `INSERT INTO dynamics (user_id, content, image_base64, is_system_post, order_id, created_at) VALUES (?,?,?,?,?,?)`,
+        [req.userId, `【宠物护理订单】${service.name} · ${pet.name} · ¥${price}/次 · ${scheduledTime}`, null, 0, String(orderId), now()]
+      )
+    }
+    res.status(201).json({ booking: { id: String(orderId), status, priceYuan: price, commissionYuan: commission, workerIncome } })
   })
 
-  // 标记预约完成
+  // 接单（"有资历的人可以接单"：信用 ≥75 且已完成认证；不能接自己的单；仅 open 状态）
+  router.post('/bookings/:id/accept', (req, res) => {
+    const row = db.get('SELECT * FROM bookings WHERE id = ?', [req.params.id])
+    if (!row) return res.status(404).json({ error: '订单不存在' })
+    if (row.user_id === req.userId) return res.status(400).json({ error: '不能接自己的订单' })
+    if (row.status !== 'open') return res.status(400).json({ error: '该订单已接单或已关闭' })
+    const me = db.get('SELECT * FROM users WHERE id = ?', [req.userId])
+    if (!me) return res.status(404).json({ error: '用户不存在' })
+    if (me.credit_score < ACCEPT_REQUIREMENT.minCredit || me.verification === 'none') {
+      return res.status(403).json({ error: `接单需要信用 ≥${ACCEPT_REQUIREMENT.minCredit} 且完成实名/学生认证（有资历要求）` })
+    }
+    db.run('UPDATE bookings SET provider_id = ?, status = ? WHERE id = ?', [req.userId, 'assigned', row.id])
+    res.json({ ok: true, booking: { id: String(row.id), status: 'assigned' } })
+  })
+
+  // 标记订单完成（结算：服务费/佣金/服务人员所得）
   router.post('/bookings/:id/complete', (req, res) => {
     const r = db.run('UPDATE bookings SET status = ? WHERE id = ? AND (user_id = ? OR provider_id = ?)',
       ['completed', req.params.id, req.userId, req.userId])
-    if (r.changes === 0) return res.status(404).json({ error: '预约不存在' })
+    if (r.changes === 0) return res.status(404).json({ error: '订单不存在' })
     res.json({ ok: true })
   })
 

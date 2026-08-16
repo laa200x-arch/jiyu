@@ -33,6 +33,46 @@ async function main() {
   // 轻量迁移：messages 表补充媒体字段
   try { db.exec('ALTER TABLE messages ADD COLUMN media_type TEXT') } catch { /* 列已存在 */ }
   try { db.exec('ALTER TABLE messages ADD COLUMN media_url TEXT') } catch { /* 列已存在 */ }
+  // 轻量迁移：宠物订单收费字段 + 动态订单卡片
+  try { db.exec('ALTER TABLE bookings ADD COLUMN price_yuan REAL') } catch { /* 列已存在 */ }
+  try { db.exec('ALTER TABLE bookings ADD COLUMN commission_rate REAL') } catch { /* 列已存在 */ }
+  try { db.exec('ALTER TABLE bookings ADD COLUMN commission_yuan REAL') } catch { /* 列已存在 */ }
+  try { db.exec('ALTER TABLE bookings ADD COLUMN worker_income REAL') } catch { /* 列已存在 */ }
+  try { db.exec('ALTER TABLE bookings ADD COLUMN open_to_feed INTEGER NOT NULL DEFAULT 0') } catch { /* 列已存在 */ }
+  try { db.exec('ALTER TABLE dynamics ADD COLUMN order_id TEXT') } catch { /* 列已存在 */ }
+  // 迁移：旧 bookings 表 provider_id 为 NOT NULL，需重建为可空（订单可发布待接单）
+  if (config.dbDriver === 'sqlite') {
+    try {
+      const cols = db.all('PRAGMA table_info(bookings)')
+      const pid = cols.find((c) => c.name === 'provider_id')
+      if (pid && pid.notnull === 1) {
+        db.exec(`
+          CREATE TABLE bookings_new (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            provider_id INTEGER,
+            pet_id INTEGER NOT NULL,
+            service_id TEXT NOT NULL,
+            service_name TEXT NOT NULL,
+            scheduled_time TEXT NOT NULL,
+            location TEXT,
+            status TEXT NOT NULL DEFAULT 'open',
+            price_yuan REAL,
+            commission_rate REAL,
+            commission_yuan REAL,
+            worker_income REAL,
+            open_to_feed INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL
+          );
+          INSERT INTO bookings_new (id, user_id, provider_id, pet_id, service_id, service_name, scheduled_time, location, status, created_at)
+            SELECT id, user_id, provider_id, pet_id, service_id, service_name, scheduled_time, location, status, created_at FROM bookings;
+          DROP TABLE bookings;
+          ALTER TABLE bookings_new RENAME TO bookings;
+        `)
+        console.log('[migrate] bookings 表已重建（provider_id 可空，支持发布待接单）')
+      }
+    } catch (e) { /* 新表无需迁移 */ }
+  }
   // 轻量迁移：users 表补充头像 URL 列
   try { db.exec('ALTER TABLE users ADD COLUMN avatar_url TEXT') } catch { /* 列已存在 */ }
   // 演示数据

@@ -1,7 +1,7 @@
 import SwiftUI
 import PhotosUI
 
-/// 宠物护理 Tab（旧巡六迁移：宠物档案 + 服务目录 + 互换预约，零金钱）
+/// 宠物护理 Tab（旧巡六迁移 → 收费订单：服务定价 + 平台佣金 10%，其余归服务人员）
 struct PetTabView: View {
     @EnvironmentObject private var store: MockDataStore
 
@@ -39,7 +39,7 @@ struct PetTabView: View {
                     .font(.title3)
                     .bold()
                     .foregroundStyle(Theme.textPrimary)
-                Text("以技能互换换取看护 · 平台零金钱交易")
+                Text("收费订单 · 平台佣金 10%，其余归服务人员")
                     .font(.caption)
                     .foregroundStyle(Theme.textSecondary)
             }
@@ -132,7 +132,7 @@ struct PetTabView: View {
 
     private var servicesSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("护理服务目录（以技能互换换取看护）")
+            Text("护理服务目录（收费 · 佣金 10%）")
                 .font(.subheadline)
                 .bold()
                 .foregroundStyle(Theme.textPrimary)
@@ -146,12 +146,16 @@ struct PetTabView: View {
                         Text("\(categoryName(service.category)) · \(service.desc) · \(service.duration)")
                             .font(.caption2)
                             .foregroundStyle(Theme.textSecondary)
+                        Text("¥\(yuanText(service.priceYuan))/次（平台佣金 ¥\(yuanText(service.priceYuan * 0.1))，服务人员得 ¥\(yuanText(service.priceYuan * 0.9))）")
+                            .font(.caption2)
+                            .bold()
+                            .foregroundStyle(Theme.warning)
                     }
                     Spacer()
                     Button {
                         bookingService = service
                     } label: {
-                        Text("发起互换")
+                        Text("发起订单")
                             .font(.caption)
                             .bold()
                             .foregroundStyle(.white)
@@ -175,16 +179,22 @@ struct PetTabView: View {
         ["overnight": "过夜", "day": "当日", "other": "其他"][c] ?? c
     }
 
-    // MARK: 我的预约
+    /// 金额显示：整数不带小数点（45 → "45"，40.5 → "40.5"）
+    private func yuanText(_ v: Double) -> String {
+        let s = String(format: "%.1f", v)
+        return s.hasSuffix(".0") ? String(s.dropLast(2)) : s
+    }
+
+    // MARK: 我的订单
 
     private var bookingsSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("我的预约")
+            Text("我的订单（我发布 + 我接单）")
                 .font(.subheadline)
                 .bold()
                 .foregroundStyle(Theme.textPrimary)
             if store.bookings.isEmpty {
-                Text("暂无预约，从服务目录发起第一次互换吧")
+                Text("暂无订单，从服务目录发起第一笔订单吧（可指定看护人，或发布到动态区等有资历的人接单）")
                     .font(.caption)
                     .foregroundStyle(Theme.textSecondary)
             } else {
@@ -220,12 +230,20 @@ struct PetTabView: View {
             Text("🕐 \(booking.scheduledTime) · 📍 \(booking.location ?? "线上")")
                 .font(.caption2)
                 .foregroundStyle(Theme.textSecondary)
+            Text("💰 ¥\(yuanText(booking.priceYuan)) · 平台佣金 ¥\(yuanText(booking.commissionYuan)) · 服务人员得 ¥\(yuanText(booking.workerIncome))")
+                .font(.caption2)
+                .bold()
+                .foregroundStyle(Theme.warning)
             if let provider = booking.provider {
                 Text("看护人：\(provider.userName)（信用 \(Int(provider.creditScore))）")
                     .font(.caption2)
                     .foregroundStyle(Theme.textSecondary)
+            } else if booking.status == "open" {
+                Text("等待有资历的人接单（信用 ≥75 且完成认证）…")
+                    .font(.caption2)
+                    .foregroundStyle(Theme.textSecondary)
             }
-            if booking.status == "pending" || booking.status == "ongoing" {
+            if booking.status == "assigned" || booking.status == "ongoing" {
                 HStack {
                     Spacer()
                     Button("标记完成") {
@@ -245,13 +263,13 @@ struct PetTabView: View {
     }
 
     private func statusName(_ s: String) -> String {
-        ["pending": "待开始", "ongoing": "进行中", "completed": "已完成", "cancelled": "已取消"][s] ?? s
+        ["open": "待接单", "assigned": "已接单", "ongoing": "进行中", "completed": "已完成", "cancelled": "已取消"][s] ?? s
     }
 
     private func statusColor(_ s: String) -> Color {
         switch s {
-        case "pending": return Theme.warning
-        case "ongoing": return Theme.primary
+        case "open": return Theme.warning
+        case "assigned", "ongoing": return Theme.primary
         case "completed": return Theme.success
         default: return Theme.danger
         }
@@ -414,27 +432,38 @@ struct PetAddSheet: View {
     }
 }
 
-/// 发起看护互换（选宠物 → 选看护人 → 时间地点）
+/// 发起订单（两种方式：指定认识的看护人 / 发布到动态区让有资历的人接单）
 struct BookingSheet: View {
     @EnvironmentObject private var store: MockDataStore
     @Environment(\.dismiss) private var dismiss
 
     let service: ServerCareService
 
+    /// 0 = 指定看护人；1 = 发布到动态区（有资历者接单）
+    @State private var orderMode = 0
     @State private var petID: String?
     @State private var providerID: String?
     @State private var scheduledTime = ""
     @State private var location = ""
     @State private var errorMessage: String?
 
+    private var commission: Double {
+        (service.priceYuan * 0.1 * 100).rounded() / 100
+    }
+
+    private var workerIncome: Double {
+        ((service.priceYuan - commission) * 100).rounded() / 100
+    }
+
     var body: some View {
         NavigationStack {
             Form {
                 Section("服务") {
                     LabeledContent("服务", value: service.name)
-                    Text("以技能互换换取看护，平台全程零金钱交易")
-                        .font(.caption2)
-                        .foregroundStyle(Theme.textSecondary)
+                    Text("¥\(yuanText(service.priceYuan))/次 · 平台佣金 ¥\(yuanText(commission)) · 服务人员得 ¥\(yuanText(workerIncome))")
+                        .font(.caption)
+                        .bold()
+                        .foregroundStyle(Theme.warning)
                 }
                 Section("宠物 *") {
                     Picker("选择宠物", selection: $petID) {
@@ -443,11 +472,22 @@ struct BookingSheet: View {
                         }
                     }
                 }
-                Section("看护人 *（信用分供参考）") {
-                    Picker("选择看护人", selection: $providerID) {
-                        ForEach(store.allUsers.filter { $0.id != store.currentUser.id }) { u in
-                            Text("\(u.userName)（信用 \(Int(u.creditScore))）").tag(Optional(u.id.serverIDString))
+                Section("下单方式 *") {
+                    Picker("下单方式", selection: $orderMode) {
+                        Text("指定认识的看护人").tag(0)
+                        Text("发布到动态区等接单").tag(1)
+                    }
+                    .pickerStyle(.segmented)
+                    if orderMode == 0 {
+                        Picker("选择看护人", selection: $providerID) {
+                            ForEach(store.allUsers.filter { $0.id != store.currentUser.id }) { u in
+                                Text("\(u.userName)（信用 \(Int(u.creditScore))）").tag(Optional(u.id.serverIDString))
+                            }
                         }
+                    } else {
+                        Text("订单将发布到互换动态区，信用 ≥75 且完成认证的有资历用户可接单")
+                            .font(.caption2)
+                            .foregroundStyle(Theme.textSecondary)
                     }
                 }
                 Section("约定") {
@@ -460,12 +500,12 @@ struct BookingSheet: View {
                     }
                 }
                 Section {
-                    Button("发起互换") { submit() }
+                    Button(orderMode == 0 ? "发起订单" : "发布订单") { submit() }
                         .frame(maxWidth: .infinity)
                         .font(.headline)
                 }
             }
-            .navigationTitle("发起互换 · \(service.name)")
+            .navigationTitle("发起订单 · \(service.name)")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -475,25 +515,40 @@ struct BookingSheet: View {
         }
     }
 
+    private func yuanText(_ v: Double) -> String {
+        let s = String(format: "%.1f", v)
+        return s.hasSuffix(".0") ? String(s.dropLast(2)) : s
+    }
+
     private func submit() {
         guard let petID else {
             errorMessage = "请选择宠物（可先添加宠物档案）"
             return
         }
-        guard let providerID, !scheduledTime.trimmingCharacters(in: .whitespaces).isEmpty,
-              !location.trimmingCharacters(in: .whitespaces).isEmpty else {
-            errorMessage = "请选择看护人并填写时间与地点"
+        let time = scheduledTime.trimmingCharacters(in: .whitespaces)
+        let place = location.trimmingCharacters(in: .whitespaces)
+        guard !time.isEmpty, !place.isEmpty else {
+            errorMessage = "请填写约定时间与地点"
             return
+        }
+        if orderMode == 0, providerID == nil {
+            errorMessage = "请选择看护人"
+            return
+        }
+        var body: [String: Any] = [
+            "petId": petID,
+            "serviceId": service.id,
+            "scheduledTime": time,
+            "location": place
+        ]
+        if orderMode == 0, let providerID {
+            body["providerId"] = providerID
+        } else {
+            body["openToFeed"] = true
         }
         Task {
             do {
-                try await store.createBooking([
-                    "petId": petID,
-                    "serviceId": service.id,
-                    "providerId": providerID,
-                    "scheduledTime": scheduledTime.trimmingCharacters(in: .whitespaces),
-                    "location": location.trimmingCharacters(in: .whitespaces)
-                ])
+                try await store.createBooking(body)
                 dismiss()
             } catch {
                 errorMessage = (error as? LocalizedError)?.errorDescription ?? "发起失败"

@@ -363,6 +363,11 @@ final class APIClient {
         let _: OkResponse = try await request("/api/bookings/\(id)/complete", method: "POST")
     }
 
+    /// 接单（动态区订单；服务端校验信用 ≥75 且已完成认证）
+    func acceptBooking(id: String) async throws {
+        let _: OkResponse = try await request("/api/bookings/\(id)/accept", method: "POST")
+    }
+
     // MARK: - 版本检查
 
     func fetchVersion() async throws -> ServerVersion {

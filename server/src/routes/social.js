@@ -137,8 +137,11 @@ export function socialRouter(db, io) {
 
   router.get('/dynamics', (req, res) => {
     const rows = db.all(`
-      SELECT d.*, u.nickname, u.avatar_symbol
-      FROM dynamics d JOIN users u ON u.id = d.user_id
+      SELECT d.*, u.nickname, u.avatar_symbol,
+             b.status AS order_status, b.price_yuan AS order_price, b.service_name AS order_service
+      FROM dynamics d
+      JOIN users u ON u.id = d.user_id
+      LEFT JOIN bookings b ON b.id = d.order_id
       ORDER BY d.id DESC LIMIT 200`)
     res.json({
       dynamics: rows.map((row) => ({
@@ -148,6 +151,10 @@ export function socialRouter(db, io) {
         avatarSymbol: row.avatar_symbol,
         content: row.content,
         imageBase64: row.image_base64 || null,
+        orderId: row.order_id || null,
+        orderStatus: row.order_status || null,
+        orderPriceYuan: row.order_price ?? null,
+        orderService: row.order_service || null,
         time: row.created_at,
         isSystemPost: !!row.is_system_post
       }))

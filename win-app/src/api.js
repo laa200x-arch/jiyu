@@ -128,15 +128,16 @@ function removeAccount(username) {
 
 /* ---------- 全量刷新 ---------- */
 async function refreshAll() {
-  const [users, convs, dyns, recs, agrs] = await Promise.all([
+  const [users, convs, dyns, recs, agrs, bks] = await Promise.all([
     api('/api/users'), api('/api/conversations'), api('/api/dynamics'),
-    api('/api/exchanges'), api('/api/agreements')
+    api('/api/exchanges'), api('/api/agreements'), api('/api/bookings')
   ])
   App.state.users = users.users
   App.state.conversations = convs.conversations
   App.state.dynamics = dyns.dynamics
   App.state.records = recs.records
   App.state.agreements = agrs.agreements
+  App.state.bookings = bks.bookings
 }
 
 /* ---------- 匹配 ---------- */
@@ -329,6 +330,11 @@ async function completeBooking(id) {
   await api('/api/bookings/' + id + '/complete', { method: 'POST' })
   const b = App.state.bookings.find((x) => x.id === String(id))
   if (b) b.status = 'completed'
+}
+async function acceptBooking(id) {
+  const data = await api('/api/bookings/' + id + '/accept', { method: 'POST' })
+  await fetchBookings()
+  return data
 }
 
 /* ---------- 版本检查 ---------- */

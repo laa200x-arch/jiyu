@@ -88,6 +88,9 @@ struct ExchangeDynamicView: View {
                         .frame(height: 180)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
+                if item.orderId != nil {
+                    orderBlock(item)
+                }
             }
         }
         .padding(14)
@@ -95,8 +98,8 @@ struct ExchangeDynamicView: View {
         .background(RoundedRectangle(cornerRadius: 16).fill(Theme.cardBg))
         .overlay(RoundedRectangle(cornerRadius: 16).stroke(Theme.divider, lineWidth: 1))
 
-        // 非系统动态：点击查看作者资料（支持私聊）
-        if item.isSystemPost {
+        // 非系统动态：点击查看作者资料（支持私聊）；订单卡片含交互按钮，不整体跳转
+        if item.isSystemPost || item.orderId != nil {
             return AnyView(card)
         }
         if let author = author(of: item) {
@@ -108,6 +111,78 @@ struct ExchangeDynamicView: View {
             )
         }
         return AnyView(card)
+    }
+
+    // MARK: 宠物护理订单卡片（动态区接单入口）
+
+    private func orderBlock(_ item: DynamicModel) -> some View {
+        let isOwn = item.userId == store.currentUser.id
+        let isOpen = item.orderStatus == "open"
+        let qualified = store.currentUser.creditScore >= 75 && store.currentUser.verification != .none
+        return HStack(spacing: 12) {
+            Text("💰 收费订单 ¥\(yuanText(item.orderPriceYuan ?? 0)) · 佣金 10%")
+                .font(.caption)
+                .bold()
+                .foregroundStyle(Theme.warning)
+            if let service = item.orderService {
+                Text(service)
+                    .font(.caption2)
+                    .foregroundStyle(Theme.textSecondary)
+            }
+            Spacer()
+            if isOpen {
+                if isOwn {
+                    Text("等待接单中…")
+                        .font(.caption2)
+                        .foregroundStyle(Theme.textSecondary)
+                } else if qualified {
+                    Button {
+                        acceptOrder(item)
+                    } label: {
+                        Text("接单")
+                            .font(.caption)
+                            .bold()
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 7)
+                            .background(Capsule().fill(Theme.primary))
+                    }
+                } else {
+                    Text("🔒 有资历者接单")
+                        .font(.caption2)
+                        .foregroundStyle(Theme.textSecondary)
+                }
+            } else {
+                Text("已接单")
+                    .font(.caption2)
+                    .bold()
+                    .foregroundStyle(Theme.success)
+            }
+        }
+        .padding(10)
+        .background(RoundedRectangle(cornerRadius: 10).fill(Theme.warning.opacity(0.08)))
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Theme.warning.opacity(0.35), lineWidth: 1))
+    }
+
+    private func yuanText(_ v: Double) -> String {
+        let s = String(format: "%.1f", v)
+        return s.hasSuffix(".0") ? String(s.dropLast(2)) : s
+    }
+
+    private func acceptOrder(_ item: DynamicModel) {
+        guard let orderId = item.orderId else { return }
+        Task {
+            do {
+                try await store.acceptBooking(id: orderId)
+                alertTitle = "接单成功"
+                alertMessage = "订单已接下，可在「宠物 → 我的订单」查看"
+                showAlert = true
+            } catch {
+                alertTitle = "接单失败"
+                alertMessage = (error as? LocalizedError)?.errorDescription ?? "请重试"
+                showAlert = true
+            }
+        }
     }
 
     /// 从用户列表解析动态作者（找不到则返回 nil，卡片不可点击）

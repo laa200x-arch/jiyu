@@ -51,6 +51,11 @@ struct DynamicModel: Codable, Identifiable, Hashable {
     var imageBase64: String?
     var time: Date
     var isSystemPost: Bool
+    // 宠物护理订单卡片（非订单动态为 nil）
+    var orderId: String?
+    var orderStatus: String?
+    var orderPriceYuan: Double?
+    var orderService: String?
 
     init(
         id: UUID = UUID(),
@@ -60,7 +65,11 @@ struct DynamicModel: Codable, Identifiable, Hashable {
         content: String,
         imageBase64: String? = nil,
         time: Date = Date(),
-        isSystemPost: Bool = false
+        isSystemPost: Bool = false,
+        orderId: String? = nil,
+        orderStatus: String? = nil,
+        orderPriceYuan: Double? = nil,
+        orderService: String? = nil
     ) {
         self.id = id
         self.userId = userId
@@ -70,5 +79,9 @@ struct DynamicModel: Codable, Identifiable, Hashable {
         self.imageBase64 = imageBase64
         self.time = time
         self.isSystemPost = isSystemPost
+        self.orderId = orderId
+        self.orderStatus = orderStatus
+        self.orderPriceYuan = orderPriceYuan
+        self.orderService = orderService
     }
 }

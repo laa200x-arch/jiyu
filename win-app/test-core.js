@@ -132,11 +132,11 @@ async function main() {
     check('删除动态', after.length === 0)
   } catch (e) { check('我的动态历史', false, e.message) }
 
-  // 12. 宠物护理域（旧巡六迁移）
+  // 12. 宠物护理域（旧巡六迁移 → 收费订单模式）
   try {
     const petsApi = require('./src/api.js')
     const svc = await petsApi.api('/api/care-services')
-    check('服务目录', svc.services.length === 7, `7 种 · ${svc.options.dogBehaviors.length} 狗行为`)
+    check('服务目录（含定价）', svc.services.length === 7 && svc.services[0].priceYuan === 45, `7 种 · 过夜 ¥45 · 遛狗 ¥20`)
     // 添加宠物
     const pet = await petsApi.api('/api/pets', { method: 'POST', body: {
       name: '测试宠物', petType: 'cat', breed: '英短', ageMonths: 18,
@@ -149,19 +149,51 @@ async function main() {
       await petsApi.api('/api/pets', { method: 'POST', body: { name: 'x', petType: 'cat', breed: 'x', ageMonths: 12, gender: 'female', neutered: false } })
       check('宠物校验（猫体重必填）', false)
     } catch (e) { check('宠物校验（猫体重必填）', e.message.includes('体重'), e.message.slice(0, 20)) }
-    // 发起预约
+    // 发起订单（指定看护人）
     const bk = await petsApi.api('/api/bookings', { method: 'POST', body: {
       petId: pet.pet.id, serviceId: 'overnight', providerId: 2,
       scheduledTime: '本周六 18:00', location: '小区门口'
     } })
-    check('发起看护预约', !!bk.booking && bk.booking.status === 'pending')
-    // 预约列表
+    check('发起订单（指定看护人）', !!bk.booking && bk.booking.status === 'assigned')
+    check('金额结算（佣金10%）', bk.booking.priceYuan === 45 && bk.booking.workerIncome === 40.5, `¥${bk.booking.priceYuan} 佣金¥${bk.booking.commissionYuan} 所得¥${bk.booking.workerIncome}`)
+    // 发布订单到动态（openToFeed）
+    const bk2 = await petsApi.api('/api/bookings', { method: 'POST', body: {
+      petId: pet.pet.id, serviceId: 'walk', scheduledTime: '本周日 10:00', location: '小区门口', openToFeed: true
+    } })
+    check('发布订单到动态（待接单）', bk2.booking.status === 'open' && bk2.booking.priceYuan === 20)
+    // 动态区出现订单卡片
+    await refreshAll()
+    const orderDyn = App.state.dynamics.find((d) => d.orderId === bk2.booking.id)
+    check('动态订单卡片', !!orderDyn && orderDyn.content.includes('遛狗'), orderDyn?.content?.slice(0, 20))
+    // 接单资历校验（新注册用户未认证应被拒）
+    const smoke = await petsApi.api('/api/auth/register', { method: 'POST', body: { username: 'noskill' + Date.now(), password: '123456', nickname: '无资历' } })
+    petsApi.App.state.token = smoke.token
+    const smokePet = await petsApi.api('/api/pets', { method: 'POST', body: {
+      name: '测试小狗', petType: 'dog', breed: '土狗', ageMonths: 24, gender: 'male', neutered: false
+    } })
+    check('新用户可建档养宠', !!smokePet.pet.id)
+    try {
+      await petsApi.api('/api/bookings/' + bk2.booking.id + '/accept', { method: 'POST' })
+      check('无资历接单被拒', false)
+    } catch (e) { check('无资历接单被拒', e.message.includes('资历') || e.message.includes('信用'), e.message.slice(0, 24)) }
+    petsApi.logout()
+    // 有资历者接单（linxiao 信用90已认证）
+    await petsApi.login('linxiao', '123456')
+    const acc = await petsApi.api('/api/bookings/' + bk2.booking.id + '/accept', { method: 'POST' })
+    check('有资历者接单成功', acc.booking.status === 'assigned')
+    petsApi.logout()
+    // 订单列表（我发布 + 我接单）
+    await petsApi.login('aqing', '123456')
     const list = await petsApi.api('/api/bookings')
-    check('预约列表', list.bookings.length > 0 && list.bookings[0].pet, list.bookings[0]?.serviceName)
-    // 删除宠物（清理）
+    check('订单列表', list.bookings.length > 0 && list.bookings[0].pet, list.bookings[0]?.serviceName)
+    // 清理：删除两只测试宠物
     await petsApi.api('/api/pets/' + pet.pet.id, { method: 'DELETE' })
     const after = await petsApi.api('/api/pets')
     check('删除宠物', !after.pets.some((p) => p.id === pet.pet.id))
+    petsApi.logout()
+    await petsApi.login(smoke.user.username, '123456')
+    await petsApi.api('/api/pets/' + smokePet.pet.id, { method: 'DELETE' })
+    petsApi.logout()
   } catch (e) { check('宠物护理域', false, e.message) }
 
   logout()

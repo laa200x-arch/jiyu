@@ -190,6 +190,11 @@ struct ServerDynamic: Decodable {
     let imageBase64: String?
     let time: Date
     let isSystemPost: Bool
+    // 宠物护理订单卡片（非订单动态为 nil）
+    let orderId: String?
+    let orderStatus: String?
+    let orderPriceYuan: Double?
+    let orderService: String?
 }
 
 struct ServerExchangeRecord: Decodable {
@@ -218,7 +223,7 @@ struct ServerAgreement: Decodable {
     let signedAt: Date
 }
 
-// MARK: - 宠物护理域 DTO（旧巡六迁移，互换语义）
+// MARK: - 宠物护理域 DTO（旧巡六迁移 → 收费订单模式）
 
 struct ServerCareService: Decodable, Identifiable {
     let id: String
@@ -226,6 +231,7 @@ struct ServerCareService: Decodable, Identifiable {
     let category: String
     let desc: String
     let duration: String
+    let priceYuan: Double
 }
 
 struct CareOptions: Decodable {
@@ -258,16 +264,32 @@ struct ServerPet: Decodable, Identifiable {
 struct PetsResponse: Decodable { let pets: [ServerPet] }
 struct PetResponse: Decodable { let pet: ServerPet }
 
+/// 订单里的用户摘要（看护人/下单人；服务端只返回这几个字段，不能复用完整 ServerUser）
+struct BookingUser: Decodable {
+    let id: String
+    let userName: String
+    let avatarSymbol: String
+    let avatarUrl: String?
+    let creditScore: Double
+    let locationLabel: String?
+}
+
 struct ServerBooking: Decodable, Identifiable {
     let id: String
+    let userId: String
+    let providerId: String?
     let petId: String
     let serviceId: String
     let serviceName: String
     let scheduledTime: String
     let location: String?
     var status: String
+    let priceYuan: Double
+    let commissionYuan: Double
+    let workerIncome: Double
+    let openToFeed: Bool
     let pet: ServerPet?
-    let provider: ServerUser?
+    let provider: BookingUser?
 }
 
 struct BookingsResponse: Decodable { let bookings: [ServerBooking] }
@@ -376,7 +398,11 @@ extension DynamicModel {
             content: server.content,
             imageBase64: server.imageBase64,
             time: server.time,
-            isSystemPost: server.isSystemPost
+            isSystemPost: server.isSystemPost,
+            orderId: server.orderId,
+            orderStatus: server.orderStatus,
+            orderPriceYuan: server.orderPriceYuan,
+            orderService: server.orderService
         )
     }
 }

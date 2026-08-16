@@ -653,6 +653,17 @@ final class MockDataStore: ObservableObject {
         }
     }
 
+    /// 接单（动态区订单；服务端校验资历）。成功后订单归属刷新到我的订单列表
+    func acceptBooking(id: String) async throws {
+        guard isServerMode else { return }
+        try await APIClient.shared.acceptBooking(id: id)
+        bookings = try await APIClient.shared.fetchBookings()
+        // 动态区的订单卡片状态同步刷新
+        if let dyns = try? await APIClient.shared.fetchDynamics() {
+            dynamics = dyns.map { DynamicModel(server: $0) }
+        }
+    }
+
     // MARK: - 互换动态（方案 2.3.6 动态区风控）
 
     /// 我的动态历史（个人发布过的全部动态）

@@ -78,6 +78,7 @@ CREATE TABLE IF NOT EXISTS dynamics (
   content TEXT NOT NULL,
   image_base64 TEXT,
   is_system_post INTEGER NOT NULL DEFAULT 0,
+  order_id TEXT,
   created_at TEXT NOT NULL
 );
 
@@ -123,13 +124,18 @@ CREATE TABLE IF NOT EXISTS pets (
 CREATE TABLE IF NOT EXISTS bookings (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id INTEGER NOT NULL,
-  provider_id INTEGER NOT NULL,
+  provider_id INTEGER,
   pet_id INTEGER NOT NULL,
   service_id TEXT NOT NULL,
   service_name TEXT NOT NULL,
   scheduled_time TEXT NOT NULL,
   location TEXT,
-  status TEXT NOT NULL DEFAULT 'pending',
+  status TEXT NOT NULL DEFAULT 'open',
+  price_yuan REAL,
+  commission_rate REAL,
+  commission_yuan REAL,
+  worker_income REAL,
+  open_to_feed INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL
 );
 `
@@ -208,6 +214,7 @@ CREATE TABLE IF NOT EXISTS dynamics (
   content TEXT NOT NULL,
   image_base64 LONGTEXT NULL,
   is_system_post TINYINT(1) NOT NULL DEFAULT 0,
+  order_id VARCHAR(32) NULL,
   created_at DATETIME NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -253,13 +260,18 @@ CREATE TABLE IF NOT EXISTS pets (
 CREATE TABLE IF NOT EXISTS bookings (
   id INT AUTO_INCREMENT PRIMARY KEY,
   user_id INT NOT NULL,
-  provider_id INT NOT NULL,
+  provider_id INT NULL,
   pet_id INT NOT NULL,
   service_id VARCHAR(32) NOT NULL,
   service_name VARCHAR(64) NOT NULL,
   scheduled_time VARCHAR(128) NOT NULL,
   location VARCHAR(255) NULL,
-  status ENUM('pending','ongoing','completed','cancelled') NOT NULL DEFAULT 'pending',
+  status ENUM('open','assigned','ongoing','completed','cancelled') NOT NULL DEFAULT 'open',
+  price_yuan DOUBLE NULL,
+  commission_rate DOUBLE NULL,
+  commission_yuan DOUBLE NULL,
+  worker_income DOUBLE NULL,
+  open_to_feed TINYINT(1) NOT NULL DEFAULT 0,
   created_at DATETIME NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 `
