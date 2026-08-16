@@ -38,7 +38,8 @@ final class MockDataStore: ObservableObject {
     /// 服务端用户 id（非空 = 服务端模式）
     private(set) var serverUserID: String?
 
-    private var messagesByConversation: [UUID: [ChatMessage]] = [:]
+    /// 会话消息缓存（@Published：消息加载完成后驱动聊天界面重绘）
+    @Published private var messagesByConversation: [UUID: [ChatMessage]] = [:]
     private var evaluationsByUser: [UUID: [EvaluateModel]] = [:]
 
     var isServerMode: Bool { serverUserID != nil }
