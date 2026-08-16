@@ -170,6 +170,33 @@ final class MockDataStore: ObservableObject {
         agreements = try await agrs.map { ExchangeAgreement(server: $0) }
     }
 
+    /// 拉取指定用户最新资料并同步本地快照（动态资料页/匹配详情打开时调用）
+    func refreshUser(_ user: UserModel) async -> UserModel {
+        guard isServerMode, let serverID = user.id.serverIDString else { return user }
+        guard let fresh = try? await APIClient.shared.fetchUser(id: serverID) else { return user }
+        let updated = UserModel(server: fresh)
+        syncUserSnapshot(updated)
+        return updated
+    }
+
+    /// 同步用户快照到 allUsers / currentUser / 会话 partner
+    private func syncUserSnapshot(_ updated: UserModel) {
+        if let idx = allUsers.firstIndex(where: { $0.id == updated.id }) {
+            allUsers[idx] = updated
+        }
+        if updated.id == currentUser.id {
+            currentUser = updated
+        }
+        for i in conversations.indices where conversations[i].partner.id == updated.id {
+            conversations[i].partner = updated
+        }
+    }
+
+    /// 更新档案后同步本地快照（技能增删/认证/曝光）
+    private func syncCurrentUserInAllUsers() {
+        syncUserSnapshot(currentUser)
+    }
+
     // MARK: - 双向匹配（方案 2.3.2，本地算法与服务端一致）
 
     func matches(filters: MatchFilters = .standard) -> [SkillMatchResult] {
@@ -477,6 +504,7 @@ final class MockDataStore: ObservableObject {
                     currentUser = UserModel(server: user)
                 }
                 currentExposurePackage = package
+                syncCurrentUserInAllUsers()
                 return
             } catch {
                 // 服务端失败回退本地
@@ -489,6 +517,7 @@ final class MockDataStore: ObservableObject {
             ExposureService.shared.deactivate(for: &currentUser)
             currentExposurePackage = nil
         }
+        syncCurrentUserInAllUsers()
     }
 
     // MARK: - 档案认证（方案 2.3.1）
@@ -497,10 +526,12 @@ final class MockDataStore: ObservableObject {
         if isServerMode {
             if let user = try? await APIClient.shared.setVerification(verification) {
                 currentUser = UserModel(server: user)
+                syncCurrentUserInAllUsers()
                 return
             }
         }
         currentUser.verification = verification
+        syncCurrentUserInAllUsers()
     }
 
     // MARK: - 技能档案编辑（方案 2.3.1）
@@ -516,6 +547,7 @@ final class MockDataStore: ObservableObject {
                 case .teach: currentUser.mySkills.append(local)
                 case .want: currentUser.wantSkills.append(local)
                 }
+                syncCurrentUserInAllUsers()
                 return
             }
         }
@@ -523,6 +555,7 @@ final class MockDataStore: ObservableObject {
         case .teach: currentUser.mySkills.append(skill)
         case .want: currentUser.wantSkills.append(skill)
         }
+        syncCurrentUserInAllUsers()
     }
 
     func removeSkill(kind: SkillKind, at offsets: IndexSet) async {
@@ -537,6 +570,7 @@ final class MockDataStore: ObservableObject {
         case .teach: currentUser.mySkills.remove(atOffsets: offsets)
         case .want: currentUser.wantSkills.remove(atOffsets: offsets)
         }
+        syncCurrentUserInAllUsers()
     }
 
     // MARK: - 互换动态（方案 2.3.6 动态区风控）

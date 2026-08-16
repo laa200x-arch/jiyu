@@ -3,9 +3,16 @@ import SwiftUI
 /// 用户资料页（通用：动态作者 / 匹配用户均可进入）
 /// 展示：头像 / 昵称 / 信用 / 认证 / VIP / 距离 / 我擅长 / 我想学
 /// 操作：私信沟通（一键进入聊天）
+/// 打开时自动从服务器拉取最新资料（技能档案实时更新）
 struct UserProfileView: View {
     @EnvironmentObject private var store: MockDataStore
-    let user: UserModel
+    let initialUser: UserModel
+    @State private var user: UserModel
+
+    init(user: UserModel) {
+        self.initialUser = user
+        _user = State(initialValue: user)
+    }
 
     var body: some View {
         ScrollView {
@@ -31,6 +38,16 @@ struct UserProfileView: View {
         .background(Theme.bg)
         .navigationTitle(user.userName)
         .navigationBarTitleDisplayMode(.inline)
+        .refreshable {
+            if store.isServerMode {
+                user = await store.refreshUser(user)
+            }
+        }
+        .task {
+            if store.isServerMode {
+                user = await store.refreshUser(user)
+            }
+        }
     }
 
     private var profileCard: some View {

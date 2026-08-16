@@ -6,10 +6,16 @@ struct MatchDetailView: View {
     @EnvironmentObject private var store: MockDataStore
     let result: SkillMatchResult
 
+    @State private var refreshedUser: UserModel?
     @State private var showAgreementSheet = false
     @State private var showAlert = false
     @State private var alertTitle = ""
     @State private var alertMessage = ""
+
+    /// 展示用用户（打开时自动拉取最新资料）
+    private var displayUser: UserModel {
+        refreshedUser ?? result.user
+    }
 
     private var hasAgreement: Bool {
         store.agreement(with: result.user.id) != nil
@@ -20,8 +26,8 @@ struct MatchDetailView: View {
             VStack(spacing: 16) {
                 profileCard
                 reasonCard
-                skillsCard(title: "TA 擅长（可以教你）", skills: result.user.mySkills)
-                skillsCard(title: "TA 想学（你来教）", skills: result.user.wantSkills)
+                skillsCard(title: "TA 擅长（可以教你）", skills: displayUser.mySkills)
+                skillsCard(title: "TA 想学（你来教）", skills: displayUser.wantSkills)
 
                 if hasAgreement {
                     Label("✅ 已与 TA 签署官方互换协议，请按时履约", systemImage: "checkmark.shield.fill")
@@ -36,7 +42,7 @@ struct MatchDetailView: View {
                     Button {
                         if hasAgreement {
                             alertTitle = "提示"
-                            alertMessage = "你已与 \(result.user.userName) 签署互换协议，可在「我的 → 我的互换」中查看进度。"
+                            alertMessage = "你已与 \(displayUser.userName) 签署互换协议，可在「我的 → 我的互换」中查看进度。"
                             showAlert = true
                         } else {
                             showAgreementSheet = true
@@ -51,7 +57,7 @@ struct MatchDetailView: View {
                     }
 
                     NavigationLink {
-                        ChatDetailView(partner: result.user)
+                        ChatDetailView(partner: displayUser)
                     } label: {
                         Text("私信沟通")
                             .font(.headline)
@@ -66,8 +72,18 @@ struct MatchDetailView: View {
             .padding(16)
         }
         .background(Theme.bg)
-        .navigationTitle(result.user.userName)
+        .navigationTitle(displayUser.userName)
         .navigationBarTitleDisplayMode(.inline)
+        .refreshable {
+            if store.isServerMode {
+                refreshedUser = await store.refreshUser(result.user)
+            }
+        }
+        .task {
+            if store.isServerMode {
+                refreshedUser = await store.refreshUser(result.user)
+            }
+        }
         .sheet(isPresented: $showAgreementSheet) {
             AgreementView(partner: result.user)
         }
@@ -80,25 +96,25 @@ struct MatchDetailView: View {
 
     private var profileCard: some View {
         HStack(spacing: 14) {
-            AvatarView(user: result.user, size: 64)
+            AvatarView(user: displayUser, size: 64)
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 6) {
-                    Text(result.user.userName)
+                    Text(displayUser.userName)
                         .font(.title3)
                         .bold()
                         .foregroundStyle(Theme.textPrimary)
-                    if result.user.isExposureVip {
+                    if displayUser.isExposureVip {
                         Image(systemName: "crown.fill")
                             .foregroundStyle(Theme.secondary)
                     }
                 }
-                Text(result.user.bio)
+                Text(displayUser.bio)
                     .font(.caption)
                     .foregroundStyle(Theme.textSecondary)
                 HStack(spacing: 8) {
-                    CreditBadgeView(score: result.user.creditScore)
-                    if result.user.verification != .none {
-                        Label(result.user.verification.rawValue, systemImage: "checkmark.seal.fill")
+                    CreditBadgeView(score: displayUser.creditScore)
+                    if displayUser.verification != .none {
+                        Label(displayUser.verification.rawValue, systemImage: "checkmark.seal.fill")
                             .font(.caption2)
                             .foregroundStyle(Theme.primary)
                     }

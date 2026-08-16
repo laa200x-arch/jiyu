@@ -124,6 +124,12 @@ final class APIClient {
         return response.users
     }
 
+    /// 拉取指定用户最新资料（资料页打开时刷新快照）
+    func fetchUser(id: String) async throws -> ServerUser {
+        let response: UserResponse = try await request("/api/users/\(id)")
+        return response.user
+    }
+
     func fetchMatches(nearbyOnly: Bool = false, type: String? = nil, keyword: String = "") async throws -> [ServerMatch] {
         var query: [String: String] = [:]
         if nearbyOnly { query["nearbyOnly"] = "1" }
