@@ -155,10 +155,49 @@ final class APIClient {
         let _: OkResponse = try await request("/api/conversations/\(conversationId)/read", method: "POST")
     }
 
-    /// REST 发送消息（Socket 失败时的兜底通道，服务端同一套风控）
-    func sendMessage(conversationId: String, text: String) async throws -> MessageSendResponse {
-        try await request("/api/messages", method: "POST",
-            body: ["conversationId": conversationId, "text": text])
+    /// REST 发送消息（Socket 失败时的兜底通道，服务端同一套风控；支持媒体消息）
+    func sendMessage(conversationId: String, text: String, mediaType: String? = nil, mediaUrl: String? = nil) async throws -> MessageSendResponse {
+        var body: [String: Any] = ["conversationId": conversationId, "text": text]
+        if let mediaType { body["mediaType"] = mediaType }
+        if let mediaUrl { body["mediaUrl"] = mediaUrl }
+        return try await request("/api/messages", method: "POST", body: body)
+    }
+
+    /// 上传媒体文件（聊天图片/视频），返回相对路径（如 /uploads/xxx.jpg）
+    func uploadMedia(data: Data, fileName: String, mimeType: String) async throws -> String {
+        var request = URLRequest(url: URL(string: "\(base)/api/upload")!)
+        request.httpMethod = "POST"
+        request.setValue("application/octet-stream", forHTTPHeaderField: "Accept")
+        if let token {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        let boundary = "Boundary-\(UUID().uuidString)"
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+
+        var body = Data()
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"file\"; filename=\"\(fileName)\"\r\n".data(using: .utf8)!)
+        body.append("Content-Type: \(mimeType)\r\n\r\n".data(using: .utf8)!)
+        body.append(data)
+        body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
+        request.httpBody = body
+
+        let responseData: Data
+        let response: URLResponse
+        do {
+            (responseData, response) = try await session.data(for: request)
+        } catch {
+            throw APIError.network
+        }
+        guard let http = response as? HTTPURLResponse else { throw APIError.network }
+        guard (200...299).contains(http.statusCode) else {
+            if http.statusCode == 401 { throw APIError.unauthorized }
+            let message = (try? JSONDecoder().decode([String: String].self, from: responseData))?["error"]
+                ?? "上传失败（HTTP \(http.statusCode)）"
+            throw APIError.server(message: message)
+        }
+        struct UploadResponse: Decodable { let url: String }
+        return try Self.decoder.decode(UploadResponse.self, from: responseData).url
     }
 
     // MARK: - 动态

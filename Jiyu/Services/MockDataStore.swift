@@ -272,6 +272,28 @@ final class MockDataStore: ObservableObject {
         return .sent
     }
 
+    /// 发送媒体消息（图片/视频，方案 2.3.3 资料传输）
+    /// 媒体走 REST 通道（先上传文件再发消息），文本走 Socket 实时
+    func sendMediaMessage(conversationID: UUID, mediaType: String, mediaUrl: String, text: String = "") async -> MessageSendResult {
+        guard isServerMode, let serverID = conversationID.serverIDString else {
+            return .failed(warning: "会话未同步，请返回消息列表重新进入")
+        }
+        do {
+            let response = try await APIClient.shared.sendMessage(
+                conversationId: serverID,
+                text: text,
+                mediaType: mediaType,
+                mediaUrl: mediaUrl
+            )
+            if response.blocked == true {
+                return .blocked(warning: response.warning ?? "内容违规，已被拦截")
+            }
+            return .sent
+        } catch {
+            return .failed(warning: (error as? LocalizedError)?.errorDescription ?? "发送失败，请重试")
+        }
+    }
+
     /// Socket 实时发送（失败返回 .failed，由调用方决定 REST 兜底）
     private func sendViaSocket(serverID: String, text: String) async -> MessageSendResult {
         await withCheckedContinuation { continuation in
@@ -297,6 +319,8 @@ final class MockDataStore: ObservableObject {
             id: UUID(serverID: payload.id),
             senderIsMe: isMe,
             text: payload.text,
+            mediaType: payload.mediaType,
+            mediaUrl: payload.mediaUrl,
             time: payload.time,
             isSystemNote: false
         )

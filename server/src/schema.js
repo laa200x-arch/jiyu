@@ -96,6 +96,8 @@ CREATE TABLE IF NOT EXISTS messages (
   conversation_id INTEGER NOT NULL,
   sender_id INTEGER NOT NULL,
   text TEXT NOT NULL,
+  media_type TEXT,
+  media_url TEXT,
   is_system_note INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL
 );
@@ -193,6 +195,8 @@ CREATE TABLE IF NOT EXISTS messages (
   conversation_id INT NOT NULL,
   sender_id INT NOT NULL,
   text VARCHAR(1000) NOT NULL,
+  media_type VARCHAR(16) NULL,
+  media_url VARCHAR(255) NULL,
   is_system_note TINYINT(1) NOT NULL DEFAULT 0,
   created_at DATETIME NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

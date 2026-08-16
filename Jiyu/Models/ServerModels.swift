@@ -173,6 +173,8 @@ struct ServerMessage: Decodable {
     let id: String
     let senderIsMe: Bool
     let text: String
+    let mediaType: String?
+    let mediaUrl: String?
     let time: Date
     let isSystemNote: Bool
 }
@@ -296,6 +298,8 @@ extension ChatMessage {
             id: UUID(serverID: server.id),
             senderIsMe: server.senderIsMe,
             text: server.text,
+            mediaType: server.mediaType,
+            mediaUrl: server.mediaUrl,
             time: server.time,
             isSystemNote: server.isSystemNote
         )

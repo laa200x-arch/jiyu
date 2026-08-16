@@ -68,6 +68,8 @@ export function serializeMessage(row) {
     id: String(row.id),
     senderIsMe: row.sender_is_me,
     text: row.text,
+    mediaType: row.media_type || null,
+    mediaUrl: row.media_url || null,
     time: row.created_at,
     isSystemNote: !!row.is_system_note
   }

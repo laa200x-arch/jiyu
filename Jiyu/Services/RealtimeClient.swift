@@ -15,6 +15,8 @@ final class RealtimeClient {
         let id: String
         let conversationId: String
         let text: String
+        let mediaType: String?
+        let mediaUrl: String?
         let time: Date
         let senderId: String
     }
@@ -102,6 +104,8 @@ final class RealtimeClient {
             id: id,
             conversationId: conversationId,
             text: text,
+            mediaType: payload["mediaType"] as? String,
+            mediaUrl: payload["mediaUrl"] as? String,
             time: time,
             senderId: senderId
         )

@@ -4,10 +4,14 @@
 import express from 'express'
 import cors from 'cors'
 import http from 'node:http'
+import path from 'node:path'
+import { mkdirSync } from 'node:fs'
+import multer from 'multer'
 import { config } from './config.js'
 import { initDb, closeDb } from './db.js'
 import { SQLITE_DDL, MYSQL_DDL } from './schema.js'
 import { seed, ensureEveryoneHasDynamics } from './seed.js'
+import { requireAuth } from './middleware.js'
 import { authRouter } from './routes/auth.js'
 import { profileRouter } from './routes/profile.js'
 import { matchRouter } from './routes/match.js'
@@ -25,6 +29,9 @@ async function main() {
   try {
     db.exec('ALTER TABLE dynamics ADD COLUMN image_base64 TEXT')
   } catch { /* 列已存在 */ }
+  // 轻量迁移：messages 表补充媒体字段
+  try { db.exec('ALTER TABLE messages ADD COLUMN media_type TEXT') } catch { /* 列已存在 */ }
+  try { db.exec('ALTER TABLE messages ADD COLUMN media_url TEXT') } catch { /* 列已存在 */ }
   // 演示数据
   if (config.autoSeed) {
     await seed(db)
@@ -48,6 +55,25 @@ async function main() {
       downloadUrl: 'https://github.com/laa200x-arch/jiyu/releases'
     })
   })
+
+  // 文件上传（聊天图片/视频，方案 2.3.3 资料传输）
+  const uploadDir = path.join(process.cwd(), 'uploads')
+  mkdirSync(uploadDir, { recursive: true })
+  const upload = multer({
+    storage: multer.diskStorage({
+      destination: uploadDir,
+      filename: (req, file, cb) => {
+        const ext = path.extname(file.originalname || '').toLowerCase().slice(0, 10)
+        cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`)
+      }
+    }),
+    limits: { fileSize: 50 * 1024 * 1024 } // 50MB 上限（视频）
+  })
+  app.post('/api/upload', requireAuth, upload.single('file'), (req, res) => {
+    if (!req.file) return res.status(400).json({ error: '缺少文件' })
+    res.status(201).json({ url: `/uploads/${req.file.filename}` })
+  })
+  app.use('/uploads', express.static(uploadDir, { maxAge: '7d' }))
 
   // 路由
   app.use('/api/auth', authRouter(db))
