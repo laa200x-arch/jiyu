@@ -9,6 +9,8 @@ struct OrderDetailView: View {
 
     @State private var booking: ServerBooking?
     @State private var loadFailed = false
+    @State private var loadFailedMessage: String?
+    @State private var showErrorAlert = false
 
     var body: some View {
         Group {
@@ -41,6 +43,11 @@ struct OrderDetailView: View {
         .background(Theme.bg)
         .navigationTitle("订单详情")
         .navigationBarTitleDisplayMode(.inline)
+        .alert("操作失败", isPresented: $showErrorAlert) {
+            Button("好的", role: .cancel) {}
+        } message: {
+            Text(loadFailedMessage ?? "请重试")
+        }
         .task {
             await load()
         }
@@ -73,9 +80,21 @@ struct OrderDetailView: View {
                     userBlock("🧑‍⚕️ 看护人", user: provider, distanceKm: provider.distanceKm)
                 } else if b.status == "open" {
                     infoBlock("⏳ 待接单") {
-                        Text("信用 ≥75 且完成实名/学生认证的用户可在动态区接单（平台佣金 10%，其余归服务人员）")
+                        Text("有资历用户可提交接单申请，你在私聊中协商后确认接单人（平台佣金 10%，其余归服务人员）")
                             .font(.caption)
                             .foregroundStyle(Theme.textSecondary)
+                    }
+                }
+                if let applications = b.applications, !applications.isEmpty {
+                    applicationsBlock(applications, booking: b)
+                } else if let my = b.myApplication, b.status == "open" {
+                    infoBlock("📋 我的申请") {
+                        Text(my.status == "pending"
+                             ? "⏳ 已提交，等待派单人确认（可在私聊中与派单人沟通）"
+                             : my.status == "rejected" ? "❌ 申请已被拒绝" : "✅ 已确定")
+                            .font(.subheadline)
+                            .bold()
+                            .foregroundStyle(my.status == "pending" ? Theme.primary : Theme.textSecondary)
                     }
                 }
                 chatButtons(b)
@@ -193,6 +212,132 @@ struct OrderDetailView: View {
                         .font(.caption)
                         .foregroundStyle(Theme.textSecondary)
                 }
+            }
+        }
+    }
+
+    // MARK: - 接单申请（派单人视角：私聊协商后确定接单人）
+
+    private func applicationsBlock(_ applications: [BookingApplication], booking: ServerBooking) -> some View {
+        infoBlock("📋 接单申请（\(applications.count)）· 私聊协商后确定接单人") {
+            ForEach(applications) { app in
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 10) {
+                        AvatarView(user: userModel(from: app), size: 36)
+                        VStack(alignment: .leading, spacing: 2) {
+                            HStack(spacing: 6) {
+                                Text(app.userName)
+                                    .font(.subheadline)
+                                    .bold()
+                                    .foregroundStyle(Theme.textPrimary)
+                                Text("信用 \(Int(app.creditScore))")
+                                    .font(.caption2)
+                                    .foregroundStyle(Theme.textSecondary)
+                                if app.verification != "none" {
+                                    Text("✅ 已认证")
+                                        .font(.caption2)
+                                        .bold()
+                                        .foregroundStyle(Theme.success)
+                                }
+                            }
+                            Text(app.message?.isEmpty == false ? "💬 \(app.message!)" : "无留言")
+                                .font(.caption)
+                                .foregroundStyle(Theme.textSecondary)
+                        }
+                        Spacer()
+                        Text(app.status == "pending" ? "待确认" : app.status == "accepted" ? "已确定" : "已拒绝")
+                            .font(.caption2)
+                            .bold()
+                            .foregroundStyle(app.status == "pending" ? Theme.warning : app.status == "accepted" ? Theme.success : Theme.textSecondary)
+                    }
+                    if app.status == "pending" {
+                        HStack(spacing: 10) {
+                            Button {
+                                confirm(app, in: booking)
+                            } label: {
+                                Text("✅ 确定接单人")
+                                    .font(.caption)
+                                    .bold()
+                                    .foregroundStyle(.white)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 7)
+                                    .background(Capsule().fill(Theme.primary))
+                            }
+                            Button {
+                                reject(app, in: booking)
+                            } label: {
+                                Text("拒绝")
+                                    .font(.caption)
+                                    .foregroundStyle(Theme.textSecondary)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 7)
+                                    .background(Capsule().fill(Theme.bg))
+                                    .overlay(Capsule().stroke(Theme.divider, lineWidth: 1))
+                            }
+                            NavigationLink {
+                                ChatDetailView(partner: userModel(from: app))
+                                    .onAppear {
+                                        store.orderDraft = booking
+                                    }
+                            } label: {
+                                Text("💬 私聊")
+                                    .font(.caption)
+                                    .foregroundStyle(Theme.primary)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 7)
+                                    .background(Capsule().fill(Theme.primary.opacity(0.10)))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+                .padding(.vertical, 6)
+                if app.id != applications.last?.id {
+                    Divider()
+                }
+            }
+        }
+    }
+
+    private func userModel(from app: BookingApplication) -> UserModel {
+        UserModel(
+            id: UUID(serverID: app.userId) ?? UUID(),
+            userName: app.userName,
+            avatarSymbol: app.avatarSymbol,
+            avatarUrl: app.avatarUrl,
+            bio: "",
+            locationLabel: app.locationLabel ?? "",
+            distanceKm: nil,
+            creditScore: app.creditScore,
+            verification: .none,
+            mySkills: [],
+            wantSkills: [],
+            isExposureVip: false
+        )
+    }
+
+    /// 确定接单人（其余申请自动拒绝；双方收到私聊系统提示）
+    private func confirm(_ app: BookingApplication, in booking: ServerBooking) {
+        Task {
+            do {
+                try await store.confirmApplication(bookingId: booking.id, applicationId: app.id)
+                await load()
+            } catch {
+                loadFailedMessage = (error as? LocalizedError)?.errorDescription ?? "操作失败"
+                showErrorAlert = true
+            }
+        }
+    }
+
+    /// 拒绝申请
+    private func reject(_ app: BookingApplication, in booking: ServerBooking) {
+        Task {
+            do {
+                try await store.rejectApplication(bookingId: booking.id, applicationId: app.id)
+                await load()
+            } catch {
+                loadFailedMessage = (error as? LocalizedError)?.errorDescription ?? "操作失败"
+                showErrorAlert = true
             }
         }
     }

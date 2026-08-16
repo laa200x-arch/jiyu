@@ -258,10 +258,12 @@ async function renderFeed() {
   v.innerHTML = `
     <div class="row" style="margin-bottom:14px">
       <span class="section-title" style="margin:0;flex:1">互换动态</span>
+      <button class="btn btn-outline btn-sm" id="feed-refresh" title="刷新动态">⟳ 刷新</button>
       <button class="btn btn-primary btn-sm" id="feed-compose">✏️ 发布动态</button>
     </div>
     <div id="feed-list"></div>`
   v.querySelector('#feed-compose').addEventListener('click', showFeedCompose)
+  v.querySelector('#feed-refresh').addEventListener('click', () => renderFeed())
   const list = v.querySelector('#feed-list')
   list.innerHTML = '<div class="empty">加载中…</div>'
   try {
@@ -277,19 +279,24 @@ async function renderFeed() {
       const orderPrice = d.orderPriceYuan ?? (own ? own.priceYuan : null)
       const orderService = d.orderService || (own ? own.serviceName : '')
       const isOwnOrder = d.orderId && String(d.userId) === String(App.state.user.id)
-      const canAccept = d.orderId && orderStatus === 'open' && !isOwnOrder
-        && (App.state.user.creditScore >= 75 && App.state.user.verification !== 'none')
+      const myApp = d.myApplicationStatus
+      const appCount = d.applicationCount || 0
+      const qualified = (App.state.user.creditScore >= 75 && App.state.user.verification !== 'none')
       const orderBlock = d.orderId ? `
             <div class="feed-order-bar" data-order-detail="${esc(d.orderId)}" style="margin-top:10px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;cursor:pointer" title="查看订单详情">
               <span class="tag tag-vip">💰 收费订单 ¥${orderPrice} · 佣金 10%</span>
               <span class="card-sub">${esc(orderService)}</span>
               <span class="spacer"></span>
               ${orderStatus === 'open'
-                ? (canAccept
-                    ? `<button class="btn btn-primary btn-sm" data-accept="${esc(d.orderId)}">接单</button>`
-                    : (isOwnOrder
-                        ? '<span class="card-sub">等待接单中…</span>'
-                        : '<span class="card-sub" title="接单需信用≥75且完成认证">🔒 有资历者接单</span>'))
+                ? (isOwnOrder
+                    ? `<span class="card-sub">等待接单中…${appCount > 0 ? `（<b style="color:var(--warning)">${appCount} 人申请</b>）` : ''}</span>`
+                    : (myApp === 'pending'
+                        ? '<span class="card-sub" style="color:var(--primary)">⏳ 已申请，等待派单人确认</span>'
+                        : (myApp === 'rejected'
+                            ? '<span class="card-sub">❌ 申请已被拒绝</span>'
+                            : (qualified
+                                ? `<button class="btn btn-primary btn-sm" data-apply="${esc(d.orderId)}">接单申请</button>`
+                                : '<span class="card-sub" title="接单需信用≥75且完成认证">🔒 有资历者接单</span>'))))
                 : `<span class="tag tag-verified">已接单</span>`}
             </div>` : ''
       return `
@@ -315,18 +322,18 @@ async function renderFeed() {
         showUserProfile(u)
       } catch (e) { toast('加载失败') }
     }))
-    // 订单接单
-    list.querySelectorAll('[data-accept]').forEach((b) => b.addEventListener('click', async () => {
-      if (!confirm('确认接下这笔订单？服务完成后费用按订单结算（平台收取 10% 佣金）')) return
+    // 接单申请（有资历者提交；派单人在私聊/订单详情确认）
+    list.querySelectorAll('[data-apply]').forEach((b) => b.addEventListener('click', async () => {
+      if (!confirm('确认提交接单申请？派单人确认后即为该订单接单人（服务费按订单结算，平台收取 10% 佣金）。\n申请后将自动与派单人建立私聊')) return
       try {
-        await acceptBooking(b.dataset.accept)
-        toast('✅ 接单成功，可在「宠物 → 我的订单」查看')
+        await applyBooking(b.dataset.apply, '')
+        toast('✅ 接单申请已提交，等待派单人确认（可在私聊中协商）')
         renderFeed()
-      } catch (e) { toast('接单失败：' + e.message) }
+      } catch (e) { toast('申请失败：' + e.message) }
     }))
-    // 订单详情（查看狗狗信息/位置距离/私聊）
+    // 订单详情（查看狗狗信息/位置距离/私聊/确认接单人）
     list.querySelectorAll('[data-order-detail]').forEach((el) => el.addEventListener('click', (e) => {
-      if (e.target.closest('[data-accept]')) return
+      if (e.target.closest('[data-apply]')) return
       showOrderDetail(el.dataset.orderDetail)
     }))
   } catch (e) {
@@ -371,7 +378,32 @@ async function showOrderDetail(orderId) {
           <div class="card-sub">${esc(b.provider.locationLabel || '未填位置')}${b.provider.distanceKm != null ? ' · 距离你约 ' + b.provider.distanceKm + ' km' : ''}</div>
         </div>
       </div>
-    </div>` : (b.status === 'open' ? '<div class="order-detail-block card-sub">⏳ 待接单：信用 ≥75 且完成认证的用户可接单</div>' : '')
+    </div>` : (b.status === 'open' ? '<div class="order-detail-block card-sub">⏳ 待接单：有资历用户可提交接单申请，你在私聊中协商后确认</div>' : '')
+  // 接单申请列表（仅派单人可见）：私聊协商 → 确定/拒绝
+  const appBlock = b.applications && b.applications.length ? `
+    <div class="order-detail-block">
+      <div class="card-sub" style="margin-bottom:6px">📋 接单申请（${b.applications.length}）· 私聊协商后确定接单人</div>
+      ${b.applications.map((a) => `
+        <div style="margin-bottom:10px;padding-bottom:8px;border-bottom:1px dashed var(--divider)">
+          <div class="row">
+            ${avatarHtml(a, 'avatar avatar-sm')}
+            <div style="flex:1;min-width:0">
+              <div class="order-detail-line"><b>${esc(a.userName)}</b>（信用 ${Math.round(a.creditScore)} · ${a.verification !== 'none' ? '✅ 已认证' : '未认证'}）</div>
+              <div class="card-sub">${esc(a.message || '无留言')}${a.locationLabel ? ' · ' + esc(a.locationLabel) : ''}</div>
+            </div>
+            <span class="tag ${a.status === 'pending' ? 'tag-vip' : 'tag-verified'}">${a.status === 'pending' ? '待确认' : a.status === 'accepted' ? '已确定' : '已拒绝'}</span>
+          </div>
+          ${a.status === 'pending' ? `
+          <div class="row" style="margin-top:8px;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-primary btn-sm" data-confirm-app="${esc(a.id)}">✅ 确定接单人</button>
+            <button class="btn btn-outline btn-sm" data-reject-app="${esc(a.id)}">拒绝</button>
+            <button class="btn btn-outline btn-sm" data-app-chat="${esc(a.userId)}">💬 私聊</button>
+          </div>` : ''}
+        </div>`).join('')}
+    </div>` : (b.myApplication && b.status === 'open' ? `
+    <div class="order-detail-block">
+      <div class="card-sub">我的申请：${b.myApplication.status === 'pending' ? '⏳ 已提交，等待派单人确认（可在私聊中与派单人沟通）' : b.myApplication.status === 'rejected' ? '❌ 申请已被拒绝' : '✅ 已确定'}</div>
+    </div>` : '')
   openModal(`
     <div class="modal-title">订单详情 · ${esc(b.serviceName)}</div>
     <div class="row" style="margin-bottom:10px">
@@ -391,6 +423,7 @@ async function showOrderDetail(orderId) {
     ${petInfo}
     ${initiatorBlock}
     ${providerBlock}
+    ${appBlock}
     <div class="modal-actions" style="flex-wrap:wrap">
       ${b.initiator && b.initiator.id !== App.state.user.id ? `<button class="btn btn-primary" id="od-chat-initiator">💬 私聊下单人</button>` : ''}
       ${b.provider && b.provider.id !== App.state.user.id ? `<button class="btn btn-primary" id="od-chat-provider">💬 私聊看护人</button>` : ''}
@@ -411,6 +444,29 @@ async function showOrderDetail(orderId) {
     if (bi) bi.addEventListener('click', () => chatWith(b.initiator))
     const bp = box.querySelector('#od-chat-provider')
     if (bp) bp.addEventListener('click', () => chatWith(b.provider))
+    // 申请处理：确定接单人 / 拒绝 / 私聊申请者
+    box.querySelectorAll('[data-confirm-app]').forEach((el) => el.addEventListener('click', async () => {
+      const app = b.applications.find((x) => x.id === el.dataset.confirmApp)
+      if (!app) return
+      if (!confirm(`确定 ${app.userName} 为该订单的接单人？其余申请将自动拒绝`)) return
+      try {
+        await confirmApplication(b.id, app.id)
+        closeModal()
+        toast(`✅ 已确定 ${app.userName} 为接单人，双方已收到私聊通知`)
+        renderFeed()
+      } catch (e) { toast('操作失败：' + e.message) }
+    }))
+    box.querySelectorAll('[data-reject-app]').forEach((el) => el.addEventListener('click', async () => {
+      try {
+        await rejectApplication(b.id, el.dataset.rejectApp)
+        toast('已拒绝该申请')
+        showOrderDetail(b.id)
+      } catch (e) { toast('操作失败：' + e.message) }
+    }))
+    box.querySelectorAll('[data-app-chat]').forEach((el) => el.addEventListener('click', () => {
+      const app = b.applications.find((x) => x.userId === el.dataset.appChat)
+      if (app) chatWith(app)
+    }))
   })
 }
 

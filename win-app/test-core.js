@@ -173,14 +173,27 @@ async function main() {
     } })
     check('新用户可建档养宠', !!smokePet.pet.id)
     try {
-      await petsApi.api('/api/bookings/' + bk2.booking.id + '/accept', { method: 'POST' })
-      check('无资历接单被拒', false)
-    } catch (e) { check('无资历接单被拒', e.message.includes('资历') || e.message.includes('信用'), e.message.slice(0, 24)) }
+      await petsApi.api('/api/bookings/' + bk2.booking.id + '/apply', { method: 'POST', body: {} })
+      check('无资历申请被拒', false)
+    } catch (e) { check('无资历申请被拒', e.message.includes('资历') || e.message.includes('信用'), e.message.slice(0, 24)) }
     petsApi.logout()
-    // 有资历者接单（linxiao 信用90已认证）
+    // 接单申请 + 派单人确认（新流程）
     await petsApi.login('linxiao', '123456')
-    const acc = await petsApi.api('/api/bookings/' + bk2.booking.id + '/accept', { method: 'POST' })
-    check('有资历者接单成功', acc.booking.status === 'assigned')
+    const app = await petsApi.api('/api/bookings/' + bk2.booking.id + '/apply', { method: 'POST', body: { message: '我有丰富遛狗经验' } })
+    check('提交接单申请', app.application.status === 'pending')
+    try {
+      await petsApi.api('/api/bookings/' + bk2.booking.id + '/apply', { method: 'POST', body: {} })
+      check('重复申请被拒', false)
+    } catch (e) { check('重复申请被拒', e.message.includes('已提交'), e.message.slice(0, 16)) }
+    petsApi.logout()
+    await petsApi.login('aqing', '123456')
+    const detail2 = await petsApi.api('/api/bookings/' + bk2.booking.id)
+    check('派单人看到申请列表', detail2.booking.applications.length === 1 && detail2.booking.applications[0].status === 'pending'
+      && detail2.booking.applications[0].userName === '林晓', detail2.booking.applications[0]?.message)
+    const confirmRes = await petsApi.api('/api/bookings/' + bk2.booking.id + '/applications/' + app.application.id + '/confirm', { method: 'POST' })
+    check('派单人确认接单人', confirmRes.booking.status === 'assigned')
+    const afterConfirm = await petsApi.api('/api/bookings/' + bk2.booking.id)
+    check('申请状态已更新', afterConfirm.booking.applications[0].status === 'accepted' && afterConfirm.booking.provider.userName === '林晓')
     petsApi.logout()
     // 订单列表（我发布 + 我接单）
     await petsApi.login('aqing', '123456')

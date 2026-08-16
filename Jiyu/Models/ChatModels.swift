@@ -60,6 +60,9 @@ struct DynamicModel: Codable, Identifiable, Hashable {
     var orderStatus: String?
     var orderPriceYuan: Double?
     var orderService: String?
+    // 我的接单申请状态 + 待确认申请数
+    var myApplicationStatus: String?
+    var applicationCount: Int?
 
     init(
         id: UUID = UUID(),
@@ -73,7 +76,9 @@ struct DynamicModel: Codable, Identifiable, Hashable {
         orderId: String? = nil,
         orderStatus: String? = nil,
         orderPriceYuan: Double? = nil,
-        orderService: String? = nil
+        orderService: String? = nil,
+        myApplicationStatus: String? = nil,
+        applicationCount: Int? = nil
     ) {
         self.id = id
         self.userId = userId
@@ -87,5 +92,7 @@ struct DynamicModel: Codable, Identifiable, Hashable {
         self.orderStatus = orderStatus
         self.orderPriceYuan = orderPriceYuan
         self.orderService = orderService
+        self.myApplicationStatus = myApplicationStatus
+        self.applicationCount = applicationCount
     }
 }

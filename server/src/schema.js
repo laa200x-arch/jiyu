@@ -122,6 +122,16 @@ CREATE TABLE IF NOT EXISTS pets (
   created_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS booking_applications (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  booking_id INTEGER NOT NULL,
+  user_id INTEGER NOT NULL,
+  message TEXT,
+  status TEXT NOT NULL DEFAULT 'pending',
+  created_at TEXT NOT NULL,
+  UNIQUE (booking_id, user_id)
+);
+
 CREATE TABLE IF NOT EXISTS bookings (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id INTEGER NOT NULL,
@@ -257,6 +267,16 @@ CREATE TABLE IF NOT EXISTS pets (
   photo_url VARCHAR(255) NULL,
   notes VARCHAR(2000) NOT NULL DEFAULT '',
   created_at DATETIME NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS booking_applications (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  booking_id INT NOT NULL,
+  user_id INT NOT NULL,
+  message VARCHAR(300) NULL,
+  status VARCHAR(16) NOT NULL DEFAULT 'pending',
+  created_at DATETIME NOT NULL,
+  UNIQUE KEY uq_app (booking_id, user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS bookings (

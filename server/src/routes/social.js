@@ -138,11 +138,15 @@ export function socialRouter(db, io) {
   router.get('/dynamics', (req, res) => {
     const rows = db.all(`
       SELECT d.*, u.nickname, u.avatar_symbol,
-             b.status AS order_status, b.price_yuan AS order_price, b.service_name AS order_service
+             b.status AS order_status, b.price_yuan AS order_price, b.service_name AS order_service,
+             (SELECT ba.status FROM booking_applications ba
+               WHERE ba.booking_id = d.order_id AND ba.user_id = ?) AS my_app_status,
+             (SELECT COUNT(*) FROM booking_applications ba2
+               WHERE ba2.booking_id = d.order_id AND ba2.status = 'pending') AS app_count
       FROM dynamics d
       JOIN users u ON u.id = d.user_id
       LEFT JOIN bookings b ON b.id = d.order_id
-      ORDER BY d.id DESC LIMIT 200`)
+      ORDER BY d.id DESC LIMIT 200`, [req.userId])
     res.json({
       dynamics: rows.map((row) => ({
         id: String(row.id),
@@ -155,6 +159,8 @@ export function socialRouter(db, io) {
         orderStatus: row.order_status || null,
         orderPriceYuan: row.order_price ?? null,
         orderService: row.order_service || null,
+        myApplicationStatus: row.my_app_status || null,
+        applicationCount: row.app_count || 0,
         time: row.created_at,
         isSystemPost: !!row.is_system_post
       }))

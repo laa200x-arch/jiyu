@@ -665,11 +665,38 @@ final class MockDataStore: ObservableObject {
     func acceptBooking(id: String) async throws {
         guard isServerMode else { return }
         try await APIClient.shared.acceptBooking(id: id)
-        bookings = try await APIClient.shared.fetchBookings()
-        // 动态区的订单卡片状态同步刷新
+        await refreshPetAndDynamics()
+    }
+
+    /// 接单申请（有资历者提交；派单人在私聊/订单详情中确认）
+    func applyBooking(id: String, message: String? = nil) async throws {
+        guard isServerMode else { return }
+        try await APIClient.shared.applyBooking(id: id, message: message)
+        await refreshPetAndDynamics()
+    }
+
+    /// 派单人确认接单人（其余申请自动拒绝；双方收到私聊系统提示）
+    func confirmApplication(bookingId: String, applicationId: String) async throws {
+        guard isServerMode else { return }
+        try await APIClient.shared.confirmApplication(bookingId: bookingId, applicationId: applicationId)
+        orderDetailCache.removeValue(forKey: bookingId)
+        await refreshPetAndDynamics()
+    }
+
+    /// 派单人拒绝申请
+    func rejectApplication(bookingId: String, applicationId: String) async throws {
+        guard isServerMode else { return }
+        try await APIClient.shared.rejectApplication(bookingId: bookingId, applicationId: applicationId)
+        orderDetailCache.removeValue(forKey: bookingId)
+        await refreshPetAndDynamics()
+    }
+
+    /// 宠物数据 + 动态区订单卡片状态一并刷新
+    private func refreshPetAndDynamics() async {
         if let dyns = try? await APIClient.shared.fetchDynamics() {
             dynamics = dyns.map { DynamicModel(server: $0) }
         }
+        bookings = (try? await APIClient.shared.fetchBookings()) ?? bookings
     }
 
     /// 订单详情（带缓存；聊天卡片与详情页共用）

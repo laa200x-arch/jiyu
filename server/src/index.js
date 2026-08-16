@@ -144,8 +144,8 @@ async function main() {
 
   // 社交路由（需要 io 推送）
   app.use('/api', socialRouter(db, io))
-  // 宠物护理域（旧巡六迁移）
-  app.use('/api', petsRouter(db))
+  // 宠物护理域（旧巡六迁移；io 用于申请/确认接单的私聊系统提示）
+  app.use('/api', petsRouter(db, io))
 
   // 404
   app.use((req, res) => {

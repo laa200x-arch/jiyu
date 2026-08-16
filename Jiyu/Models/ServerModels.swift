@@ -196,6 +196,9 @@ struct ServerDynamic: Decodable {
     let orderStatus: String?
     let orderPriceYuan: Double?
     let orderService: String?
+    // 我的接单申请状态（pending/rejected/accepted；未申请为 nil）+ 待确认申请数
+    let myApplicationStatus: String?
+    let applicationCount: Int?
 }
 
 struct ServerExchangeRecord: Decodable {
@@ -276,6 +279,29 @@ struct BookingUser: Decodable {
     let distanceKm: Double?
 }
 
+/// 接单申请（派单人可见列表：申请者信息 + 状态）
+struct BookingApplication: Decodable, Identifiable {
+    let id: String
+    let userId: String
+    let userName: String
+    let avatarSymbol: String
+    let avatarUrl: String?
+    let creditScore: Double
+    let verification: String
+    let locationLabel: String?
+    let message: String?
+    let status: String
+    let createdAt: String
+}
+
+/// 我自己的申请（申请者视角）
+struct MyApplication: Decodable {
+    let id: String
+    let status: String
+    let message: String?
+    let createdAt: String
+}
+
 struct ServerBooking: Decodable, Identifiable {
     let id: String
     let userId: String
@@ -294,6 +320,8 @@ struct ServerBooking: Decodable, Identifiable {
     let pet: ServerPet?
     let initiator: BookingUser?
     let provider: BookingUser?
+    let applications: [BookingApplication]?
+    let myApplication: MyApplication?
 }
 
 struct BookingsResponse: Decodable { let bookings: [ServerBooking] }
@@ -408,7 +436,9 @@ extension DynamicModel {
             orderId: server.orderId,
             orderStatus: server.orderStatus,
             orderPriceYuan: server.orderPriceYuan,
-            orderService: server.orderService
+            orderService: server.orderService,
+            myApplicationStatus: server.myApplicationStatus,
+            applicationCount: server.applicationCount
         )
     }
 }

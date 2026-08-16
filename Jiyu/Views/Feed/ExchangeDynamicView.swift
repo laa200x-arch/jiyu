@@ -27,7 +27,23 @@ struct ExchangeDynamicView: View {
         .background(Theme.bg)
         .navigationTitle("互换动态")
         .navigationBarTitleDisplayMode(.inline)
+        .refreshable {
+            if store.isServerMode {
+                try? await store.refreshAll()
+            }
+        }
         .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button {
+                    Task {
+                        if store.isServerMode {
+                            try? await store.refreshAll()
+                        }
+                    }
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                }
+            }
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button {
                     showCompose = true
@@ -116,12 +132,14 @@ struct ExchangeDynamicView: View {
         return AnyView(card)
     }
 
-    // MARK: 宠物护理订单卡片（动态区接单入口）
+    // MARK: 宠物护理订单卡片（动态区：接单申请入口）
 
     private func orderBlock(_ item: DynamicModel) -> some View {
         let isOwn = item.userId == store.currentUser.id
         let isOpen = item.orderStatus == "open"
         let qualified = store.currentUser.creditScore >= 75 && store.currentUser.verification != .none
+        let myApp = item.myApplicationStatus
+        let appCount = item.applicationCount ?? 0
         return HStack(spacing: 12) {
             Text("💰 收费订单 ¥\(yuanText(item.orderPriceYuan ?? 0)) · 佣金 10%")
                 .font(.caption)
@@ -135,14 +153,23 @@ struct ExchangeDynamicView: View {
             Spacer()
             if isOpen {
                 if isOwn {
-                    Text("等待接单中…")
+                    Text(appCount > 0 ? "等待接单中…（\(appCount) 人申请）" : "等待接单中…")
+                        .font(.caption2)
+                        .foregroundStyle(Theme.textSecondary)
+                } else if myApp == "pending" {
+                    Text("⏳ 已申请，等待派单人确认")
+                        .font(.caption2)
+                        .bold()
+                        .foregroundStyle(Theme.primary)
+                } else if myApp == "rejected" {
+                    Text("❌ 申请已被拒绝")
                         .font(.caption2)
                         .foregroundStyle(Theme.textSecondary)
                 } else if qualified {
                     Button {
-                        acceptOrder(item)
+                        applyOrder(item)
                     } label: {
-                        Text("接单")
+                        Text("接单申请")
                             .font(.caption)
                             .bold()
                             .foregroundStyle(.white)
@@ -172,16 +199,17 @@ struct ExchangeDynamicView: View {
         return s.hasSuffix(".0") ? String(s.dropLast(2)) : s
     }
 
-    private func acceptOrder(_ item: DynamicModel) {
+    /// 提交接单申请（派单人在私聊/订单详情中确认）
+    private func applyOrder(_ item: DynamicModel) {
         guard let orderId = item.orderId else { return }
         Task {
             do {
-                try await store.acceptBooking(id: orderId)
-                alertTitle = "接单成功"
-                alertMessage = "订单已接下，可在「宠物 → 我的订单」查看"
+                try await store.applyBooking(id: orderId)
+                alertTitle = "申请已提交"
+                alertMessage = "等待派单人确认，可在私聊中与派单人协商；确认后你即为接单人"
                 showAlert = true
             } catch {
-                alertTitle = "接单失败"
+                alertTitle = "申请失败"
                 alertMessage = (error as? LocalizedError)?.errorDescription ?? "请重试"
                 showAlert = true
             }

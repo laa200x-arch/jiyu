@@ -33,7 +33,7 @@ export const PET_OPTIONS = {
   weightOptions: ['<5kg', '5-10kg', '10-25kg', '>25kg']
 }
 
-export function petsRouter(db) {
+export function petsRouter(db, bus = { io: null }) {
   const router = Router()
   router.use(requireAuth)
   const now = () => new Date().toISOString()
@@ -114,11 +114,35 @@ export function petsRouter(db) {
     res.json({ ok: true })
   })
 
-  /** 订单序列化（列表与详情共用；viewerId 用于计算下单人与查看者的距离） */
+  /** 订单序列化（列表与详情共用；viewerId 用于计算下单人与查看者的距离、返回本人申请状态） */
   function serializeBooking(row, viewerId = null) {
     const initiator = db.get('SELECT id, nickname, avatar_symbol, avatar_url, credit_score, location_label, distance_km FROM users WHERE id = ?', [row.user_id])
     const provider = row.provider_id ? db.get('SELECT id, nickname, avatar_symbol, avatar_url, credit_score, location_label, distance_km FROM users WHERE id = ?', [row.provider_id]) : null
     const distanceKm = initiator ? (Number(viewerId) === row.user_id ? 0 : initiator.distance_km ?? null) : null
+    // 申请列表：仅派单人（下单人）可见；申请者只返回自己的申请状态
+    const applications = Number(viewerId) === row.user_id
+      ? db.all(
+          `SELECT a.*, u.nickname, u.avatar_symbol, u.avatar_url, u.credit_score, u.verification, u.location_label
+           FROM booking_applications a JOIN users u ON u.id = a.user_id
+           WHERE a.booking_id = ? ORDER BY a.id`,
+          [row.id]
+        ).map((a) => ({
+          id: String(a.id),
+          userId: String(a.user_id),
+          userName: a.nickname,
+          avatarSymbol: a.avatar_symbol,
+          avatarUrl: a.avatar_url || null,
+          creditScore: a.credit_score,
+          verification: a.verification,
+          locationLabel: a.location_label,
+          message: a.message || null,
+          status: a.status,
+          createdAt: a.created_at
+        }))
+      : null
+    const mine = viewerId != null
+      ? db.get('SELECT * FROM booking_applications WHERE booking_id = ? AND user_id = ?', [row.id, viewerId])
+      : null
     return {
       id: String(row.id),
       userId: String(row.user_id),
@@ -141,7 +165,9 @@ export function petsRouter(db) {
       })(),
       initiator: initiator ? { id: String(initiator.id), userName: initiator.nickname, avatarSymbol: initiator.avatar_symbol, avatarUrl: initiator.avatar_url || null, creditScore: initiator.credit_score, locationLabel: initiator.location_label, distanceKm: initiator.distance_km } : null,
       provider: provider ? { id: String(provider.id), userName: provider.nickname, avatarSymbol: provider.avatar_symbol, avatarUrl: provider.avatar_url || null, creditScore: provider.credit_score, locationLabel: provider.location_label, distanceKm: provider.distance_km } : null,
-      distanceKm
+      distanceKm,
+      applications,
+      myApplication: mine ? { id: String(mine.id), status: mine.status, message: mine.message || null, createdAt: mine.created_at } : null
     }
   }
 
@@ -203,7 +229,61 @@ export function petsRouter(db) {
     res.status(201).json({ booking: { id: String(orderId), status, priceYuan: price, commissionYuan: commission, workerIncome } })
   })
 
-  // 接单（"有资历的人可以接单"：信用 ≥75 且已完成认证；不能接自己的单；仅 open 状态）
+  // 接单申请（"有资历的人可以接单"：信用 ≥75 且已完成认证；不能申请自己的单；仅 open 状态）
+  // 申请后由派单人在私聊/订单详情中确认接单人（confirm）
+  router.post('/bookings/:id/apply', (req, res) => {
+    const row = db.get('SELECT * FROM bookings WHERE id = ?', [req.params.id])
+    if (!row) return res.status(404).json({ error: '订单不存在' })
+    if (row.user_id === req.userId) return res.status(400).json({ error: '不能申请自己的订单' })
+    if (row.status !== 'open') return res.status(400).json({ error: '该订单已接单或已关闭' })
+    const me = db.get('SELECT * FROM users WHERE id = ?', [req.userId])
+    if (!me) return res.status(404).json({ error: '用户不存在' })
+    if (me.credit_score < ACCEPT_REQUIREMENT.minCredit || me.verification === 'none') {
+      return res.status(403).json({ error: `接单需要信用 ≥${ACCEPT_REQUIREMENT.minCredit} 且完成实名/学生认证（有资历要求）` })
+    }
+    const existing = db.get('SELECT * FROM booking_applications WHERE booking_id = ? AND user_id = ?', [row.id, req.userId])
+    if (existing) return res.status(400).json({ error: '已提交过申请，等待派单人确认' })
+    const message = String(req.body?.message || '').trim().slice(0, 200) || null
+    const r = db.run(
+      `INSERT INTO booking_applications (booking_id, user_id, message, status, created_at) VALUES (?,?,?,?,?)`,
+      [row.id, req.userId, message, 'pending', now()]
+    )
+    // 通知派单人：自动建立会话并追加系统提示（在私聊中协商并确认接单人）
+    notifyInChat(row.user_id, req.userId, row, `📋 ${me.nickname} 申请接下你的「${row.service_name}」订单（¥${row.price_yuan}），可在私聊中协商并确认接单人`)
+    res.status(201).json({ application: { id: String(r.lastInsertRowid), status: 'pending' } })
+  })
+
+  // 派单人确认接单人（在私聊/订单详情中确定；其余待处理申请自动拒绝）
+  router.post('/bookings/:id/applications/:appId/confirm', (req, res) => {
+    const row = db.get('SELECT * FROM bookings WHERE id = ?', [req.params.id])
+    if (!row) return res.status(404).json({ error: '订单不存在' })
+    if (row.user_id !== req.userId) return res.status(403).json({ error: '只有派单人可以确认接单人' })
+    const app = db.get('SELECT * FROM booking_applications WHERE id = ? AND booking_id = ?', [req.params.appId, row.id])
+    if (!app) return res.status(404).json({ error: '申请不存在' })
+    if (app.status !== 'pending') return res.status(400).json({ error: '该申请已处理' })
+    if (row.status !== 'open') return res.status(400).json({ error: '该订单已接单或已关闭' })
+    db.run(`UPDATE booking_applications SET status = 'accepted' WHERE id = ?`, [app.id])
+    db.run(`UPDATE booking_applications SET status = 'rejected' WHERE booking_id = ? AND id != ? AND status = 'pending'`, [row.id, app.id])
+    db.run('UPDATE bookings SET provider_id = ?, status = ? WHERE id = ?', [app.user_id, 'assigned', row.id])
+    const applicant = db.get('SELECT * FROM users WHERE id = ?', [app.user_id])
+    notifyInChat(app.user_id, row.user_id, row, `✅ 派单人已确认你为「${row.service_name}」订单的接单人（¥${row.price_yuan}），请按时提供宠物护理服务`)
+    notifyInChat(row.user_id, app.user_id, row, `✅ 你已确认 ${applicant?.nickname || '对方'} 接下「${row.service_name}」订单，服务完成后可标记完成`)
+    res.json({ ok: true, booking: { id: String(row.id), status: 'assigned', providerId: String(app.user_id) } })
+  })
+
+  // 派单人拒绝申请
+  router.post('/bookings/:id/applications/:appId/reject', (req, res) => {
+    const row = db.get('SELECT * FROM bookings WHERE id = ?', [req.params.id])
+    if (!row) return res.status(404).json({ error: '订单不存在' })
+    if (row.user_id !== req.userId) return res.status(403).json({ error: '只有派单人可以处理申请' })
+    const app = db.get('SELECT * FROM booking_applications WHERE id = ? AND booking_id = ?', [req.params.appId, row.id])
+    if (!app) return res.status(404).json({ error: '申请不存在' })
+    if (app.status !== 'pending') return res.status(400).json({ error: '该申请已处理' })
+    db.run(`UPDATE booking_applications SET status = 'rejected' WHERE id = ?`, [app.id])
+    res.json({ ok: true })
+  })
+
+  // 直接接单（兼容旧接口；新流程请用 apply + confirm）
   router.post('/bookings/:id/accept', (req, res) => {
     const row = db.get('SELECT * FROM bookings WHERE id = ?', [req.params.id])
     if (!row) return res.status(404).json({ error: '订单不存在' })
@@ -225,6 +305,44 @@ export function petsRouter(db) {
     if (r.changes === 0) return res.status(404).json({ error: '订单不存在' })
     res.json({ ok: true })
   })
+
+  /**
+   * 私聊系统提示（申请/确认接单自动写入会话）
+   * 自动建立/复用 双方会话，追加系统消息并实时广播（双方可见）
+   */
+  function notifyInChat(recipientId, actorId, booking, text) {
+    const a = Math.min(recipientId, actorId)
+    const b = Math.max(recipientId, actorId)
+    let convo = db.get('SELECT * FROM conversations WHERE user_a = ? AND user_b = ?', [a, b])
+    if (!convo) {
+      const r = db.run(
+        'INSERT INTO conversations (user_a, user_b, last_message_text, last_time, unread_a, unread_b) VALUES (?,?,?,?,?,?)',
+        [a, b, text, now(), 0, 0]
+      )
+      convo = db.get('SELECT * FROM conversations WHERE id = ?', [r.lastInsertRowid])
+    }
+    const r = db.run(
+      'INSERT INTO messages (conversation_id, sender_id, text, is_system_note, created_at) VALUES (?,?,?,?,?)',
+      [convo.id, actorId, text, 1, now()]
+    )
+    if (convo.user_a === recipientId) {
+      db.run('UPDATE conversations SET last_message_text = ?, last_time = ?, unread_a = unread_a + 1 WHERE id = ?',
+        [text, now(), convo.id])
+    } else {
+      db.run('UPDATE conversations SET last_message_text = ?, last_time = ?, unread_b = unread_b + 1 WHERE id = ?',
+        [text, now(), convo.id])
+    }
+    const payload = {
+      id: String(r.lastInsertRowid),
+      conversationId: String(convo.id),
+      text,
+      time: now(),
+      senderId: String(actorId),
+      isSystemNote: true
+    }
+    bus.io?.to(`user:${a}`).emit('chat:message', payload)
+    bus.io?.to(`user:${b}`).emit('chat:message', payload)
+  }
 
   return router
 }

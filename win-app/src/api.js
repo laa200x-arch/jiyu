@@ -350,6 +350,21 @@ async function fetchBooking(id) {
   App.state.orderCache[id] = data.booking
   return data.booking
 }
+async function applyBooking(id, message) {
+  const data = await api('/api/bookings/' + id + '/apply', { method: 'POST', body: { message } })
+  return data.application
+}
+async function confirmApplication(bookingId, appId) {
+  const data = await api('/api/bookings/' + bookingId + '/applications/' + appId + '/confirm', { method: 'POST' })
+  delete App.state.orderCache[bookingId]
+  await fetchBookings()
+  return data
+}
+async function rejectApplication(bookingId, appId) {
+  const data = await api('/api/bookings/' + bookingId + '/applications/' + appId + '/reject', { method: 'POST' })
+  delete App.state.orderCache[bookingId]
+  return data
+}
 
 /* ---------- 版本检查 ---------- */
 async function fetchVersion() {
@@ -358,5 +373,5 @@ async function fetchVersion() {
 
 /* Node 环境导出（测试用） */
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { App, api, login, register, loginWithSaved, autoLogin, logout, refreshAll, fetchMatches, fetchUser, openConversation, loadMessages, sendMessageRest, uploadMedia, postDynamic, signAgreement, completeExchange, submitEvaluation, fetchVersion, fetchBooking }
+  module.exports = { App, api, login, register, loginWithSaved, autoLogin, logout, refreshAll, fetchMatches, fetchUser, openConversation, loadMessages, sendMessageRest, uploadMedia, postDynamic, signAgreement, completeExchange, submitEvaluation, fetchVersion, fetchBooking, applyBooking, confirmApplication, rejectApplication }
 }

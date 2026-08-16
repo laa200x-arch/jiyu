@@ -369,6 +369,23 @@ final class APIClient {
         let _: OkResponse = try await request("/api/bookings/\(id)/accept", method: "POST")
     }
 
+    /// 接单申请（提交后由派单人在私聊/订单详情中确认；服务端校验资历）
+    func applyBooking(id: String, message: String? = nil) async throws {
+        var body: [String: Any] = [:]
+        if let message, !message.isEmpty { body["message"] = message }
+        let _: OkResponse = try await request("/api/bookings/\(id)/apply", method: "POST", body: body)
+    }
+
+    /// 派单人确认接单人（其余申请自动拒绝）
+    func confirmApplication(bookingId: String, applicationId: String) async throws {
+        let _: OkResponse = try await request("/api/bookings/\(bookingId)/applications/\(applicationId)/confirm", method: "POST")
+    }
+
+    /// 派单人拒绝申请
+    func rejectApplication(bookingId: String, applicationId: String) async throws {
+        let _: OkResponse = try await request("/api/bookings/\(bookingId)/applications/\(applicationId)/reject", method: "POST")
+    }
+
     /// 订单详情（动态区公开可见：宠物信息/位置距离；登录即可）
     func fetchBooking(id: String) async throws -> ServerBooking {
         let response: BookingResponse = try await request("/api/bookings/\(id)")

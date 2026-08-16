@@ -239,7 +239,7 @@ struct PetTabView: View {
                     .font(.caption2)
                     .foregroundStyle(Theme.textSecondary)
             } else if booking.status == "open" {
-                Text("等待有资历的人接单（信用 ≥75 且完成认证）…")
+                Text("等待接单申请：有资历用户申请后，你在私聊/订单详情中确认接单人")
                     .font(.caption2)
                     .foregroundStyle(Theme.textSecondary)
             }
