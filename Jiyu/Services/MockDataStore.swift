@@ -610,6 +610,41 @@ final class MockDataStore: ObservableObject {
 
     // MARK: - 互换动态（方案 2.3.6 动态区风控）
 
+    /// 我的动态历史（个人发布过的全部动态）
+    func myDynamics() -> [DynamicModel] {
+        guard let myID = serverUserID else { return [] }
+        return dynamics.filter { $0.userId?.serverIDString == myID }
+    }
+
+    /// 删除自己的动态
+    func deleteDynamic(id: UUID) async {
+        guard isServerMode, let serverID = id.serverIDString else { return }
+        do {
+            try await APIClient.shared.deleteDynamic(id: serverID)
+            dynamics.removeAll { $0.id == id }
+        } catch {
+            print("[store] 删除动态失败: \(error)")
+        }
+    }
+
+    /// 更新自定义头像（上传已完成后调用）
+    func updateAvatar(url: String) async {
+        if isServerMode {
+            if let user = try? await APIClient.shared.updateProfile(avatarUrl: url) {
+                currentUser = UserModel(server: user)
+                syncCurrentUserInAllUsers()
+                return
+            }
+        }
+        currentUser.avatarUrl = url
+        syncCurrentUserInAllUsers()
+    }
+
+    /// 未读消息总数（消息 Tab 红点）
+    var unreadTotal: Int {
+        conversations.reduce(0) { $0 + $1.unreadCount }
+    }
+
     /// 发布动态（服务端模式：服务端风控，支持图片）
     @discardableResult
     func postDynamic(content: String, imageBase64: String? = nil) async -> MessageSendResult {

@@ -15,16 +15,17 @@ export function profileRouter(db) {
     return serializeUser(row, { skills })
   }
 
-  // 更新资料（主页文本同样过风控：禁止出现价格/接单等词，方案 2.3.1）
+  // 更新资料（主页文本同样过风控：禁止出现价格/接单等词，方案 2.3.1；支持头像 URL）
   router.put('/me/profile', (req, res) => {
-    const { bio, locationLabel, distanceKm } = req.body || {}
+    const { bio, locationLabel, distanceKm, avatarUrl } = req.body || {}
     if (bio !== undefined) {
       const risk = checkTextRisk(bio)
       if (risk.isIllegal) return res.status(403).json({ error: risk.warning, matchedWords: risk.matchedWords })
     }
     db.run(
-      `UPDATE users SET bio = COALESCE(?, bio), location_label = COALESCE(?, location_label), distance_km = COALESCE(?, distance_km) WHERE id = ?`,
-      [bio ?? null, locationLabel ?? null, distanceKm ?? null, req.userId]
+      `UPDATE users SET bio = COALESCE(?, bio), location_label = COALESCE(?, location_label),
+        distance_km = COALESCE(?, distance_km), avatar_url = COALESCE(?, avatar_url) WHERE id = ?`,
+      [bio ?? null, locationLabel ?? null, distanceKm ?? null, avatarUrl ?? null, req.userId]
     )
     res.json({ user: userWithSkills(req.userId) })
   })

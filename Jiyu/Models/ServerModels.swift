@@ -145,6 +145,7 @@ struct ServerUser: Decodable {
     let username: String
     let userName: String
     let avatarSymbol: String
+    let avatarUrl: String?
     let bio: String
     let locationLabel: String
     let distanceKm: Double?
@@ -271,6 +272,7 @@ extension UserModel {
             id: UUID(serverID: server.id),
             userName: server.userName,
             avatarSymbol: server.avatarSymbol,
+            avatarUrl: server.avatarUrl,
             bio: server.bio,
             locationLabel: server.locationLabel,
             distanceKm: server.distanceKm,

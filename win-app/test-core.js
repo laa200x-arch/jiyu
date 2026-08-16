@@ -104,6 +104,34 @@ async function main() {
     check('版本接口', !!v.current, v.current)
   } catch (e) { check('版本接口', false, e.message) }
 
+  // 10. 自定义头像（上传 + 更新资料）
+  try {
+    const fakePng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64')
+    const url = await uploadMedia(fakePng, 'avatar-test.png', 'image/png')
+    const api2 = require('./src/api.js')
+    const data = await api2.api('/api/me/profile', { method: 'PUT', body: { avatarUrl: url } })
+    check('更新头像', data.user.avatarUrl === url, url)
+    // 头像回显
+    const me = await api2.api('/api/me')
+    check('头像持久化', me.user.avatarUrl === url)
+  } catch (e) { check('自定义头像', false, e.message) }
+
+  // 11. 我的动态历史（发布 → 列表过滤 → 删除）
+  try {
+    const api2 = require('./src/api.js')
+    const content = '动态历史测试 ' + Date.now()
+    await postDynamic(content)
+    await refreshAll()
+    const mine = App.state.dynamics.filter((d) => String(d.userId) === String(App.state.user.id))
+    const mineContent = mine.filter((d) => d.content === content)
+    check('我的动态历史', mineContent.length === 1, `共 ${mine.length} 条`)
+    // 删除
+    await api2.api('/api/dynamics/delete', { method: 'POST', body: { id: mineContent[0].id } })
+    await refreshAll()
+    const after = App.state.dynamics.filter((d) => String(d.userId) === String(App.state.user.id) && d.content === content)
+    check('删除动态', after.length === 0)
+  } catch (e) { check('我的动态历史', false, e.message) }
+
   logout()
   console.log(`\n══════ 结果：${passed} 通过 / ${failed} 失败 ══════`)
   process.exit(failed > 0 ? 1 : 0)

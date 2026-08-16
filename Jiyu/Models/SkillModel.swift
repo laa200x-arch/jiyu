@@ -61,11 +61,12 @@ enum UserVerification: String, Codable, CaseIterable, Identifiable {
 }
 
 /// 用户核心模型（方案 5.1）
-/// avatarSymbol：SF Symbol 名（本版本无图片资源，正式版替换为头像 URL）
+/// avatarSymbol：SF Symbol 占位；avatarUrl：自定义头像（服务器上传后返回的相对路径，优先显示）
 struct UserModel: Codable, Identifiable, Hashable {
     let id: UUID
     var userName: String
     var avatarSymbol: String
+    var avatarUrl: String?
     var bio: String
     var locationLabel: String
     var distanceKm: Double?          // 线下距离（同城匹配）
@@ -80,6 +81,7 @@ struct UserModel: Codable, Identifiable, Hashable {
         id: UUID = UUID(),
         userName: String,
         avatarSymbol: String,
+        avatarUrl: String? = nil,
         bio: String,
         locationLabel: String,
         distanceKm: Double?,
@@ -93,6 +95,7 @@ struct UserModel: Codable, Identifiable, Hashable {
         self.id = id
         self.userName = userName
         self.avatarSymbol = avatarSymbol
+        self.avatarUrl = avatarUrl
         self.bio = bio
         self.locationLabel = locationLabel
         self.distanceKm = distanceKm

@@ -282,6 +282,18 @@ final class APIClient {
 
     // MARK: - 档案
 
+    /// 更新资料（支持自定义头像 URL）
+    func updateProfile(bio: String? = nil, avatarUrl: String? = nil) async throws -> ServerUser {
+        var body: [String: Any] = [:]
+        if let bio { body["bio"] = bio }
+        if let avatarUrl { body["avatarUrl"] = avatarUrl }
+        let response: UserResponse = try await request("/api/me/profile", method: "PUT", body: body)
+        return response.user
+    }
+
+    func deleteDynamic(id: String) async throws {
+        let _: OkResponse = try await request("/api/dynamics/delete", method: "POST", body: ["id": id])
+    }
     func setVerification(_ verification: UserVerification) async throws -> ServerUser {
         let response: UserResponse = try await request("/api/me/verification", method: "PUT",
             body: ["verification": verification.serverCode])

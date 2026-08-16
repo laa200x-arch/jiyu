@@ -3,6 +3,7 @@ import SwiftUI
 /// 应用主框架：4 大 Tab（技能匹配 / 互换动态 / 消息 / 我的）
 /// 设计原则：去商业化、去交易化 —— 全页面无价格、无付费商品、无充值入口
 struct ContentView: View {
+    @EnvironmentObject private var store: MockDataStore
     @State private var tabIndex = 0
     @State private var updateInfo: ServerVersion?
     @AppStorage("jiyu.syncHistory") private var syncHistory = true
@@ -33,6 +34,7 @@ struct ContentView: View {
             .tabItem {
                 Label("消息", systemImage: "message")
             }
+            .badge(store.unreadTotal > 0 ? store.unreadTotal : 0)
             .tag(2)
 
             NavigationStack {

@@ -148,8 +148,8 @@ async function fetchUser(id) {
   const data = await api('/api/users/' + id)
   return data.user
 }
-async function updateProfile(bio) {
-  const data = await api('/api/me/profile', { method: 'PUT', body: { bio } })
+async function updateProfile({ bio, avatarUrl } = {}) {
+  const data = await api('/api/me/profile', { method: 'PUT', body: { bio, avatarUrl } })
   App.state.user = data.user
 }
 async function addSkill(kind, skill) {
@@ -259,8 +259,16 @@ function connectSocket() {
       conv.lastTime = msg.time
       if (!isMe && App.state.activeConversation !== msg.conversationId) conv.unreadCount = (conv.unreadCount || 0) + 1
       if (App.state.views.onConversationUpdate) App.state.views.onConversationUpdate()
-      if (!isMe && !document.hidden && App.state.activeConversation !== msg.conversationId) {
+      if (!isMe && App.state.activeConversation !== msg.conversationId) {
+        // 应用内弹窗（点击跳转会话）
+        if (App.state.views.onNewMessage) App.state.views.onNewMessage(msg, conv)
+        // 系统桌面通知
         try { new Notification('技遇 · ' + conv.partner.userName + ' 发来消息', { body: msg.text || '[媒体消息]' }) } catch (e) {}
+        // 任务栏闪烁提醒
+        try {
+          const electron = require('electron')
+          if (electron && electron.ipcRenderer) electron.ipcRenderer.send('flash')
+        } catch (e) { /* 非 Electron 环境 */ }
       }
     }
   })

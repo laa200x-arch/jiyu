@@ -137,8 +137,21 @@ body {
   background: linear-gradient(135deg, #33d1d9, #3f8cd9); color: #fff;
   display: flex; align-items: center; justify-content: center; font-size: 20px;
 }
+.avatar-img { object-fit: cover; }
 .avatar-lg { width: 64px; height: 64px; font-size: 26px; }
 .avatar-sm { width: 36px; height: 36px; font-size: 15px; }
+
+/* 新消息弹窗（右下角） */
+.notify-popup {
+  position: fixed; right: 18px; bottom: 18px; z-index: 260;
+  display: flex; align-items: center; gap: 10px;
+  background: #fff; border-radius: 14px; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
+  padding: 12px 16px; width: 320px; cursor: pointer;
+  border-left: 4px solid var(--primary);
+  animation: slideIn 0.25s ease-out;
+}
+.notify-popup:hover { background: #f7fafb; }
+@keyframes slideIn { from { transform: translateY(16px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
 /* 匹配卡片 */
 .match-reason {

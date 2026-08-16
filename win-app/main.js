@@ -1,5 +1,5 @@
 // 技遇 Windows 桌面版 - Electron 主进程
-const { app, BrowserWindow, Notification, shell } = require('electron')
+const { app, BrowserWindow, Notification, shell, ipcMain } = require('electron')
 const path = require('path')
 
 let mainWindow = null
@@ -21,6 +21,14 @@ function createWindow() {
   })
 
   mainWindow.loadFile(path.join(__dirname, 'src', 'index.html'))
+
+  // 新消息时任务栏闪烁提醒
+  ipcMain.on('flash', () => {
+    if (mainWindow) {
+      mainWindow.flashFrame(true)
+      setTimeout(() => { if (mainWindow) mainWindow.flashFrame(false) }, 4000)
+    }
+  })
 
   // 外部链接用系统浏览器打开（版本更新下载等）
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {

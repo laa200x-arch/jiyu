@@ -46,12 +46,32 @@ struct CreditBadgeView: View {
     }
 }
 
-/// 用户头像（SF Symbol + 品牌渐变底）
+/// 用户头像（自定义头像优先显示图片，否则 SF Symbol + 品牌渐变底）
 struct AvatarView: View {
     let user: UserModel
     var size: CGFloat = 48
 
     var body: some View {
+        if let avatarUrl = user.avatarUrl,
+           let url = URL(string: AppConfig.serverBase + avatarUrl) {
+            AsyncImage(url: url) { phase in
+                if let image = phase.image {
+                    image
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: size, height: size)
+                        .clipShape(Circle())
+                } else {
+                    placeholder
+                }
+            }
+            .frame(width: size, height: size)
+        } else {
+            placeholder
+        }
+    }
+
+    private var placeholder: some View {
         ZStack {
             Circle()
                 .fill(Theme.gradient)

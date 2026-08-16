@@ -32,6 +32,8 @@ async function main() {
   // 轻量迁移：messages 表补充媒体字段
   try { db.exec('ALTER TABLE messages ADD COLUMN media_type TEXT') } catch { /* 列已存在 */ }
   try { db.exec('ALTER TABLE messages ADD COLUMN media_url TEXT') } catch { /* 列已存在 */ }
+  // 轻量迁移：users 表补充头像 URL 列
+  try { db.exec('ALTER TABLE users ADD COLUMN avatar_url TEXT') } catch { /* 列已存在 */ }
   // 演示数据
   if (config.autoSeed) {
     await seed(db)

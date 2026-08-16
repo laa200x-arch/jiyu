@@ -170,5 +170,13 @@ export function socialRouter(db, io) {
     res.status(201).json({ ok: true })
   })
 
+  // 删除自己的动态（个人动态历史管理）
+  router.post('/dynamics/delete', (req, res) => {
+    const { id } = req.body || {}
+    const r = db.run('DELETE FROM dynamics WHERE id = ? AND user_id = ?', [id, req.userId])
+    if (r.changes === 0) return res.status(404).json({ error: '动态不存在' })
+    res.json({ ok: true })
+  })
+
   return router
 }

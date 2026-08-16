@@ -1,7 +1,8 @@
 import SwiftUI
+import PhotosUI
 
 /// 个人中心（方案 2.3.1/2.3.5/3.1）
-/// 技能档案 / 认证 / 信用分 / 曝光服务 / 我的互换（协议+评价入口）/ 协议与风控规则
+/// 技能档案 / 认证 / 信用分 / 曝光服务 / 我的互换（协议+评价入口）/ 我的动态 / 协议与风控规则
 struct MineView: View {
     @EnvironmentObject private var store: MockDataStore
     @EnvironmentObject private var appState: AppState
@@ -10,11 +11,14 @@ struct MineView: View {
     @State private var showExposure = false
     @State private var showProtocol = false
     @State private var showRules = false
+    @State private var showMyDynamics = false
     @State private var showEvaluate: ExchangeRecord?
     @State private var showLogoutConfirm = false
     @State private var showAlert = false
     @State private var alertTitle = ""
     @State private var alertMessage = ""
+    @State private var avatarItem: PhotosPickerItem?
+    @State private var isUploadingAvatar = false
     @AppStorage("jiyu.syncHistory") private var syncHistory = true
 
     var body: some View {
@@ -37,6 +41,7 @@ struct MineView: View {
         .sheet(isPresented: $showExposure) { ExposureView() }
         .sheet(isPresented: $showProtocol) { ProtocolReadView() }
         .sheet(isPresented: $showRules) { RiskRulesView() }
+        .sheet(isPresented: $showMyDynamics) { MyDynamicsView() }
         .sheet(item: $showEvaluate) { record in
             EvaluateView(record: record)
         }
@@ -52,7 +57,23 @@ struct MineView: View {
     private var profileHeader: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 14) {
-                AvatarView(user: store.currentUser, size: 62)
+                ZStack(alignment: .bottomTrailing) {
+                    AvatarView(user: store.currentUser, size: 62)
+                    // 自定义头像（相机图标按钮 → 相册选择 → 上传）
+                    PhotosPicker(selection: $avatarItem, matching: .images) {
+                        if isUploadingAvatar {
+                            ProgressView()
+                                .frame(width: 24, height: 24)
+                        } else {
+                            Image(systemName: "camera.fill")
+                                .font(.system(size: 10))
+                                .foregroundStyle(.white)
+                                .frame(width: 24, height: 24)
+                                .background(Circle().fill(Theme.primary))
+                        }
+                    }
+                    .disabled(isUploadingAvatar)
+                }
                 VStack(alignment: .leading, spacing: 5) {
                     HStack(spacing: 6) {
                         Text(store.currentUser.userName)
@@ -88,6 +109,57 @@ struct MineView: View {
         .padding(16)
         .background(RoundedRectangle(cornerRadius: 18).fill(Theme.cardBg))
         .overlay(RoundedRectangle(cornerRadius: 18).stroke(Theme.divider, lineWidth: 1))
+        .onChange(of: avatarItem) { _ in
+            handleAvatarSelection()
+        }
+    }
+
+    /// 相册选择头像 → 压缩上传 → 更新资料
+    private func handleAvatarSelection() {
+        guard let avatarItem else { return }
+        Task {
+            isUploadingAvatar = true
+            defer {
+                isUploadingAvatar = false
+                self.avatarItem = nil
+            }
+            guard let data = try? await avatarItem.loadTransferable(type: Data.self),
+                  let image = UIImage(data: data),
+                  let jpeg = downscaledJPEG(image) else {
+                alertTitle = "提示"
+                alertMessage = "头像读取失败，请重试"
+                showAlert = true
+                return
+            }
+            guard let url = try? await APIClient.shared.uploadMedia(
+                data: jpeg, fileName: "avatar.jpg", mimeType: "image/jpeg"
+            ) else {
+                alertTitle = "提示"
+                alertMessage = "头像上传失败，请检查网络"
+                showAlert = true
+                return
+            }
+            await store.updateAvatar(url: url)
+            alertTitle = "成功"
+            alertMessage = "头像已更新"
+            showAlert = true
+        }
+    }
+
+    /// 压缩图片至最长边 512px 并转 JPEG（头像）
+    private func downscaledJPEG(_ image: UIImage) -> Data? {
+        let maxSide: CGFloat = 512
+        let size = image.size
+        var target = image
+        if max(size.width, size.height) > maxSide {
+            let scale = maxSide / max(size.width, size.height)
+            let newSize = CGSize(width: size.width * scale, height: size.height * scale)
+            let renderer = UIGraphicsImageRenderer(size: newSize)
+            target = renderer.image { _ in
+                image.draw(in: CGRect(origin: .zero, size: newSize))
+            }
+        }
+        return target.jpegData(compressionQuality: 0.8)
     }
 
     private var creditRing: some View {
@@ -338,6 +410,8 @@ struct MineView: View {
             toolRow(icon: "doc.text", title: "官方互换协议") { showProtocol = true }
             Divider().padding(.leading, 40)
             toolRow(icon: "exclamationmark.shield.fill", title: "风控规则（零金钱交易）") { showRules = true }
+            Divider().padding(.leading, 40)
+            toolRow(icon: "square.and.pencil", title: "我的动态（历史）") { showMyDynamics = true }
             Divider().padding(.leading, 40)
             toolRow(icon: "info.circle", title: "关于技遇") {
                 alertTitle = "关于技遇"

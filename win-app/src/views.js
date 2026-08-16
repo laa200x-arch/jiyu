@@ -15,7 +15,9 @@ function fmtTime(iso) {
 }
 function levelClass(level) { return 'tag-' + level }
 function avatarHtml(user, cls = 'avatar') {
-  return `<div class="${cls}">${esc(user.avatarSymbol || '👤')}</div>`
+  // 自定义头像优先显示图片
+  if (user && user.avatarUrl) return `<img class="${cls} avatar-img" src="${mediaUrl(user.avatarUrl)}" alt="">`
+  return `<div class="${cls}">${esc((user && user.avatarSymbol) || '👤')}</div>`
 }
 function skillTags(skills) {
   if (!skills || !skills.length) return '<span class="card-sub">暂无</span>'
@@ -702,10 +704,12 @@ function renderMine() {
             <div class="credit-ring"><span class="num">${Math.round(u.creditScore)}</span><span class="label">信用分</span></div>
           </div>
           <div class="row" style="margin-top:12px">
+            <button class="btn btn-outline btn-sm" id="change-avatar">🖼 更换头像</button>
             <button class="btn btn-outline btn-sm" id="verify-student">🎓 学生认证</button>
             <button class="btn btn-outline btn-sm" id="verify-realname">🪪 实名认证</button>
             <button class="btn btn-outline btn-sm" id="exposure-btn">👑 曝光服务</button>
             <button class="btn btn-outline btn-sm" id="edit-skills">✏️ 技能档案</button>
+            <input type="file" id="avatar-file" accept="image/*" hidden>
           </div>
         </div>
 
@@ -735,6 +739,7 @@ function renderMine() {
 
         <div class="card">
           <div class="card-title">工具</div>
+          <div class="tool-row" id="tool-mydynamics"><span class="tool-icon">📝</span>我的动态（历史）</div>
           <div class="tool-row" id="tool-protocol"><span class="tool-icon">📄</span>官方互换协议</div>
           <div class="tool-row" id="tool-rules"><span class="tool-icon">🛡</span>风控规则（零金钱交易）</div>
           <div class="tool-row" id="tool-about"><span class="tool-icon">ℹ️</span>关于技遇</div>
@@ -747,6 +752,20 @@ function renderMine() {
   v.querySelector('#verify-realname').addEventListener('click', () => doVerify('realname'))
   v.querySelector('#exposure-btn').addEventListener('click', showExposure)
   v.querySelector('#edit-skills').addEventListener('click', showSkillEditor)
+  v.querySelector('#change-avatar').addEventListener('click', () => avatarFile.click())
+  v.querySelector('#avatar-file').addEventListener('change', async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    try {
+      const blob = await compressImage(file)
+      const url = await uploadMedia(await blob.arrayBuffer(), 'avatar.jpg', 'image/jpeg')
+      await updateProfile({ avatarUrl: url })
+      toast('✅ 头像已更新')
+      renderMine()
+    } catch (err) { toast('头像上传失败：' + err.message) }
+    e.target.value = ''
+  })
+  v.querySelector('#tool-mydynamics').addEventListener('click', showMyDynamics)
   v.querySelector('#sync-toggle').addEventListener('change', (e) => {
     App.state.syncHistory = e.target.checked
     localStorage.setItem('jiyu.syncHistory', App.state.syncHistory ? '1' : '0')
@@ -936,11 +955,67 @@ function rulesText() {
   return '技遇零金钱交易风控规则\n1. 平台全程禁止任何金钱、物资、有偿交易。\n2. 文本/图片内容自动风控拦截，违禁词命中即拦截。\n3. 平台人工巡检私聊与动态区。\n4. 违规处罚：首次警告 → 二次限流 → 三次永久封禁。\n5. 敷衍教学、爽约、诱导交易可投诉，人工审核并扣减信用分。'
 }
 
+/* 我的动态历史（个人发布的全部动态） */
+function showMyDynamics() {
+  const mine = App.state.dynamics.filter((d) => String(d.userId) === String(App.state.user.id))
+  openModal(`
+    <div class="modal-title">我的动态（${mine.length}）</div>
+    ${mine.length
+      ? mine.map((d) => `
+        <div class="card" style="margin-bottom:8px">
+          <div class="row">
+            <span class="feed-time" style="margin-left:0">${fmtTime(d.time)}</span>
+            <span class="spacer"></span>
+            <button class="btn btn-danger btn-sm" data-del="${d.id}" title="删除这条动态">删除</button>
+          </div>
+          <div class="feed-content" style="margin-top:6px">${esc(d.content)}</div>
+          ${d.imageBase64 ? `<img class="feed-image" src="data:image/jpeg;base64,${d.imageBase64}" onclick="openFullscreen('<img src=&quot;data:image/jpeg;base64,${d.imageBase64}&quot;>')">` : ''}
+        </div>`).join('')
+      : '<div class="empty"><div class="empty-icon">📝</div>你还没有发布过动态<br>去「互换动态」发布第一条吧</div>'}
+  `, (box) => {
+    box.querySelectorAll('[data-del]').forEach((b) => b.addEventListener('click', async () => {
+      if (!confirm('删除这条动态？')) return
+      try {
+        await api('/api/dynamics/delete', { method: 'POST', body: { id: b.dataset.del } })
+        App.state.dynamics = App.state.dynamics.filter((d) => String(d.id) !== b.dataset.del)
+        toast('已删除')
+        closeModal()
+        showMyDynamics()
+      } catch (e) { toast('删除失败：' + e.message) }
+    }))
+  })
+}
+
+/* 新消息应用内弹窗（右下角，点击跳转会话） */
+function showNewMessagePopup(msg, conv) {
+  // 避免同一会话连续弹窗堆叠
+  const existing = document.querySelector(`.notify-popup[data-cid="${conv.id}"]`)
+  if (existing) existing.remove()
+  const box = document.createElement('div')
+  box.className = 'notify-popup'
+  box.dataset.cid = conv.id
+  box.innerHTML = `
+    ${avatarHtml(conv.partner, 'avatar avatar-sm')}
+    <div style="flex:1;min-width:0">
+      <div class="convo-name">${esc(conv.partner.userName)}</div>
+      <div class="convo-last">${esc(msg.text || (msg.mediaType === 'video' ? '[视频]' : msg.mediaType === 'audio' ? '[语音]' : '[图片]'))}</div>
+    </div>
+    <span class="unread-dot" style="align-self:center">新</span>`
+  box.addEventListener('click', () => {
+    box.remove()
+    switchView('message')
+    showChat(conv)
+  })
+  document.body.appendChild(box)
+  setTimeout(() => box.remove(), 6000)
+}
+
 /* 注册视图入口（供 app.js 调用） */
 App.views = {
   renderMatch, renderFeed, renderMessage, renderMine, renderLogin,
   onMessage: (cid) => { if (App.state.activeConversation === cid) renderMessages(App.state.conversations.find((c) => c.id === cid)) },
   onConversationUpdate: () => renderConvoList(),
+  onNewMessage: showNewMessagePopup,
   onDataChanged: () => { if (App.state.views.current === 'feed') renderFeed() }
 }
 App.views.current = 'match'
