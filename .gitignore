@@ -37,3 +37,6 @@ win-app/node_modules/
 win-app/dist/
 
 .dsh-vision-toolkit/
+
+# npm »º´æ£¨É³ÏäÄÚÊ¹ÓÃ£©
+.tmp-npm-cache/

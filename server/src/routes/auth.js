@@ -38,6 +38,11 @@ export function authRouter(db) {
       [phoneTrim, code, purpose, 0, 0, expiresAt, now()]
     )
     sendSms(phoneTrim, code).then((r) => {
+      if (!r.ok) {
+        // 真实通道发送失败且未开启降级：作废刚生成的验证码，要求用户稍后重试
+        db.run('DELETE FROM phone_codes WHERE phone = ?', [phoneTrim])
+        return res.status(502).json({ error: '短信发送失败，请稍后重试' })
+      }
       res.status(201).json({ ok: true, message: '验证码已发送（5 分钟内有效）', ...(r.devCode ? { devCode: r.devCode } : {}) })
     })
   })

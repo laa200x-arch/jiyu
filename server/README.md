@@ -47,6 +47,20 @@ npx pm2 save && npx pm2 startup
 
 > ⚠️ 上线前必改：`.env` 中 `JWT_SECRET` 换成长随机串；配置百度 AI Key 启用图像风控；曝光购买走苹果 IAP 服务端校验。
 
+## 短信验证码（注册手机验证）
+
+通道可插拔（`src/sms.js`，零 SDK 依赖，签名手写实现）：
+
+| `SMS_PROVIDER` | 说明 | 所需环境变量 |
+|---|---|---|
+| `console`（默认） | 测试通道：验证码直接返回 `devCode` 并自动填入客户端 | 无 |
+| `aliyun` | 阿里云短信（RPC v1.0 签名） | `ALIYUN_ACCESS_KEY_ID` / `ALIYUN_ACCESS_KEY_SECRET` / `ALIYUN_SMS_SIGN_NAME` / `ALIYUN_SMS_TEMPLATE_CODE`（模板须含 `${code}`） |
+| `tencent` | 腾讯云短信（TC3-HMAC-SHA256 签名） | `TENCENT_SECRET_ID` / `TENCENT_SECRET_KEY` / `TENCENT_SMS_SDK_APP_ID` / `TENCENT_SMS_SIGN_NAME` / `TENCENT_SMS_TEMPLATE_ID`（正文须含 `{1}`）；`TENCENT_SMS_REGION` 可选默认 ap-guangzhou |
+
+- `SMS_DEV_FALLBACK=1`（默认）：真实通道发送失败时降级返回 devCode，测试期不阻断注册
+- ⚠️ **生产必须 `SMS_DEV_FALLBACK=0`**：发送失败返回 502 并作废验证码，客户端需稍后重试
+- `GET /api/health` 返回 `sms: {provider, configured, devFallback}`，启动日志也会打印短信通道状态
+
 ## 架构
 
 ```

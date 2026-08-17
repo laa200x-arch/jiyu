@@ -68,7 +68,10 @@ git push -u origin main
 
 - 新注册必须填写 **11 位手机号 + 短信验证码**；**每个手机号仅可注册一个账号**
 - 验证码 5 分钟有效、60 秒限频、错误 5 次作废；已注册手机号会被拦截并提示
-- 短信通道为可插拔设计（`server/src/sms.js`）：当前为测试通道（验证码直接返回 `devCode` 并自动填入客户端，便于测试）；接入阿里云/腾讯云短信后自动关闭 devCode
+- 短信通道为可插拔设计（`server/src/sms.js`），支持 **console（测试）/ 阿里云 / 腾讯云** 三种：
+  - 测试通道：验证码直接返回 `devCode` 并自动填入客户端，便于联调
+  - 接入真实短信：在 `server/.env` 配置 `SMS_PROVIDER=aliyun`（AccessKey+签名+模板）或 `SMS_PROVIDER=tencent`（SecretId/Key+SdkAppId+签名+模板），详见 `server/.env.example`
+  - ⚠️ 生产环境必须 `SMS_DEV_FALLBACK=0`：发送失败时不再降级返回 devCode，避免验证码泄漏
 - 老账号不受影响（手机号仅对新增注册强制）
 
 ### Windows 版本发布到 GitHub Releases

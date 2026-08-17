@@ -19,6 +19,7 @@ import { socialRouter } from './routes/social.js'
 import { chatRouter } from './routes/chat.js'
 import { petsRouter } from './routes/pets.js'
 import { setupSocket } from './socket.js'
+import { smsStatus } from './sms.js'
 
 async function main() {
   console.log(`[jiyu-server] 启动中... 数据库驱动: ${config.dbDriver}`)
@@ -91,7 +92,7 @@ async function main() {
 
   // 健康检查
   app.get('/api/health', (req, res) => {
-    res.json({ ok: true, service: 'jiyu-server', time: new Date().toISOString() })
+    res.json({ ok: true, service: 'jiyu-server', time: new Date().toISOString(), sms: smsStatus() })
   })
 
   // 版本检查（App 启动时轮询：有新版本则提示下载）
@@ -166,6 +167,11 @@ async function main() {
   httpServer.listen(config.port, () => {
     console.log(`[jiyu-server] 已启动: http://localhost:${config.port}`)
     console.log(`[jiyu-server] 健康检查: http://localhost:${config.port}/api/health`)
+    const sms = smsStatus()
+    console.log(
+      `[jiyu-server] 短信通道: ${sms.provider}${sms.configured ? '' : '（未配置完整，发送会失败/降级）'}` +
+        `${sms.devFallback ? '，SMS_DEV_FALLBACK=1（失败降级 devCode，生产请置 0）' : '，SMS_DEV_FALLBACK=0（失败即报错）'}`
+    )
   })
 
   const shutdown = () => {

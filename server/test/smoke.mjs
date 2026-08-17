@@ -238,17 +238,28 @@ let blockedMessage = null
   s2.close()
 }
 
-// 15. 注册新用户
+// 15. 注册新用户（手机验证：一手机号一号）
 {
   const uname = `smokeuser${Date.now()}`
+  const randPhone = () => `13${String(Math.floor(1e9 + Math.random() * 9e9)).slice(-9)}`
+  const phoneA = randPhone()
+  const codeRes = await api('/api/auth/phone/send-code', { method: 'POST', body: { phone: phoneA } })
+  check('发送注册验证码（console 通道返回 devCode）', codeRes.status === 201 && !!codeRes.data?.devCode)
   const { status, data } = await api('/api/auth/register', {
     method: 'POST',
-    body: { username: uname, password: '123456', nickname: '冒烟测试' }
+    body: { username: uname, password: '123456', nickname: '冒烟测试', phone: phoneA, code: codeRes.data.devCode }
   })
-  check('注册新用户', status === 201 && !!data.token)
+  check('注册新用户（含手机验证码）', status === 201 && !!data.token)
+  const dupPhone = await api('/api/auth/register', {
+    method: 'POST',
+    body: { username: uname, password: '123456', nickname: '重复', phone: phoneA, code: codeRes.data.devCode }
+  })
+  check('同一手机号二次注册被拒绝', dupPhone.status === 409)
+  const phoneB = randPhone()
+  const codeB = await api('/api/auth/phone/send-code', { method: 'POST', body: { phone: phoneB } })
   const dup = await api('/api/auth/register', {
     method: 'POST',
-    body: { username: uname, password: '123456', nickname: '重复' }
+    body: { username: uname, password: '123456', nickname: '重复', phone: phoneB, code: codeB.data.devCode }
   })
   check('重复用户名被拒绝', dup.status === 409)
 }
