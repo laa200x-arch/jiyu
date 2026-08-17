@@ -61,6 +61,26 @@ git branch -M main
 git push -u origin main
 ```
 
+> 每次更新都会推送到 GitHub（main 分支）：推送后 GitHub Actions 自动构建 iOS 新版 IPA；
+> Windows 安装包由本机打包后发布到 **GitHub Releases**（`tools/release-win.mjs`，见下）。
+
+### 注册手机验证（一手机号一号）
+
+- 新注册必须填写 **11 位手机号 + 短信验证码**；**每个手机号仅可注册一个账号**
+- 验证码 5 分钟有效、60 秒限频、错误 5 次作废；已注册手机号会被拦截并提示
+- 短信通道为可插拔设计（`server/src/sms.js`）：当前为测试通道（验证码直接返回 `devCode` 并自动填入客户端，便于测试）；接入阿里云/腾讯云短信后自动关闭 devCode
+- 老账号不受影响（手机号仅对新增注册强制）
+
+### Windows 版本发布到 GitHub Releases
+
+```bash
+node tools/release-win.mjs --tag win-v1.1.0 --name "技遇 Windows v1.1.0" \
+  --exe "win-app/dist/技遇 Setup 1.0.0.exe" --body "本次更新内容…"
+```
+
+- token 自动从 git 凭据管理器读取（或设置 `GH_TOKEN` 环境变量）
+- 每次更新：重新打包 → 推 GitHub → 运行发布脚本，即可在仓库 Releases 页下载完整安装包
+
 ## 二、方案落地对照表
 
 | 方案章节 | 模块 | 落地文件 |

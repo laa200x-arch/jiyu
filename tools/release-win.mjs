@@ -51,9 +51,9 @@ async function main() {
     console.log('已创建 Release:', release.html_url)
   }
 
-  // 2) 上传安装包附件
+  // 2) 上传安装包附件（使用 ASCII 文件名，避免 GitHub 丢弃非 ASCII 字符）
   const uploadBase = release.upload_url.replace('{?name,label}', '')
-  const fileName = basename(exePath).replace(/\s+/g, '-')
+  const fileName = `Jiyu-Setup-${tag.replace(/^win-/, '')}.exe`
   const up = await fetch(`${uploadBase}?name=${encodeURIComponent(fileName)}`, {
     method: 'POST',
     headers: { ...H, 'Content-Type': 'application/octet-stream' },
