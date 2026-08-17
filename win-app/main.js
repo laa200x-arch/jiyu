@@ -14,9 +14,10 @@ function createWindow() {
     title: '技遇 - 纯公益技能互换平台',
     autoHideMenuBar: true,
     webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false,
-      // 允许页面直接连接服务器与使用系统能力（本地单机应用）
+      // 安全：禁用 Node 集成 + 开启上下文隔离，仅通过 preload 暴露最小 API（防 XSS→RCE）
+      nodeIntegration: false,
+      contextIsolation: true,
+      preload: path.join(__dirname, 'preload.js'),
       webSecurity: true
     }
   })

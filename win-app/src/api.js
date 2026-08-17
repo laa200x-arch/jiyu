@@ -215,6 +215,12 @@ async function submitEvaluation(recordId, body) {
   if (partner) partner.creditScore = data.newCreditScore
   return data
 }
+async function fetchReceivedEvaluations() {
+  return api('/api/evaluations/received')
+}
+async function appealEvaluation(id, reason) {
+  return api(`/api/evaluations/${id}/appeal`, { method: 'POST', body: { reason } })
+}
 
 /* ---------- 动态 ---------- */
 async function postDynamic(content, imageBase64) {
@@ -282,10 +288,9 @@ function connectSocket() {
         if (App.state.views.onNewMessage) App.state.views.onNewMessage(msg, conv)
         // 系统桌面通知
         try { new Notification('技遇 · ' + conv.partner.userName + ' 发来消息', { body: msg.text || '[媒体消息]' }) } catch (e) {}
-        // 任务栏闪烁提醒
+        // 任务栏闪烁提醒（通过 preload 暴露的最小 API，渲染进程无 Node 权限）
         try {
-          const electron = require('electron')
-          if (electron && electron.ipcRenderer) electron.ipcRenderer.send('flash')
+          if (window.jiyu && window.jiyu.flash) window.jiyu.flash()
         } catch (e) { /* 非 Electron 环境 */ }
       }
     }

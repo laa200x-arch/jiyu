@@ -23,6 +23,7 @@
     "productName": "技遇",
     "files": [
       "main.js",
+      "preload.js",
       "src/**/*"
     ],
     "win": {

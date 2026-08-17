@@ -13,15 +13,26 @@ export const FORBIDDEN_WORDS = [
   '赚钱', '利润', '提现', '充值', '红包码', '收款码', '卖艺', '卖技能'
 ]
 
-export function checkTextRisk(text = '') {
-  const matched = FORBIDDEN_WORDS.filter((w) => text.includes(w))
+/**
+ * 宠物护理订单协商词（结构化收费业务，允许在订单相关私聊中出现）
+ * 仅放行「协商服务」所需的最小词集；转账/红包/收款码等真实金钱交易词仍严格拦截
+ */
+export const PET_ORDER_ALLOWED_WORDS = ['接单', '价格', '多少钱', '收费', '付费', '佣金']
+
+export function checkTextRisk(text = '', { allowPetOrderWords = false } = {}) {
+  const words = allowPetOrderWords
+    ? FORBIDDEN_WORDS.filter((w) => !PET_ORDER_ALLOWED_WORDS.includes(w))
+    : FORBIDDEN_WORDS
+  const matched = words.filter((w) => text.includes(w))
   if (matched.length === 0) {
     return { isIllegal: false, matchedWords: [], warning: '内容合规' }
   }
   return {
     isIllegal: true,
     matchedWords: matched,
-    warning: `平台严禁任何金钱交易，仅支持纯技能无偿互换。命中词：${matched.join('、')}`
+    warning: allowPetOrderWords
+      ? `宠物订单协商仅允许讨论服务安排；仍严禁转账/红包/收款码等线下金钱交易。命中词：${matched.join('、')}`
+      : `平台严禁任何金钱交易，仅支持纯技能无偿互换。命中词：${matched.join('、')}`
   }
 }
 

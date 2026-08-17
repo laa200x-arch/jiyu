@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self' http://43.157.17.88:3000 data: blob:; img-src 'self' http://43.157.17.88:3000 data: blob:; media-src 'self' http://43.157.17.88:3000 blob:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self' http://43.157.17.88:3000 ws://43.157.17.88:3000">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' http://43.157.17.88:3000 data: blob:; img-src 'self' http://43.157.17.88:3000 data: blob:; media-src 'self' http://43.157.17.88:3000 blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' http://43.157.17.88:3000 ws://43.157.17.88:3000">
   <title>技遇</title>
   <link rel="stylesheet" href="style.css">
 </head>
@@ -36,7 +36,10 @@
       </div>
       <div id="login-error" class="error-text hidden"></div>
       <button id="login-submit" class="btn btn-primary btn-block">登 录</button>
-      <button id="login-toggle" class="btn-link">没有账号？注册一个</button>
+      <div class="login-links">
+        <button id="login-toggle" class="btn-link">没有账号？注册一个</button>
+        <button id="forgot-btn" class="btn-link">忘记密码？</button>
+      </div>
       <p class="hint">服务地址：http://43.157.17.88:3000（演示账号 aqing / 123456）</p>
     </div>
   </div>
@@ -88,6 +91,7 @@
   <div id="toast" class="toast hidden"></div>
 
   <script src="../node_modules/socket.io-client/dist/socket.io.min.js"></script>
+  <script src="../node_modules/leaflet/dist/leaflet.js"></script>
   <script src="api.js"></script>
   <script src="views.js"></script>
   <script src="map.js"></script>

@@ -45,3 +45,7 @@ win-app/dist/
 .tmp-gh-token.txt
 .tmp-push.ps1
 .tmp-gh-cred
+
+# 打包缓存与运行时上传目录
+.tmp-electron-cache/
+server/uploads/

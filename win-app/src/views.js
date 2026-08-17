@@ -1036,6 +1036,7 @@ function renderMine() {
           <div class="tool-row" id="tool-protocol"><span class="tool-icon">📄</span>官方互换协议<span class="caret">›</span></div>
           <div class="tool-row" id="tool-rules"><span class="tool-icon">🛡</span>风控规则（零金钱交易）<span class="caret">›</span></div>
           <div class="tool-row" id="tool-mydynamics"><span class="tool-icon">📝</span>我的动态（历史）<span class="caret">›</span></div>
+          <div class="tool-row" id="tool-myevaluations"><span class="tool-icon">⭐</span>收到的评价<span class="caret">›</span></div>
           <div class="tool-row" id="tool-about"><span class="tool-icon">ℹ️</span>关于技遇<span class="caret">›</span></div>
           <div class="tool-row tool-logout" id="tool-logout"><span class="tool-icon">🚪</span>退出登录<span class="caret">›</span></div>
         </div>
@@ -1062,6 +1063,7 @@ function renderMine() {
     e.target.value = ''
   })
   v.querySelector('#tool-mydynamics').addEventListener('click', showMyDynamics)
+  v.querySelector('#tool-myevaluations').addEventListener('click', showReceivedEvaluations)
   v.querySelector('#sync-toggle').addEventListener('change', (e) => {
     App.state.syncHistory = e.target.checked
     localStorage.setItem('jiyu.syncHistory', App.state.syncHistory ? '1' : '0')
@@ -1326,6 +1328,47 @@ function showMyDynamics() {
         closeModal()
         showMyDynamics()
       } catch (e) { toast('删除失败：' + e.message) }
+    }))
+  })
+}
+
+/* 收到的评价（文字评价展示 + 违规申诉入口，V1.1） */
+function showReceivedEvaluations() {
+  openModal(`<div class="modal-title">⭐ 收到的评价</div><div class="empty"><div class="empty-icon">⏳</div>加载中…</div>`, async (box) => {
+    let list
+    try {
+      const data = await fetchReceivedEvaluations()
+      list = data.evaluations || []
+    } catch (e) {
+      box.querySelector('.empty').innerHTML = '<div class="empty-icon">⚠️</div>加载失败：' + esc(e.message)
+      return
+    }
+    if (!list.length) {
+      box.querySelector('.empty').innerHTML = '<div class="empty-icon">⭐</div>还没有收到评价<br>完成互换并互相评价后展示在这里'
+      return
+    }
+    box.querySelector('.modal-title').insertAdjacentHTML('afterend', `<div class="card-sub">共 ${list.length} 条评价 · 平均 ${(list.reduce((s, e) => s + (e.punctuality + e.serious + e.communication) / 3, 0) / list.length).toFixed(1)} 分</div>`)
+    box.querySelector('.empty').outerHTML = list.map((e) => `
+      <div class="card" style="margin-bottom:8px">
+        <div class="row">
+          <b>${esc(e.fromName)}</b>
+          <span class="spacer"></span>
+          <span class="feed-time" style="margin-left:0">${fmtTime(e.createdAt)}</span>
+        </div>
+        <div class="card-sub" style="margin:6px 0">守时 ${e.punctuality} · 认真 ${e.serious} · 沟通 ${e.communication}</div>
+        ${e.comment ? `<div class="feed-content" style="margin-bottom:6px">${esc(e.comment)}</div>` : '<div class="card-sub">（无文字评价）</div>'}
+        ${e.myAppealStatus
+          ? `<span class="tag tag-master">申诉中（${esc(e.myAppealStatus)}）</span>`
+          : `<button class="btn btn-outline btn-sm" data-appeal="${e.id}" data-name="${esc(e.fromName)}">申诉这条评价</button>`}
+      </div>`).join('')
+    box.querySelectorAll('[data-appeal]').forEach((b) => b.addEventListener('click', () => {
+      const reason = prompt('申诉理由（评价不实/内容违规等，平台 1-3 个工作日内审核）：')
+      if (!reason || !reason.trim()) return
+      appealEvaluation(b.dataset.appeal, reason.trim()).then(() => {
+        toast('✅ 申诉已提交，等待平台审核')
+        closeModal()
+        showReceivedEvaluations()
+      }).catch((e) => toast('申诉失败：' + e.message))
     }))
   })
 }

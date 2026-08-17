@@ -15,6 +15,7 @@ struct LoginView: View {
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var savedAccounts: [SavedAccount] = []
+    @State private var showForgotPassword = false
 
     var body: some View {
         VStack(spacing: 18) {
@@ -114,6 +115,17 @@ struct LoginView: View {
                     .foregroundStyle(Theme.primary)
             }
 
+            if !isRegister {
+                Button {
+                    showForgotPassword = true
+                } label: {
+                    Text("忘记密码？")
+                        .font(.caption)
+                        .foregroundStyle(Theme.textSecondary)
+                }
+                .padding(.bottom, 4)
+            }
+
             Spacer()
 
             VStack(spacing: 3) {
@@ -127,6 +139,9 @@ struct LoginView: View {
             .padding(.bottom, 24)
         }
         .background(Theme.bg)
+        .sheet(isPresented: $showForgotPassword) {
+            ForgotPasswordView()
+        }
         .task {
             savedAccounts = TokenStore.savedAccounts()
         }

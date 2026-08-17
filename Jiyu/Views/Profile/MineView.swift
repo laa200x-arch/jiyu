@@ -13,6 +13,7 @@ struct MineView: View {
     @State private var showProtocol = false
     @State private var showRules = false
     @State private var showMyDynamics = false
+    @State private var showMyEvaluations = false
     @State private var showEvaluate: ExchangeRecord?
     @State private var showLogoutConfirm = false
     @State private var showAlert = false
@@ -43,6 +44,7 @@ struct MineView: View {
         .sheet(isPresented: $showProtocol) { ProtocolReadView() }
         .sheet(isPresented: $showRules) { RiskRulesView() }
         .sheet(isPresented: $showMyDynamics) { MyDynamicsView() }
+        .sheet(isPresented: $showMyEvaluations) { ReceivedEvaluationsView() }
         .sheet(item: $showEvaluate) { record in
             EvaluateView(record: record)
         }
@@ -502,6 +504,8 @@ struct MineView: View {
             toolRow(icon: "exclamationmark.shield.fill", title: "风控规则（零金钱交易）") { showRules = true }
             Divider().padding(.leading, 40)
             toolRow(icon: "square.and.pencil", title: "我的动态（历史）") { showMyDynamics = true }
+            Divider().padding(.leading, 40)
+            toolRow(icon: "star.fill", title: "收到的评价") { showMyEvaluations = true }
             Divider().padding(.leading, 40)
             toolRow(icon: "info.circle", title: "关于技遇") {
                 alertTitle = "关于技遇"

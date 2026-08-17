@@ -87,7 +87,16 @@ async function main() {
   }
 
   const app = express()
-  app.use(cors())
+  // CORS：白名单配置化（CORS_ORIGINS）。原生客户端（无 Origin / file:// / null）始终放行；
+  // 浏览器来源仅放行白名单，防第三方站点调用接口
+  app.use(cors({
+    origin(origin, cb) {
+      if (!origin) return cb(null, true) // 原生客户端/服务端请求
+      if (origin === 'null' || origin.startsWith('file://')) return cb(null, true) // Electron 本地页面
+      if (config.corsOrigins.length === 0 || config.corsOrigins.includes(origin)) return cb(null, true)
+      return cb(null, false)
+    }
+  }))
   app.use(express.json({ limit: '5mb' }))
 
   // 健康检查
@@ -105,30 +114,52 @@ async function main() {
   })
 
   // 文件上传（聊天图片/视频，方案 2.3.3 资料传输）
+  // 安全：MIME 白名单 + 扩展名白名单（拒绝 .html/.svg 等可执行内容，防存储型 XSS）
   const uploadDir = path.join(process.cwd(), 'uploads')
   mkdirSync(uploadDir, { recursive: true })
+  const ALLOWED_MIME = new Set([
+    'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+    'video/mp4', 'video/quicktime', 'video/webm'
+  ])
+  const ALLOWED_EXT = new Set(['.jpg', '.jpeg', '.png', '.gif', '.webp', '.mp4', '.mov', '.webm'])
   const upload = multer({
     storage: multer.diskStorage({
       destination: uploadDir,
       filename: (req, file, cb) => {
-        const ext = path.extname(file.originalname || '').toLowerCase().slice(0, 10)
-        cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`)
+        const ext = (path.extname(file.originalname || '').toLowerCase().slice(0, 10)) || '.jpg'
+        cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}${ALLOWED_EXT.has(ext) ? ext : '.bin'}`)
       }
     }),
-    limits: { fileSize: 50 * 1024 * 1024 } // 50MB 上限（视频）
+    limits: { fileSize: 50 * 1024 * 1024 }, // 50MB 上限（视频）
+    fileFilter: (req, file, cb) => {
+      // 注意：必须显式 cb(null, true) 接受；仅 cb(null) 会被 multer 视为拒绝
+      const ok = ALLOWED_MIME.has(String(file.mimetype || '').toLowerCase())
+      if (!ok) return cb(new Error('仅支持图片(jpg/png/gif/webp)与视频(mp4/mov/webm)'))
+      cb(null, true)
+    }
   })
   app.post('/api/upload', requireAuth, upload.single('file'), (req, res) => {
     if (!req.file) return res.status(400).json({ error: '缺少文件' })
     res.status(201).json({ url: `/uploads/${req.file.filename}` })
+  }, (err, req, res, next) => {
+    res.status(400).json({ error: err.message || '上传失败' })
   })
-  app.use('/uploads', express.static(uploadDir, { maxAge: '7d' }))
+  // 静态媒体目录：nosniff + attachment 下载头，杜绝 HTML/SVG 直接渲染执行
+  app.use('/uploads', express.static(uploadDir, {
+    maxAge: '7d',
+    setHeaders: (res) => {
+      res.setHeader('X-Content-Type-Options', 'nosniff')
+      res.setHeader('Content-Disposition', 'attachment')
+      res.setHeader('Cache-Control', 'public, max-age=604800')
+    }
+  }))
 
   // 我的资料（客户端自动登录/一键切换账号使用；挂载在 /api 而非 /api/auth）
   app.get('/api/me', requireAuth, (req, res) => {
     const row = db.get('SELECT * FROM users WHERE id = ?', [req.userId])
     if (!row) return res.status(404).json({ error: '用户不存在' })
     const skills = db.all('SELECT * FROM skills WHERE user_id = ?', [req.userId])
-    res.json({ user: serializeUser(row, { skills }) })
+    res.json({ user: serializeUser(row, { skills, includePhone: true }) })
   })
 
   // 路由

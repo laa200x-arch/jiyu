@@ -285,9 +285,9 @@ async function main() {
       check('同手机号二次注册被拒', false)
     } catch (e) { check('同手机号二次注册被拒', e.message.includes('已注册'), e.message.slice(0, 20)) }
     try {
-      await api.api('/api/auth/register', { method: 'POST', body: { username: 'pv3' + Date.now(), password: '123456', nickname: 'x', code: '123456' } })
-      check('未填手机号被拒', false)
-    } catch (e) { check('未填手机号被拒', e.message.includes('手机号'), e.message.slice(0, 16)) }
+      const noPhone = await api.api('/api/auth/register', { method: 'POST', body: { username: 'pv3' + Date.now(), password: '123456', nickname: '无手机注册', code: '123456' } })
+      check('未填手机号直接注册成功', !!noPhone.token && noPhone.user.phone === null)
+    } catch (e) { check('未填手机号直接注册成功', false, e.message.slice(0, 16)) }
   } catch (e) { check('手机验证注册', false, e.message) }
 
   logout()

@@ -45,6 +45,8 @@
 		A00000000000000000000024 /* MyDynamicsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000122 /* MyDynamicsView.swift */; };
 		A00000000000000000000025 /* PetTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000123 /* PetTabView.swift */; };
 		A00000000000000000000026 /* OrderDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000127 /* OrderDetailView.swift */; };
+		A00000000000000000000027 /* ForgotPasswordView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000128 /* ForgotPasswordView.swift */; };
+		A00000000000000000000028 /* ReceivedEvaluationsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000129 /* ReceivedEvaluationsView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -77,6 +79,8 @@
 		A0000000000000000000011B /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
 		A0000000000000000000011C /* RealtimeClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RealtimeClient.swift; sourceTree = "<group>"; };
 		A0000000000000000000011D /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
+		A00000000000000000000128 /* ForgotPasswordView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ForgotPasswordView.swift; sourceTree = "<group>"; };
+		A00000000000000000000129 /* ReceivedEvaluationsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReceivedEvaluationsView.swift; sourceTree = "<group>"; };
 		A0000000000000000000011E /* MatchMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MatchMapView.swift; sourceTree = "<group>"; };
 		A0000000000000000000011F /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
 		A00000000000000000000120 /* UserProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserProfileView.swift; sourceTree = "<group>"; };
@@ -216,6 +220,7 @@
 			children = (
 				A0000000000000000000011D /* LoginView.swift */,
 				A00000000000000000000121 /* LaunchView.swift */,
+				A00000000000000000000128 /* ForgotPasswordView.swift */,
 			);
 			path = Auth;
 			sourceTree = "<group>";
@@ -262,6 +267,7 @@
 				A00000000000000000000115 /* ExposureView.swift */,
 				A00000000000000000000120 /* UserProfileView.swift */,
 				A00000000000000000000122 /* MyDynamicsView.swift */,
+				A00000000000000000000129 /* ReceivedEvaluationsView.swift */,
 			);
 			path = Profile;
 			sourceTree = "<group>";
@@ -387,11 +393,13 @@
 				A0000000000000000000001C /* APIClient.swift in Sources */,
 				A0000000000000000000001D /* RealtimeClient.swift in Sources */,
 				A0000000000000000000001E /* LoginView.swift in Sources */,
+				A00000000000000000000027 /* ForgotPasswordView.swift in Sources */,
 				A00000000000000000000020 /* MatchMapView.swift in Sources */,
 				A00000000000000000000021 /* NotificationService.swift in Sources */,
 				A00000000000000000000022 /* UserProfileView.swift in Sources */,
 				A00000000000000000000023 /* LaunchView.swift in Sources */,
 				A00000000000000000000024 /* MyDynamicsView.swift in Sources */,
+				A00000000000000000000028 /* ReceivedEvaluationsView.swift in Sources */,
 				A00000000000000000000025 /* PetTabView.swift in Sources */,
 				A00000000000000000000026 /* OrderDetailView.swift in Sources */,
 			);

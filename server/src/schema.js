@@ -161,6 +161,16 @@ CREATE TABLE IF NOT EXISTS bookings (
   open_to_feed INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS appeals (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  evaluation_id INTEGER NOT NULL,
+  user_id INTEGER NOT NULL,
+  reason TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending',
+  created_at TEXT NOT NULL,
+  UNIQUE (evaluation_id, user_id)
+);
 `
 
 export const MYSQL_DDL = `
@@ -320,5 +330,15 @@ CREATE TABLE IF NOT EXISTS bookings (
   worker_income DOUBLE NULL,
   open_to_feed TINYINT(1) NOT NULL DEFAULT 0,
   created_at DATETIME NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS appeals (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  evaluation_id INT NOT NULL,
+  user_id INT NOT NULL,
+  reason VARCHAR(500) NOT NULL,
+  status ENUM('pending','accepted','rejected') NOT NULL DEFAULT 'pending',
+  created_at DATETIME NOT NULL,
+  UNIQUE KEY uq_appeal (evaluation_id, user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 `

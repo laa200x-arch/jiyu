@@ -29,6 +29,47 @@ function bindLogin() {
   let isRegister = false
   const page = document.getElementById('login-page')
 
+  // 忘记密码（手机号 + 验证码 + 新密码）
+  page.querySelector('#forgot-btn').addEventListener('click', () => {
+    views.openModal(`<div class="modal-title">🔑 忘记密码</div>
+      <div class="field"><input id="fp-phone" type="tel" placeholder="已注册的手机号" maxlength="11"></div>
+      <div class="field"><div style="display:flex;gap:8px">
+        <input id="fp-code" type="text" placeholder="验证码" maxlength="6" style="flex:1">
+        <button id="fp-send" class="btn btn-outline" style="white-space:nowrap">获取验证码</button>
+      </div></div>
+      <div class="field"><input id="fp-pass" type="password" placeholder="新密码（至少 6 位）"></div>
+      <div id="fp-err" class="error-text hidden"></div>
+      <button id="fp-submit" class="btn btn-primary btn-block">重置密码</button>
+      <p class="hint">重置成功后请用新密码登录</p>`, (box) => {
+      const phone = box.querySelector('#fp-phone')
+      const code = box.querySelector('#fp-code')
+      const pass = box.querySelector('#fp-pass')
+      const err = box.querySelector('#fp-err')
+      box.querySelector('#fp-send').addEventListener('click', async () => {
+        const p = phone.value.trim()
+        if (!/^1[3-9]\d{9}$/.test(p)) return show(err, '请输入正确的 11 位手机号')
+        try {
+          const r = await api('/api/auth/phone/forgot-code', { method: 'POST', body: { phone: p } })
+          if (r.devCode) {
+            code.value = r.devCode
+            show(err, '✅ 验证码已发送（测试通道，已自动填入）')
+          } else show(err, '✅ 验证码已发送到 ' + p + '（5 分钟内有效）')
+        } catch (e) { show(err, e.message) }
+      })
+      box.querySelector('#fp-submit').addEventListener('click', async () => {
+        const p = phone.value.trim()
+        if (!/^1[3-9]\d{9}$/.test(p)) return show(err, '请输入正确的 11 位手机号')
+        if (!code.value.trim()) return show(err, '请输入验证码')
+        if (!pass.value || pass.value.length < 6) return show(err, '新密码至少 6 位')
+        try {
+          const r = await api('/api/auth/reset-password', { method: 'POST', body: { phone: p, code: code.value.trim(), newPassword: pass.value } })
+          show(err, '✅ ' + (r.message || '密码已重置，请用新密码登录'))
+          setTimeout(() => closeModal(), 1200)
+        } catch (e) { show(err, e.message) }
+      })
+    })
+  })
+
   page.querySelector('#login-toggle').addEventListener('click', () => {
     isRegister = !isRegister
     document.getElementById('login-toggle').textContent = isRegister ? '已有账号？去登录' : '没有账号？注册一个'

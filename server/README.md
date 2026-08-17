@@ -45,6 +45,17 @@ npx pm2 save && npx pm2 startup
 # 5. 安全组放行 3000 端口（或经 Nginx 反代 + HTTPS）
 ```
 
+## 安全与合规（已加固）
+
+- **手机号隐私**：`GET /api/users` 及他人档案不再返回 `phone` 字段，仅本人接口（登录/注册/`/api/me`）可见
+- **宠物订单风控豁免**：宠物订单相关私聊（消息携带 orderId）放行「接单/价格/佣金」等协商词，仍拦截转账/红包/收款码等真实金钱交易词（`risk.js` 分级词库）
+- **登录防爆破**：连续失败 5 次锁定 15 分钟（按用户名+IP）
+- **上传白名单**：仅 jpg/png/gif/webp/mp4/mov/webm；`/uploads` 响应 `X-Content-Type-Options: nosniff` + `Content-Disposition: attachment`，杜绝存储型 XSS
+- **JWT 密钥**：`NODE_ENV=production` 时强制随机 `JWT_SECRET`，默认值直接拒绝启动
+- **CORS**：`CORS_ORIGINS` 白名单配置化，原生客户端（无 Origin/file://）放行，浏览器来源仅限白名单
+- **过期 VIP**：`exposure_until` 过期后自动视为普通用户（匹配排序/展示一致）
+- **明文 HTTP 提示**：线上仍为 `http://43.157.17.88:3000`，正式对外建议配置域名 + HTTPS（证书 + Nginx 反代），并将客户端 `AppConfig.serverBase`/`api.js` 的 BASE 切到 https
+
 > ⚠️ 上线前必改：`.env` 中 `JWT_SECRET` 换成长随机串；配置百度 AI Key 启用图像风控；曝光购买走苹果 IAP 服务端校验。
 
 ## 短信验证码（注册手机验证）
@@ -87,8 +98,11 @@ server/
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| POST | /api/auth/register | 注册 `{username,password,nickname}` → `{token,user}` |
-| POST | /api/auth/login | 登录 → `{token,user}` |
+| POST | /api/auth/register | 注册 `{username,password,nickname}` → `{token,user}`（手机号选填：填写则强制一手机号一号+验证码） |
+| POST | /api/auth/login | 登录 → `{token,user}`（连续失败 5 次锁定 15 分钟防爆破） |
+| POST | /api/auth/phone/send-code | 发送注册验证码（手机号选填场景保留） |
+| POST | /api/auth/phone/forgot-code | 忘记密码：向已注册手机号发送重置验证码 |
+| POST | /api/auth/reset-password | 重置密码 `{phone, code, newPassword}` |
 | GET | /api/me | 我的完整档案（含技能） |
 | PUT | /api/me/profile | 更新 bio/locationLabel/distanceKm（文本过风控） |
 | POST | /api/me/skills | 添加技能 `{kind:'teach'\|'want', skill:{skillName,skillLevel,exchangeType,availableTime}}` |
@@ -101,6 +115,8 @@ server/
 | GET | /api/exchanges | 我的互换记录 |
 | POST | /api/exchanges/:id/complete | 标记完成 |
 | POST | /api/evaluations | 提交评价 `{recordId,punctuality,serious,communication,comment}` → 信用分重算 |
+| GET | /api/evaluations/received | 我收到的评价（含文字评价与申诉状态） |
+| POST | /api/evaluations/:id/appeal | 对收到的评价发起申诉 `{reason}`（V1.1 违规申诉） |
 | GET | /api/dynamics | 动态列表 |
 | POST | /api/dynamics | 发布动态（违禁词 → 403 拦截） |
 | GET | /api/conversations | 会话列表（含未读数） |

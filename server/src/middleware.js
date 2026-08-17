@@ -24,26 +24,34 @@ export function requireAuth(req, res, next) {
 /**
  * 用户序列化：数据库字段 → iOS 端 Codable 对齐的 camelCase JSON
  * （字段名与 Swift 端 UserModel 完全一致，便于客户端直接解码）
+ * @param {object} row 用户行
+ * @param {object} opts
+ * @param {Array|null} opts.skills 技能行数组
+ * @param {boolean} opts.includePhone 是否返回手机号（隐私：仅本人相关接口可传 true）
  */
-export function serializeUser(row, { skills = null } = {}) {
+export function serializeUser(row, { skills = null, includePhone = false } = {}) {
   if (!row) return null
-  return {
+  // 曝光 VIP 过期校验：exposure_until 已过则视为普通用户（排序/展示一致）
+  const vipActive = !!row.is_exposure_vip &&
+    (!row.exposure_until || new Date(row.exposure_until).getTime() > Date.now())
+  const user = {
     id: String(row.id),
     username: row.username,
     userName: row.nickname,
     avatarSymbol: row.avatar_symbol,
     avatarUrl: row.avatar_url || null,
-    phone: row.phone || null,
     bio: row.bio,
     locationLabel: row.location_label,
     distanceKm: row.distance_km,
     creditScore: row.credit_score,
     verification: row.verification,
-    isExposureVip: !!row.is_exposure_vip,
+    isExposureVip: vipActive,
     exposureUntil: row.exposure_until || null,
     mySkills: skills ? skills.filter((s) => s.kind === 'teach').map(serializeSkill) : [],
     wantSkills: skills ? skills.filter((s) => s.kind === 'want').map(serializeSkill) : []
   }
+  if (includePhone) user.phone = row.phone || null
+  return user
 }
 
 export function serializeSkill(row) {

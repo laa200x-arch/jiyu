@@ -128,9 +128,70 @@ export function socialRouter(db, io) {
     res.json({ newCreditScore: score, evaluations: evals.length })
   })
 
+  // 收到的评价（含文字评价与我的申诉状态；用于「我的 → 收到的评价」展示）
+  router.get('/evaluations/received', (req, res) => {
+    const rows = db.all(
+      `SELECT e.*, u.nickname AS from_name, u.avatar_symbol AS from_avatar,
+              (SELECT a.status FROM appeals a WHERE a.evaluation_id = e.id AND a.user_id = ?) AS my_appeal_status
+       FROM evaluations e JOIN users u ON u.id = e.from_user_id
+       WHERE e.to_user_id = ? ORDER BY e.id DESC`,
+      [req.userId, req.userId]
+    )
+    res.json({
+      evaluations: rows.map((row) => ({
+        id: String(row.id),
+        fromUserId: String(row.from_user_id),
+        fromName: row.from_name,
+        fromAvatar: row.from_avatar,
+        punctuality: row.punctuality,
+        serious: row.serious,
+        communication: row.communication,
+        comment: row.comment,
+        myAppealStatus: row.my_appeal_status || null,
+        createdAt: row.created_at
+      }))
+    })
+  })
+
+  // 违规申诉（V1.1：被评人可对评价发起申诉，平台人工审核）
+  router.post('/evaluations/:id/appeal', (req, res) => {
+    const evaluation = db.get('SELECT * FROM evaluations WHERE id = ?', [req.params.id])
+    if (!evaluation) return res.status(404).json({ error: '评价不存在' })
+    if (Number(evaluation.to_user_id) !== req.userId) {
+      return res.status(403).json({ error: '只能申诉发给自己的评价' })
+    }
+    const reason = String(req.body?.reason || '').trim()
+    if (!reason) return res.status(400).json({ error: '请填写申诉理由' })
+    if (reason.length > 500) return res.status(400).json({ error: '申诉理由不能超过 500 字' })
+    const existing = db.get('SELECT * FROM appeals WHERE evaluation_id = ? AND user_id = ?', [evaluation.id, req.userId])
+    if (existing) return res.status(400).json({ error: '该评价已提交过申诉，等待平台审核' })
+    db.run(
+      'INSERT INTO appeals (evaluation_id, user_id, reason, status, created_at) VALUES (?,?,?,?,?)',
+      [evaluation.id, req.userId, reason, 'pending', now()]
+    )
+    res.status(201).json({ ok: true, message: '申诉已提交，平台将在 1-3 个工作日内审核' })
+  })
+
   router.get('/evaluations/:userId', (req, res) => {
-    const rows = db.all('SELECT * FROM evaluations WHERE to_user_id = ? ORDER BY id DESC', [req.params.userId])
-    res.json({ evaluations: rows })
+    const rows = db.all(
+      `SELECT e.*, u.nickname AS from_name, u.avatar_symbol AS from_avatar
+       FROM evaluations e JOIN users u ON u.id = e.from_user_id
+       WHERE e.to_user_id = ? ORDER BY e.id DESC`,
+      [req.params.userId]
+    )
+    res.json({
+      evaluations: rows.map((row) => ({
+        id: String(row.id),
+        fromUserId: String(row.from_user_id),
+        fromName: row.from_name,
+        fromAvatar: row.from_avatar,
+        punctuality: row.punctuality,
+        serious: row.serious,
+        communication: row.communication,
+        comment: row.comment,
+        createdAt: row.created_at
+      }))
+    })
   })
 
   // ── 动态（方案 2.3.6：发布内容前置风控）──

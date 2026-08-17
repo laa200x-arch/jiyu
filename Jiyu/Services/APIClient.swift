@@ -122,6 +122,19 @@ final class APIClient {
         return (response.message, response.devCode)
     }
 
+    /// 忘记密码：向已注册手机号发送重置验证码
+    func sendForgotCode(phone: String) async throws -> (message: String, devCode: String?) {
+        let response: SmsCodeResponse = try await request("/api/auth/phone/forgot-code", method: "POST",
+            body: ["phone": phone])
+        return (response.message, response.devCode)
+    }
+
+    /// 重置密码（手机号 + 验证码 + 新密码）
+    func resetPassword(phone: String, code: String, newPassword: String) async throws {
+        let _: OkResponse = try await request("/api/auth/reset-password", method: "POST",
+            body: ["phone": phone, "code": code, "newPassword": newPassword])
+    }
+
     // MARK: - 用户与匹配
 
     func fetchMe() async throws -> ServerUser {
@@ -289,6 +302,17 @@ final class APIClient {
             "comment": comment
         ])
         return response.newCreditScore
+    }
+
+    /// 我收到的评价（含文字评价与申诉状态）
+    func fetchReceivedEvaluations() async throws -> [ReceivedEvaluation] {
+        let response: EvaluationsResponse = try await request("/api/evaluations/received")
+        return response.evaluations
+    }
+
+    /// 对收到的评价发起申诉（V1.1 违规申诉，平台人工审核）
+    func appealEvaluation(id: String, reason: String) async throws {
+        let _: OkResponse = try await request("/api/evaluations/\(id)/appeal", method: "POST", body: ["reason": reason])
     }
 
     // MARK: - 档案

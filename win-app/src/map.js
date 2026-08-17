@@ -35,7 +35,9 @@ async function showMap() {
       link.href = '../node_modules/leaflet/dist/leaflet.css'
       document.head.appendChild(link)
     }
-    const L = require('leaflet')
+    // Leaflet 由 index.html 的 <script> 标签全局引入（渲染进程无 require 权限）
+    const L = window.L
+    if (!L) return toast('地图组件加载失败')
 
     const defaultCenter = [39.92, 116.40]
     const map = L.map('map').setView(defaultCenter, 10)

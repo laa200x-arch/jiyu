@@ -365,6 +365,20 @@ struct EvaluationResponse: Decodable {
     let newCreditScore: Double?
     let evaluations: Int?
 }
+/// 收到的评价（含文字评价与我的申诉状态，V1.1）
+struct ReceivedEvaluation: Decodable {
+    let id: String
+    let fromUserId: String
+    let fromName: String
+    let fromAvatar: String
+    let punctuality: Double
+    let serious: Double
+    let communication: Double
+    let comment: String
+    let myAppealStatus: String?
+    let createdAt: String
+}
+struct EvaluationsResponse: Decodable { let evaluations: [ReceivedEvaluation] }
 struct RecordResponse: Decodable { let record: ServerExchangeRecord? }
 struct OkResponse: Decodable { let ok: Bool? }
 

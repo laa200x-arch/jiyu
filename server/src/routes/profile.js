@@ -9,10 +9,10 @@ export function profileRouter(db) {
   const router = Router()
   router.use(requireAuth)
 
-  function userWithSkills(id) {
+  function userWithSkills(id, includePhone = false) {
     const row = db.get('SELECT * FROM users WHERE id = ?', [id])
     const skills = db.all('SELECT * FROM skills WHERE user_id = ?', [id])
-    return serializeUser(row, { skills })
+    return serializeUser(row, { skills, includePhone })
   }
 
   // 更新资料（主页文本同样过风控：禁止出现价格/接单等词，方案 2.3.1；支持头像/昵称）
@@ -28,7 +28,7 @@ export function profileRouter(db) {
         distance_km = COALESCE(?, distance_km), avatar_url = COALESCE(?, avatar_url) WHERE id = ?`,
       [nickname ?? null, bio ?? null, locationLabel ?? null, distanceKm ?? null, avatarUrl ?? null, req.userId]
     )
-    res.json({ user: userWithSkills(req.userId) })
+    res.json({ user: userWithSkills(req.userId, true) })
   })
 
   // 添加技能
@@ -64,7 +64,7 @@ export function profileRouter(db) {
       return res.status(400).json({ error: 'verification 取值不合法' })
     }
     db.run('UPDATE users SET verification = ? WHERE id = ?', [verification, req.userId])
-    res.json({ user: userWithSkills(req.userId) })
+    res.json({ user: userWithSkills(req.userId, true) })
   })
 
   // 曝光服务（方案 3.1：模拟开通；正式版由 iOS 端 IAP 回调后调用）
@@ -79,11 +79,11 @@ export function profileRouter(db) {
     if (!pkg) return res.status(400).json({ error: 'packageId 必填：day/week/month' })
     const until = new Date(Date.now() + pkg.days * 86400000).toISOString()
     db.run('UPDATE users SET is_exposure_vip = 1, exposure_until = ? WHERE id = ?', [until, req.userId])
-    res.json({ user: userWithSkills(req.userId) })
+    res.json({ user: userWithSkills(req.userId, true) })
   })
   router.delete('/me/exposure', (req, res) => {
     db.run('UPDATE users SET is_exposure_vip = 0, exposure_until = NULL WHERE id = ?', [req.userId])
-    res.json({ user: userWithSkills(req.userId) })
+    res.json({ user: userWithSkills(req.userId, true) })
   })
 
   // 用户列表（公开档案，用于匹配与展示）

@@ -153,10 +153,11 @@ export function chatRouter(db, bus = { io: null }) {
       orderPreview = `[订单] ${order.service_name} ¥${order.price_yuan}`
     }
     const preview = orderPreview || content || (mediaType === 'video' ? '[视频]' : mediaType === 'audio' ? '[语音]' : '[图片]')
-    const risk = checkTextRisk(content)
+    // 宠物订单会话（消息携带 orderId）：放行协商词（接单/价格/佣金等），仍拦截真实金钱交易词
+    const risk = checkTextRisk(content, { allowPetOrderWords: !!orderRef })
     if (risk.isIllegal) {
-      // 原文不发送，追加系统提示（方案 2.3.6）
-      const note = `⚠️ 该消息含违禁词：${risk.matchedWords.join('、')}，已被平台风控拦截。技遇仅支持纯技能无偿互换。`
+      // 原文不发送，追加系统提示（方案 2.3.6）：明确告知命中词与规则
+      const note = `⚠️ 该消息含违禁词：${risk.matchedWords.join('、')}，已被平台风控拦截。${orderRef ? '宠物订单协商仅可讨论服务安排，严禁转账/红包等线下金钱交易。' : '技遇仅支持纯技能无偿互换。'}`
       const r = db.run(
         `INSERT INTO messages (conversation_id, sender_id, text, is_system_note, created_at) VALUES (?,?,?,?,?)`,
         [convo.id, senderId, note, 1, now()]
