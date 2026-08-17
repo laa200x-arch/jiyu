@@ -47,7 +47,7 @@ export function authRouter(db) {
     })
   })
 
-  // 注册（手机验证：每个手机号仅可注册一个账号）
+  // 注册（手机验证可选：不填手机号直接注册；填写手机号则强制校验「一手机号一号 + 验证码」）
   router.post('/register', async (req, res) => {
     const { username, password, nickname, avatarSymbol = 'person.fill', phone, code } = req.body || {}
     if (!username || !password || !nickname) {
@@ -57,25 +57,27 @@ export function authRouter(db) {
       return res.status(400).json({ error: '用户名至少 3 位，密码至少 6 位' })
     }
     const phoneTrim = String(phone || '').trim()
-    if (!isValidPhone(phoneTrim)) return res.status(400).json({ error: '请填写手机号（11 位大陆手机号）' })
-    const exists = db.get('SELECT id FROM users WHERE phone = ?', [phoneTrim])
-    if (exists) return res.status(409).json({ error: '该手机号已注册账号（每个手机号仅可注册一个账号）' })
-    // 验证码校验
-    const record = db.get('SELECT * FROM phone_codes WHERE phone = ? ORDER BY id DESC LIMIT 1', [phoneTrim])
-    if (!record || record.purpose !== 'register') return res.status(400).json({ error: '请先获取手机验证码' })
-    if (record.used) return res.status(400).json({ error: '验证码已使用，请重新获取' })
-    if (new Date(record.expires_at).getTime() < Date.now()) {
-      return res.status(400).json({ error: '验证码已过期，请重新获取' })
-    }
-    if (record.code !== String(code || '').trim()) {
-      db.run('UPDATE phone_codes SET attempts = attempts + 1 WHERE id = ?', [record.id])
-      if (record.attempts + 1 >= SMS_OPTIONS.maxAttempts) {
-        db.run('UPDATE phone_codes SET used = 1 WHERE id = ?', [record.id])
-        return res.status(400).json({ error: '验证码错误次数过多，请重新获取' })
+    if (phoneTrim) {
+      // 手机号为选填：填写后才校验（格式 / 一手机号一号 / 验证码）
+      if (!isValidPhone(phoneTrim)) return res.status(400).json({ error: '手机号格式不正确（11 位大陆手机号）' })
+      const exists = db.get('SELECT id FROM users WHERE phone = ?', [phoneTrim])
+      if (exists) return res.status(409).json({ error: '该手机号已注册账号（每个手机号仅可注册一个账号）' })
+      const record = db.get('SELECT * FROM phone_codes WHERE phone = ? ORDER BY id DESC LIMIT 1', [phoneTrim])
+      if (!record || record.purpose !== 'register') return res.status(400).json({ error: '请先获取手机验证码' })
+      if (record.used) return res.status(400).json({ error: '验证码已使用，请重新获取' })
+      if (new Date(record.expires_at).getTime() < Date.now()) {
+        return res.status(400).json({ error: '验证码已过期，请重新获取' })
       }
-      return res.status(400).json({ error: '验证码错误' })
+      if (record.code !== String(code || '').trim()) {
+        db.run('UPDATE phone_codes SET attempts = attempts + 1 WHERE id = ?', [record.id])
+        if (record.attempts + 1 >= SMS_OPTIONS.maxAttempts) {
+          db.run('UPDATE phone_codes SET used = 1 WHERE id = ?', [record.id])
+          return res.status(400).json({ error: '验证码错误次数过多，请重新获取' })
+        }
+        return res.status(400).json({ error: '验证码错误' })
+      }
+      db.run('UPDATE phone_codes SET used = 1 WHERE id = ?', [record.id])
     }
-    db.run('UPDATE phone_codes SET used = 1 WHERE id = ?', [record.id])
 
     const usernameExists = db.get('SELECT id FROM users WHERE username = ?', [username])
     if (usernameExists) return res.status(409).json({ error: '用户名已存在' })
@@ -84,7 +86,7 @@ export function authRouter(db) {
     const r = db.run(
       `INSERT INTO users (username, password_hash, nickname, avatar_symbol, phone, created_at)
        VALUES (?,?,?,?,?,?)`,
-      [username, hash, nickname, avatarSymbol, phoneTrim, now()]
+      [username, hash, nickname, avatarSymbol, phoneTrim || null, now()]
     )
     const user = userWithSkills(r.lastInsertRowid)
     res.status(201).json({ token: signToken(r.lastInsertRowid), user })

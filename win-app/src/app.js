@@ -76,8 +76,9 @@ function bindLogin() {
     const err = document.getElementById('login-error')
     if (!username || !password) return show(err, '请输入用户名和密码')
     if (isRegister && !nickname) return show(err, '请输入昵称')
-    if (isRegister && !/^1[3-9]\d{9}$/.test(phone)) return show(err, '请输入正确的 11 位手机号')
-    if (isRegister && !code) return show(err, '请先获取并填写手机验证码')
+    // 手机号选填：填写了手机号则必须格式正确且完成验证
+    if (isRegister && phone && !/^1[3-9]\d{9}$/.test(phone)) return show(err, '手机号格式不正确（选填，11 位大陆手机号）')
+    if (isRegister && phone && !code) return show(err, '填写了手机号，请先获取并填写验证码')
     hide(err)
     const btn = document.getElementById('login-submit')
     btn.disabled = true

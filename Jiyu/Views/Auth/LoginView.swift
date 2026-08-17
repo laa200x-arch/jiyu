@@ -53,7 +53,7 @@ struct LoginView: View {
                 if isRegister {
                     TextField("昵称", text: $nickname)
                         .textFieldStyle(.roundedBorder)
-                    TextField("手机号（11 位，每个手机号仅可注册一个账号）", text: $phone)
+                    TextField("手机号（选填，填写则需验证码）", text: $phone)
                         .textFieldStyle(.roundedBorder)
                         .keyboardType(.numberPad)
                     HStack(spacing: 8) {
@@ -223,12 +223,14 @@ struct LoginView: View {
             errorMessage = "请输入昵称"
             return
         }
-        if isRegister && !isValidPhone(phone) {
-            errorMessage = "请输入正确的 11 位手机号"
+        // 手机号选填：填写了手机号则必须格式正确且完成验证
+        let trimmedPhone = phone.trimmingCharacters(in: .whitespaces)
+        if isRegister && !trimmedPhone.isEmpty && !isValidPhone(trimmedPhone) {
+            errorMessage = "手机号格式不正确（选填，11 位大陆手机号）"
             return
         }
-        if isRegister && smsCode.trimmingCharacters(in: .whitespaces).isEmpty {
-            errorMessage = "请先获取并填写手机验证码"
+        if isRegister && !trimmedPhone.isEmpty && smsCode.trimmingCharacters(in: .whitespaces).isEmpty {
+            errorMessage = "填写了手机号，请先获取并填写验证码"
             return
         }
         Task {
