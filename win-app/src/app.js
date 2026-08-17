@@ -33,22 +33,57 @@ function bindLogin() {
     isRegister = !isRegister
     document.getElementById('login-toggle').textContent = isRegister ? '已有账号？去登录' : '没有账号？注册一个'
     document.getElementById('register-field').classList.toggle('hidden', !isRegister)
+    document.getElementById('register-phone-field').classList.toggle('hidden', !isRegister)
+    document.getElementById('register-code-field').classList.toggle('hidden', !isRegister)
     document.getElementById('login-submit').textContent = isRegister ? '注册并登录' : '登 录'
+  })
+
+  // 获取手机验证码（每个手机号仅可注册一个账号）
+  page.querySelector('#send-code-btn').addEventListener('click', async () => {
+    const phone = document.getElementById('login-phone').value.trim()
+    const err = document.getElementById('login-error')
+    const btn = document.getElementById('send-code-btn')
+    if (!/^1[3-9]\d{9}$/.test(phone)) return show(err, '请输入正确的 11 位手机号')
+    hide(err)
+    btn.disabled = true
+    try {
+      const r = await api('/api/auth/phone/send-code', { method: 'POST', body: { phone } })
+      if (r.devCode) {
+        document.getElementById('login-code').value = r.devCode
+        show(err, '✅ 验证码已发送（测试通道，已自动填入：' + r.devCode + '）')
+      } else {
+        show(err, '✅ 验证码已发送到 ' + phone + '（5 分钟内有效）')
+      }
+      // 60 秒倒计时
+      let left = 60
+      const timer = setInterval(() => {
+        left--
+        btn.textContent = left > 0 ? '重新发送(' + left + 's)' : '获取验证码'
+        if (left <= 0) { clearInterval(timer); btn.disabled = false }
+      }, 1000)
+    } catch (e) {
+      show(err, e.message)
+      btn.disabled = false
+    }
   })
 
   page.querySelector('#login-submit').addEventListener('click', async () => {
     const username = document.getElementById('login-username').value.trim()
     const password = document.getElementById('login-password').value
     const nickname = document.getElementById('login-nickname').value.trim()
+    const phone = document.getElementById('login-phone').value.trim()
+    const code = document.getElementById('login-code').value.trim()
     const err = document.getElementById('login-error')
     if (!username || !password) return show(err, '请输入用户名和密码')
     if (isRegister && !nickname) return show(err, '请输入昵称')
+    if (isRegister && !/^1[3-9]\d{9}$/.test(phone)) return show(err, '请输入正确的 11 位手机号')
+    if (isRegister && !code) return show(err, '请先获取并填写手机验证码')
     hide(err)
     const btn = document.getElementById('login-submit')
     btn.disabled = true
     btn.textContent = '登录中…'
     try {
-      if (isRegister) await register(username, password, nickname)
+      if (isRegister) await register(username, password, nickname, phone, code)
       else await login(username, password)
       afterEnterApp()
     } catch (e) {

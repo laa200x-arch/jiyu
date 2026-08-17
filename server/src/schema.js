@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS users (
   nickname TEXT NOT NULL,
   avatar_symbol TEXT NOT NULL DEFAULT 'person.fill',
   avatar_url TEXT,
+  phone TEXT,
   bio TEXT NOT NULL DEFAULT '',
   location_label TEXT NOT NULL DEFAULT '',
   distance_km REAL,
@@ -20,6 +21,17 @@ CREATE TABLE IF NOT EXISTS users (
   is_exposure_vip INTEGER NOT NULL DEFAULT 0,
   exposure_until TEXT,
   violation_count INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS phone_codes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  phone TEXT NOT NULL,
+  code TEXT NOT NULL,
+  purpose TEXT NOT NULL DEFAULT 'register',
+  used INTEGER NOT NULL DEFAULT 0,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  expires_at TEXT NOT NULL,
   created_at TEXT NOT NULL
 );
 
@@ -159,6 +171,7 @@ CREATE TABLE IF NOT EXISTS users (
   nickname VARCHAR(64) NOT NULL,
   avatar_symbol VARCHAR(64) NOT NULL DEFAULT 'person.fill',
   avatar_url VARCHAR(255) NULL,
+  phone VARCHAR(20) NULL,
   bio VARCHAR(500) NOT NULL DEFAULT '',
   location_label VARCHAR(128) NOT NULL DEFAULT '',
   distance_km DOUBLE NULL,
@@ -168,6 +181,18 @@ CREATE TABLE IF NOT EXISTS users (
   exposure_until DATETIME NULL,
   violation_count INT NOT NULL DEFAULT 0,
   created_at DATETIME NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS phone_codes (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  phone VARCHAR(20) NOT NULL,
+  code VARCHAR(8) NOT NULL,
+  purpose VARCHAR(16) NOT NULL DEFAULT 'register',
+  used TINYINT(1) NOT NULL DEFAULT 0,
+  attempts INT NOT NULL DEFAULT 0,
+  expires_at DATETIME NOT NULL,
+  created_at DATETIME NOT NULL,
+  UNIQUE KEY uq_phone (phone)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS skills (

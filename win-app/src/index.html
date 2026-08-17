@@ -25,6 +25,15 @@
       <div id="register-field" class="field hidden">
         <input id="login-nickname" type="text" placeholder="昵称">
       </div>
+      <div id="register-phone-field" class="field hidden">
+        <input id="login-phone" type="tel" placeholder="手机号（11 位，每个手机号仅可注册一个账号）" maxlength="11" autocomplete="off">
+      </div>
+      <div id="register-code-field" class="field hidden">
+        <div style="display:flex;gap:8px">
+          <input id="login-code" type="text" placeholder="手机验证码" maxlength="6" style="flex:1" autocomplete="off">
+          <button id="send-code-btn" class="btn btn-outline" style="white-space:nowrap">获取验证码</button>
+        </div>
+      </div>
       <div id="login-error" class="error-text hidden"></div>
       <button id="login-submit" class="btn btn-primary btn-block">登 录</button>
       <button id="login-toggle" class="btn-link">没有账号？注册一个</button>

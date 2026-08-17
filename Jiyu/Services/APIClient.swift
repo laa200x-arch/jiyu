@@ -105,11 +105,21 @@ final class APIClient {
         return response.user
     }
 
-    func register(username: String, password: String, nickname: String) async throws -> ServerUser {
-        let response: TokenResponse = try await request("/api/auth/register", method: "POST",
-            body: ["username": username, "password": password, "nickname": nickname])
+    func register(username: String, password: String, nickname: String, phone: String? = nil, code: String? = nil) async throws -> ServerUser {
+        var body: [String: Any] = ["username": username, "password": password, "nickname": nickname]
+        if let phone { body["phone"] = phone }
+        if let code { body["code"] = code }
+        let response: TokenResponse = try await request("/api/auth/register", method: "POST", body: body)
         TokenStore.token = response.token
         return response.user
+    }
+
+    /// 发送注册手机验证码（每个手机号仅可注册一个账号）
+    /// 返回 devCode（测试通道自动附带；接入真实短信网关后不再返回）
+    func sendSmsCode(phone: String) async throws -> (message: String, devCode: String?) {
+        let response: SmsCodeResponse = try await request("/api/auth/phone/send-code", method: "POST",
+            body: ["phone": phone])
+        return (response.message, response.devCode)
     }
 
     // MARK: - 用户与匹配

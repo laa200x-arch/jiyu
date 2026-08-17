@@ -76,6 +76,9 @@ async function main() {
   }
   // 轻量迁移：users 表补充头像 URL 列
   try { db.exec('ALTER TABLE users ADD COLUMN avatar_url TEXT') } catch { /* 列已存在 */ }
+  // 轻量迁移：users 表补充手机号列（注册手机验证，一手机号一号）
+  try { db.exec('ALTER TABLE users ADD COLUMN phone TEXT') } catch { /* 列已存在 */ }
+  try { db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_phone ON users(phone)') } catch { /* 索引已存在 */ }
   // 演示数据
   if (config.autoSeed) {
     await seed(db)

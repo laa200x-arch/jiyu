@@ -9,6 +9,17 @@ const check = (name, cond, extra = '') => {
   else { failed++; console.log('  ❌', name, extra) }
 }
 
+/* 手机验证注册（发送验证码 → 用 devCode 注册） */
+async function registerWithPhone(api, username, nickname) {
+  const phone = '139' + String(Date.now()).slice(-8)
+  const sent = await api.api('/api/auth/phone/send-code', { method: 'POST', body: { phone } })
+  if (!sent.devCode) throw new Error('未返回 devCode')
+  return api.api('/api/auth/register', {
+    method: 'POST',
+    body: { username, password: '123456', nickname, phone, code: sent.devCode }
+  })
+}
+
 async function main() {
   console.log('══════ 技遇 Windows 版核心逻辑测试 ══════\n')
 
@@ -166,7 +177,7 @@ async function main() {
     const orderDyn = App.state.dynamics.find((d) => d.orderId === bk2.booking.id)
     check('动态订单卡片', !!orderDyn && orderDyn.content.includes('遛狗'), orderDyn?.content?.slice(0, 20))
     // 接单资历校验（新注册用户未认证应被拒）
-    const smoke = await petsApi.api('/api/auth/register', { method: 'POST', body: { username: 'noskill' + Date.now(), password: '123456', nickname: '无资历' } })
+    const smoke = await registerWithPhone(petsApi, 'noskill' + Date.now(), '无资历')
     petsApi.App.state.token = smoke.token
     const smokePet = await petsApi.api('/api/pets', { method: 'POST', body: {
       name: '测试小狗', petType: 'dog', breed: '土狗', ageMonths: 24, gender: 'male', neutered: false
@@ -232,7 +243,7 @@ async function main() {
     const ref = await petsApi.api('/api/messages', { method: 'POST', body: { conversationId: convId, text: '看看这个订单', orderId: bk.booking.id } })
     check('聊天引用订单', ref.message.orderId === bk.booking.id && ref.message.text === '看看这个订单')
     // 引用无关订单被拒：注册临时用户 C 建订单，aqing 引用 → 403
-    const c = await petsApi.api('/api/auth/register', { method: 'POST', body: { username: 'tempc' + Date.now(), password: '123456', nickname: '临时C' } })
+    const c = await registerWithPhone(petsApi, 'tempc' + Date.now(), '临时C')
     petsApi.App.state.token = c.token
     const cPet = await petsApi.api('/api/pets', { method: 'POST', body: {
       name: 'C狗', petType: 'dog', breed: 'x', ageMonths: 12, gender: 'male', neutered: false
@@ -256,6 +267,28 @@ async function main() {
     await petsApi.api('/api/pets/' + cPet.pet.id, { method: 'DELETE' })
     petsApi.logout()
   } catch (e) { check('订单详情/引用', false, e.message) }
+
+  // 14. 手机验证注册（一手机号一号）
+  try {
+    const api = require('./src/api.js')
+    const phone = '137' + String(Date.now()).slice(-8)
+    const sent = await api.api('/api/auth/phone/send-code', { method: 'POST', body: { phone } })
+    check('发送验证码', !!sent.devCode && sent.message.includes('5 分钟'), 'devCode=' + sent.devCode)
+    try {
+      await api.api('/api/auth/register', { method: 'POST', body: { username: 'pv' + Date.now(), password: '123456', nickname: 'x', phone, code: '000000' } })
+      check('错误验证码被拒', false)
+    } catch (e) { check('错误验证码被拒', e.message.includes('验证码错误'), e.message.slice(0, 16)) }
+    const u = await api.api('/api/auth/register', { method: 'POST', body: { username: 'pv' + Date.now(), password: '123456', nickname: '手机测试', phone, code: sent.devCode } })
+    check('手机验证注册', !!u.token && u.user.phone === phone, u.user.userName)
+    try {
+      await api.api('/api/auth/register', { method: 'POST', body: { username: 'pv2' + Date.now(), password: '123456', nickname: 'x', phone, code: sent.devCode } })
+      check('同手机号二次注册被拒', false)
+    } catch (e) { check('同手机号二次注册被拒', e.message.includes('已注册'), e.message.slice(0, 20)) }
+    try {
+      await api.api('/api/auth/register', { method: 'POST', body: { username: 'pv3' + Date.now(), password: '123456', nickname: 'x', code: '123456' } })
+      check('未填手机号被拒', false)
+    } catch (e) { check('未填手机号被拒', e.message.includes('手机号'), e.message.slice(0, 16)) }
+  } catch (e) { check('手机验证注册', false, e.message) }
 
   logout()
   console.log(`\n══════ 结果：${passed} 通过 / ${failed} 失败 ══════`)

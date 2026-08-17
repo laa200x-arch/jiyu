@@ -84,9 +84,9 @@ final class MockDataStore: ObservableObject {
         }
     }
 
-    func register(username: String, password: String, nickname: String) async throws {
+    func register(username: String, password: String, nickname: String, phone: String? = nil, code: String? = nil) async throws {
         do {
-            let user = try await APIClient.shared.register(username: username, password: password, nickname: nickname)
+            let user = try await APIClient.shared.register(username: username, password: password, nickname: nickname, phone: phone, code: code)
             try await activateServerSession(user)
         } catch {
             TokenStore.token = nil

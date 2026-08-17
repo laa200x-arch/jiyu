@@ -8,6 +8,9 @@ struct LoginView: View {
     @State private var username = "aqing"
     @State private var password = "123456"
     @State private var nickname = ""
+    @State private var phone = ""
+    @State private var smsCode = ""
+    @State private var codeCountdown = 0
     @State private var isRegister = false
     @State private var isLoading = false
     @State private var errorMessage: String?
@@ -50,6 +53,26 @@ struct LoginView: View {
                 if isRegister {
                     TextField("昵称", text: $nickname)
                         .textFieldStyle(.roundedBorder)
+                    TextField("手机号（11 位，每个手机号仅可注册一个账号）", text: $phone)
+                        .textFieldStyle(.roundedBorder)
+                        .keyboardType(.numberPad)
+                    HStack(spacing: 8) {
+                        TextField("手机验证码", text: $smsCode)
+                            .textFieldStyle(.roundedBorder)
+                            .keyboardType(.numberPad)
+                        Button {
+                            sendCode()
+                        } label: {
+                            Text(codeCountdown > 0 ? "重新发送(\(codeCountdown)s)" : "获取验证码")
+                                .font(.caption)
+                                .bold()
+                                .foregroundStyle(codeCountdown > 0 ? Theme.textSecondary : .white)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 9)
+                                .background(Capsule().fill(codeCountdown > 0 ? Theme.divider : Theme.primary))
+                        }
+                        .disabled(codeCountdown > 0 || isLoading)
+                    }
                 }
             }
             .padding(.horizontal, 32)
@@ -200,6 +223,14 @@ struct LoginView: View {
             errorMessage = "请输入昵称"
             return
         }
+        if isRegister && !isValidPhone(phone) {
+            errorMessage = "请输入正确的 11 位手机号"
+            return
+        }
+        if isRegister && smsCode.trimmingCharacters(in: .whitespaces).isEmpty {
+            errorMessage = "请先获取并填写手机验证码"
+            return
+        }
         Task {
             isLoading = true
             errorMessage = nil
@@ -209,7 +240,9 @@ struct LoginView: View {
                     try await MockDataStore.shared.register(
                         username: name,
                         password: password,
-                        nickname: nickname.trimmingCharacters(in: .whitespaces)
+                        nickname: nickname.trimmingCharacters(in: .whitespaces),
+                        phone: phone.trimmingCharacters(in: .whitespaces),
+                        code: smsCode.trimmingCharacters(in: .whitespaces)
                     )
                 } else {
                     try await MockDataStore.shared.login(username: name, password: password)
@@ -221,6 +254,49 @@ struct LoginView: View {
                     ?? "登录失败，请重试"
             }
         }
+    }
+
+    /// 获取注册验证码（一手机号一号；测试通道自动填入 devCode）
+    private func sendCode() {
+        let trimmed = phone.trimmingCharacters(in: .whitespaces)
+        guard isValidPhone(trimmed) else {
+            errorMessage = "请输入正确的 11 位手机号"
+            return
+        }
+        Task {
+            do {
+                let (message, devCode) = try await APIClient.shared.sendSmsCode(phone: trimmed)
+                if let devCode {
+                    smsCode = devCode
+                    errorMessage = "✅ \(message)（测试通道验证码已自动填入）"
+                } else {
+                    errorMessage = "✅ \(message)"
+                }
+                startCountdown()
+            } catch {
+                errorMessage = (error as? LocalizedError)?.errorDescription
+                    ?? (error as? APIError)?.errorDescription
+                    ?? "验证码发送失败，请重试"
+            }
+        }
+    }
+
+    private func startCountdown() {
+        codeCountdown = 60
+        Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { timer in
+            if codeCountdown <= 1 {
+                codeCountdown = 0
+                timer.invalidate()
+            } else {
+                codeCountdown -= 1
+            }
+        }
+    }
+
+    private func isValidPhone(_ p: String) -> Bool {
+        let trimmed = p.trimmingCharacters(in: .whitespaces)
+        guard trimmed.count == 11, trimmed.hasPrefix("1") else { return false }
+        return trimmed.allSatisfy(\.isNumber)
     }
 }
 

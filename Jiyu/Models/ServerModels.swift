@@ -336,6 +336,13 @@ struct ServerVersion: Decodable {
 }
 
 struct TokenResponse: Decodable { let token: String; let user: ServerUser }
+
+/// 发送手机验证码响应（测试通道附带 devCode）
+struct SmsCodeResponse: Decodable {
+    let ok: Bool?
+    let message: String
+    let devCode: String?
+}
 struct UserResponse: Decodable { let user: ServerUser }
 struct UsersResponse: Decodable { let users: [ServerUser] }
 struct MatchesResponse: Decodable { let matches: [ServerMatch] }

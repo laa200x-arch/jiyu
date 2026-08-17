@@ -33,6 +33,7 @@ export function serializeUser(row, { skills = null } = {}) {
     userName: row.nickname,
     avatarSymbol: row.avatar_symbol,
     avatarUrl: row.avatar_url || null,
+    phone: row.phone || null,
     bio: row.bio,
     locationLabel: row.location_label,
     distanceKm: row.distance_km,

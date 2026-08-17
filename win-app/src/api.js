@@ -63,8 +63,8 @@ async function login(username, password) {
   const data = await api('/api/auth/login', { method: 'POST', body: { username, password } })
   await afterLogin(data)
 }
-async function register(username, password, nickname) {
-  const data = await api('/api/auth/register', { method: 'POST', body: { username, password, nickname } })
+async function register(username, password, nickname, phone, code) {
+  const data = await api('/api/auth/register', { method: 'POST', body: { username, password, nickname, phone, code } })
   await afterLogin(data)
 }
 async function loginWithSaved(account) {
