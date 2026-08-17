@@ -480,6 +480,15 @@ async function showOrderDetail(orderId) {
 
 /* 用户资料（动态作者/私信入口） */
 function showUserProfile(u) {
+  const mine = (App.state.dynamics || []).filter((d) => String(d.userId) === String(u.id))
+  const dynamicsHtml = mine.length
+    ? mine.slice(0, 20).map((d) => `
+        <div class="list" style="margin-bottom:8px"><li>
+          <div style="color:var(--text)">${esc(d.content)}</div>
+          ${d.imageBase64 ? `<img class="feed-image" style="margin-top:6px" src="data:image/jpeg;base64,${d.imageBase64}">` : ''}
+          <div class="card-sub" style="margin-top:4px">${fmtTime(d.time)}</div>
+        </li></div>`).join('')
+    : '<div class="card-sub">暂无动态</div>'
   openModal(`
     <div class="modal-title">${esc(u.userName)}</div>
     <div class="row" style="margin-bottom:12px">
@@ -501,11 +510,14 @@ function showUserProfile(u) {
     <div class="skill-grid" style="margin-bottom:10px">${skillTags(u.mySkills)}</div>
     <div class="card-sub" style="margin:8px 0 4px">我想学（你来教）</div>
     <div class="skill-grid" style="margin-bottom:14px">${skillTags(u.wantSkills)}</div>
-    <div class="modal-actions">
-      <button class="btn btn-primary" id="up-chat">💬 私信沟通</button>
-    </div>
+    <div class="card-sub" style="margin:8px 0 4px">我的动态</div>
+    ${dynamicsHtml}
+    ${String(u.id) !== String(App.state.user.id)
+      ? `<div class="modal-actions"><button class="btn btn-primary" id="up-chat">💬 私信沟通</button></div>`
+      : ''}
   `, (box) => {
-    box.querySelector('#up-chat').addEventListener('click', () => { closeModal(); startChatWithUser(u) })
+    const chatBtn = box.querySelector('#up-chat')
+    if (chatBtn) chatBtn.addEventListener('click', () => { closeModal(); startChatWithUser(u) })
   })
 }
 
@@ -1120,14 +1132,26 @@ async function doVerify(kind) {
   } catch (e) { toast(e.message) }
 }
 
-/* 技能编辑 */
+/* 编辑资料（统一：头像 / 账号 / 我擅长 / 我想学） */
 function showSkillEditor() {
   const u = App.state.user
   openModal(`
-    <div class="modal-title">技能档案</div>
-    <div class="card-sub" style="margin-bottom:6px">我擅长</div>
+    <div class="modal-title">编辑资料</div>
+    <div class="row" style="align-items:center;gap:12px;margin-bottom:14px">
+      ${avatarHtml(u, 'avatar avatar-lg')}
+      <button class="btn btn-outline btn-sm" id="se-avatar">🖼 更换头像</button>
+      <input type="file" id="se-avatar-file" accept="image/*" hidden>
+    </div>
+    <div class="form-row">
+      <div class="form-field"><label>昵称</label><input id="se-nickname" value="${esc(u.userName)}"></div>
+      <div class="form-field"><label>所在城市</label><input id="se-location" value="${esc(u.locationLabel || '')}" placeholder="如：广州·天河"></div>
+    </div>
+    <div class="form-field"><label>简介</label><textarea id="se-bio" rows="2" placeholder="介绍一下自己吧">${esc(u.bio || '')}</textarea></div>
+    <div class="modal-actions"><button class="btn btn-outline" id="se-save-account">💾 保存账号信息</button></div>
+    <div style="border-top:1px solid var(--divider);margin:14px 0"></div>
+    <div class="card-sub" style="margin-bottom:6px">我擅长（用于教他人）</div>
     <div id="se-teach" class="skill-grid" style="margin-bottom:12px">${skillTags(u.mySkills)}</div>
-    <div class="card-sub" style="margin-bottom:6px">我想学</div>
+    <div class="card-sub" style="margin-bottom:6px">我想学（用于匹配）</div>
     <div id="se-want" class="skill-grid" style="margin-bottom:14px">${skillTags(u.wantSkills)}</div>
     <div class="form-row">
       <div class="form-field"><label>技能名称</label><input id="se-name" placeholder="如：吉他"></div>
@@ -1144,6 +1168,34 @@ function showSkillEditor() {
       <button class="btn btn-primary" id="se-add-want">＋ 加入「我想学」</button>
     </div>
   `, (box) => {
+    // 头像
+    const af = box.querySelector('#se-avatar-file')
+    box.querySelector('#se-avatar').addEventListener('click', () => af.click())
+    af.addEventListener('change', async (e) => {
+      const file = e.target.files[0]
+      if (!file) return
+      try {
+        const blob = await compressImage(file)
+        const url = await uploadMedia(await blob.arrayBuffer(), 'avatar.jpg', 'image/jpeg')
+        await updateProfile({ avatarUrl: url })
+        toast('✅ 头像已更新')
+      } catch (err) { toast('头像上传失败：' + err.message) }
+      e.target.value = ''
+    })
+    // 账号信息
+    box.querySelector('#se-save-account').addEventListener('click', async () => {
+      const nickname = box.querySelector('#se-nickname').value.trim()
+      if (!nickname) return toast('昵称不能为空')
+      try {
+        await updateProfile({
+          nickname,
+          bio: box.querySelector('#se-bio').value.trim(),
+          locationLabel: box.querySelector('#se-location').value.trim()
+        })
+        toast('✅ 账号信息已保存')
+      } catch (e) { toast(e.message) }
+    })
+    // 技能
     const read = () => ({
       skillName: box.querySelector('#se-name').value.trim(),
       skillLevel: box.querySelector('#se-level').value,

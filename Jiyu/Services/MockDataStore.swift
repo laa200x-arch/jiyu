@@ -757,6 +757,21 @@ final class MockDataStore: ObservableObject {
         syncCurrentUserInAllUsers()
     }
 
+    /// 更新个人资料（昵称/简介/位置/头像）
+    func updateProfile(nickname: String? = nil, bio: String? = nil, locationLabel: String? = nil, avatarUrl: String? = nil) async throws {
+        if isServerMode {
+            let user = try await APIClient.shared.updateProfile(nickname: nickname, bio: bio, locationLabel: locationLabel, avatarUrl: avatarUrl)
+            currentUser = UserModel(server: user)
+            syncCurrentUserInAllUsers()
+            return
+        }
+        if let nickname { currentUser.userName = nickname }
+        if let bio { currentUser.bio = bio }
+        if let locationLabel { currentUser.locationLabel = locationLabel }
+        if let avatarUrl { currentUser.avatarUrl = avatarUrl }
+        syncCurrentUserInAllUsers()
+    }
+
     /// 未读消息总数（消息 Tab 红点）
     var unreadTotal: Int {
         conversations.reduce(0) { $0 + $1.unreadCount }

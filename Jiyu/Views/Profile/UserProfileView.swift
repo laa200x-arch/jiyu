@@ -20,6 +20,7 @@ struct UserProfileView: View {
                 profileCard
                 skillsCard(title: "我擅长（可以教你）", skills: user.mySkills)
                 skillsCard(title: "我想学（你来教）", skills: user.wantSkills)
+                dynamicsSection
 
                 NavigationLink {
                     ChatDetailView(partner: user)
@@ -119,5 +120,55 @@ struct UserProfileView: View {
         .padding(14)
         .background(RoundedRectangle(cornerRadius: 16).fill(Theme.cardBg))
         .overlay(RoundedRectangle(cornerRadius: 16).stroke(Theme.divider, lineWidth: 1))
+    }
+
+    /// 我的动态（查看主页：展示该用户发布过的动态）
+    private var dynamicsSection: some View {
+        let mine = store.dynamics.filter { $0.userId == user.id }
+        return VStack(alignment: .leading, spacing: 10) {
+            Text("我的动态")
+                .font(.subheadline)
+                .bold()
+                .foregroundStyle(Theme.textPrimary)
+            if mine.isEmpty {
+                Text("还没有发布过动态")
+                    .font(.caption)
+                    .foregroundStyle(Theme.textSecondary)
+            } else {
+                ForEach(mine.prefix(20)) { item in
+                    dynamicRow(item)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(14)
+        .background(RoundedRectangle(cornerRadius: 16).fill(Theme.cardBg))
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Theme.divider, lineWidth: 1))
+    }
+
+    private func dynamicRow(_ item: DynamicModel) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(item.content)
+                .font(.subheadline)
+                .foregroundStyle(Theme.textPrimary)
+                .lineSpacing(3)
+            if let imageBase64 = item.imageBase64,
+               let imageData = Data(base64Encoded: imageBase64),
+               let uiImage = UIImage(data: imageData) {
+                Image(uiImage: uiImage)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 140)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+            }
+            Text(Formatters.timeText(item.time))
+                .font(.caption2)
+                .foregroundStyle(Theme.textSecondary)
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 12).fill(Theme.bg))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Theme.divider, lineWidth: 1))
     }
 }

@@ -158,9 +158,17 @@ async function fetchUser(id) {
   const data = await api('/api/users/' + id)
   return data.user
 }
-async function updateProfile({ bio, avatarUrl } = {}) {
-  const data = await api('/api/me/profile', { method: 'PUT', body: { bio, avatarUrl } })
+async function updateProfile({ nickname, bio, locationLabel, avatarUrl } = {}) {
+  const body = {}
+  if (nickname !== undefined) body.nickname = nickname
+  if (bio !== undefined) body.bio = bio
+  if (locationLabel !== undefined) body.locationLabel = locationLabel
+  if (avatarUrl !== undefined) body.avatarUrl = avatarUrl
+  const data = await api('/api/me/profile', { method: 'PUT', body })
   App.state.user = data.user
+  const acc = App.state.savedAccounts.find((a) => a.username === data.user.username)
+  if (acc) { acc.nickname = data.user.userName; storage.setItem('jiyu.accounts', JSON.stringify(App.state.savedAccounts)) }
+  if (App.state.views.onDataChanged) App.state.views.onDataChanged()
 }
 async function addSkill(kind, skill) {
   const data = await api('/api/me/skills', { method: 'POST', body: { kind, skill } })

@@ -8,6 +8,7 @@ struct MineView: View {
     @EnvironmentObject private var appState: AppState
 
     @State private var showEdit = false
+    @State private var showProfile = false
     @State private var showExposure = false
     @State private var showProtocol = false
     @State private var showRules = false
@@ -37,6 +38,7 @@ struct MineView: View {
         .navigationTitle("我的")
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showEdit) { ProfileEditView() }
+        .sheet(isPresented: $showProfile) { NavigationStack { UserProfileView(user: store.currentUser) } }
         .sheet(isPresented: $showExposure) { ExposureView() }
         .sheet(isPresented: $showProtocol) { ProtocolReadView() }
         .sheet(isPresented: $showRules) { RiskRulesView() }
@@ -107,7 +109,7 @@ struct MineView: View {
                         .padding(.vertical, 10)
                         .background(Capsule().fill(Theme.primary))
                 }
-                Button { showProtocol = true } label: {
+                Button { showProfile = true } label: {
                     Label("查看主页", systemImage: "person")
                         .font(.subheadline)
                         .bold()
