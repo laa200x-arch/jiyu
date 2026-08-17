@@ -201,6 +201,7 @@ function bindTabs() {
 async function bootstrap() {
   bindLogin()
   bindTabs()
+  bindModalMask()
   // 请求桌面通知权限（消息推送）
   if ('Notification' in window && Notification.permission === 'default') {
     try { Notification.requestPermission() } catch (e) { /* ignore */ }

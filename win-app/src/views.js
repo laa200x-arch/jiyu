@@ -33,11 +33,19 @@ function toast(msg) {
   toast._t = setTimeout(() => el.classList.add('hidden'), 2600)
 }
 function openModal(html, onMount) {
-  document.getElementById('modal-box').innerHTML = html
+  const box = document.getElementById('modal-box')
+  // 全局注入右上角关闭按钮（每个弹窗都有 ×）
+  box.innerHTML = `<button class="modal-close" onclick="closeModal()" title="关闭">✕</button>` + html
   document.getElementById('modal-mask').classList.remove('hidden')
-  if (onMount) onMount(document.getElementById('modal-box'))
+  if (onMount) onMount(box)
 }
 function closeModal() { document.getElementById('modal-mask').classList.add('hidden') }
+/* 点击遮罩空白处关闭弹窗 */
+function bindModalMask() {
+  document.getElementById('modal-mask').addEventListener('click', (e) => {
+    if (e.target.id === 'modal-mask') closeModal()
+  })
+}
 function openFullscreen(html) {
   const mask = document.createElement('div')
   mask.className = 'fullscreen-mask'

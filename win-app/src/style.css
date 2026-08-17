@@ -346,9 +346,15 @@ body {
 }
 .modal-box {
   background: #fff; border-radius: 16px; max-width: 560px; width: 92%;
-  max-height: 86vh; overflow-y: auto; padding: 22px;
+  max-height: 86vh; overflow-y: auto; padding: 22px; position: relative;
 }
-.modal-title { font-size: 17px; font-weight: 700; margin-bottom: 14px; }
+.modal-close {
+  position: absolute; top: 10px; right: 12px; width: 28px; height: 28px;
+  border: none; background: #f1f2f7; color: var(--text-2); border-radius: 50%;
+  cursor: pointer; font-size: 14px; line-height: 1; display: flex; align-items: center; justify-content: center;
+}
+.modal-close:hover { background: #e7e8ee; color: var(--text); }
+.modal-title { font-size: 17px; font-weight: 700; margin-bottom: 14px; padding-right: 28px; }
 .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; }
 
 /* 全屏查看 */
