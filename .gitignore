@@ -40,3 +40,8 @@ win-app/dist/
 
 # npm 缓存（沙箱内使用）
 .tmp-npm-cache/
+
+# 本地凭据临时文件（切勿提交）
+.tmp-gh-token.txt
+.tmp-push.ps1
+.tmp-gh-cred
