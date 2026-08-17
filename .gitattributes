@@ -1,0 +1,28 @@
+# ============================================================
+# GitHub 语言统计：仅保留 Swift 与 JavaScript 两种语言
+# 其余文件类型（HTML/CSS/JSON/YAML/BAT/plist/pbxproj/文档）均
+# 通过 linguist 属性排除出 Languages 统计。
+# 参考：https://github.com/github/linguist/blob/master/docs/overrides.md
+# ============================================================
+
+# Xcode 工程文件与资源目录（非源码）
+*.pbxproj linguist-detectable=false
+*.plist linguist-detectable=false
+Jiyu/Assets.xcassets/** linguist-detectable=false
+
+# Windows 端渲染壳（HTML/CSS 由 JavaScript 应用驱动，不计语言）
+win-app/src/index.html linguist-detectable=false
+win-app/src/style.css linguist-detectable=false
+
+# 数据与配置文件
+*.json linguist-detectable=false
+*.yml linguist-detectable=false
+*.yaml linguist-detectable=false
+*.bat linguist-detectable=false
+
+# GitHub Actions 工作流（第三方配置，不计语言）
+.github/** linguist-vendored
+
+# 文档（README/方案文档，不计语言）
+*.md linguist-documentation
+docs/** linguist-documentation
