@@ -25,8 +25,7 @@ struct MineView: View {
         ScrollView {
             VStack(spacing: 14) {
                 profileHeader
-                skillSection(title: "我擅长", skills: store.currentUser.mySkills, action: { showEdit = true })
-                skillSection(title: "我想学", skills: store.currentUser.wantSkills, action: { showEdit = true })
+                skillsDualCard
                 exposureCard
                 exchangeSection
                 settingsSection
@@ -81,29 +80,47 @@ struct MineView: View {
                             .bold()
                             .foregroundStyle(Theme.textPrimary)
                         if store.currentUser.isExposureVip {
-                            Image(systemName: "crown.fill")
+                            Label("曝光会员", systemImage: "crown.fill")
+                                .font(.caption2)
+                                .bold()
                                 .foregroundStyle(Theme.secondary)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .background(Capsule().fill(Theme.secondary.opacity(0.14)))
                         }
                     }
-                    Text(store.currentUser.bio)
+                    Text("@\(store.currentUser.userName)")
                         .font(.caption)
-                        .foregroundStyle(Theme.textSecondary)
-                    Text(store.currentUser.locationLabel)
-                        .font(.caption2)
                         .foregroundStyle(Theme.textSecondary)
                 }
                 Spacer()
                 creditRing
             }
 
+            HStack(spacing: 10) {
+                Button { showEdit = true } label: {
+                    Label("编辑资料", systemImage: "pencil")
+                        .font(.subheadline)
+                        .bold()
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(Capsule().fill(Theme.primary))
+                }
+                Button { showProtocol = true } label: {
+                    Label("查看主页", systemImage: "person")
+                        .font(.subheadline)
+                        .bold()
+                        .foregroundStyle(Theme.primary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(Capsule().stroke(Theme.primary, lineWidth: 1.2))
+                }
+            }
+
             HStack(spacing: 8) {
                 verificationButton(.student, label: "学生认证")
                 verificationButton(.realname, label: "实名认证")
-                if store.currentUser.verification != .none {
-                    Label(store.currentUser.verification.rawValue, systemImage: "checkmark.seal.fill")
-                        .font(.caption2)
-                        .foregroundStyle(Theme.primary)
-                }
             }
         }
         .padding(16)
@@ -211,6 +228,77 @@ struct MineView: View {
     }
 
     // MARK: - 技能档案
+
+    /// 技能双卡（我擅长 | 我想学，左右分栏）
+    private var skillsDualCard: some View {
+        HStack(alignment: .top, spacing: 0) {
+            skillHalf(title: "我擅长", subtitle: "（用于教他人）", icon: "video.fill",
+                      skills: store.currentUser.mySkills, accent: Theme.primary)
+            Divider()
+                .frame(height: 110)
+                .padding(.horizontal, 12)
+            skillHalf(title: "我想学", subtitle: "（用于匹配）", icon: "paintpalette.fill",
+                      skills: store.currentUser.wantSkills, accent: Theme.secondary)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 16).fill(Theme.cardBg))
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Theme.divider, lineWidth: 1))
+    }
+
+    private func skillHalf(title: String, subtitle: String, icon: String, skills: [SkillModel], accent: Color) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(title)
+                    .font(.subheadline)
+                    .bold()
+                    .foregroundStyle(Theme.textPrimary)
+                Text(subtitle)
+                    .font(.caption2)
+                    .foregroundStyle(Theme.textSecondary)
+                Spacer()
+                Button("编辑") { showEdit = true }
+                    .font(.caption)
+                    .foregroundStyle(Theme.primary)
+            }
+            HStack(spacing: 8) {
+                Image(systemName: icon)
+                    .font(.system(size: 14))
+                    .foregroundStyle(.white)
+                    .frame(width: 30, height: 30)
+                    .background(Circle().fill(accent))
+                if let first = skills.first {
+                    Text("\(first.skillName) · \(levelText(first.skillLevel))")
+                        .font(.caption)
+                        .bold()
+                        .foregroundStyle(Theme.textPrimary)
+                } else {
+                    Text("尚未添加")
+                        .font(.caption)
+                        .foregroundStyle(Theme.textSecondary)
+                }
+            }
+            if skills.isEmpty {
+                Text("去「编辑」完善技能档案")
+                    .font(.caption2)
+                    .foregroundStyle(Theme.textSecondary)
+            } else {
+                Text(skills.map { $0.skillName }.joined(separator: " / "))
+                    .font(.caption2)
+                    .foregroundStyle(Theme.textSecondary)
+                    .lineLimit(2)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func levelText(_ level: SkillLevel) -> String {
+        switch level {
+        case .beginner: return "Beginner"
+        case .skilled: return "熟练"
+        case .master: return "精通"
+        }
+    }
 
     private func skillSection(title: String, skills: [SkillModel], action: @escaping () -> Void) -> some View {
         VStack(alignment: .leading, spacing: 10) {

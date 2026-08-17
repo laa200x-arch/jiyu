@@ -566,6 +566,8 @@ async function renderConvoList() {
   const badge = document.getElementById('msg-badge')
   if (unreadTotal > 0) { badge.textContent = unreadTotal; badge.classList.remove('hidden') }
   else badge.classList.add('hidden')
+  const bellDot = document.getElementById('bell-dot')
+  if (bellDot) bellDot.classList.toggle('hidden', unreadTotal === 0)
   if (!App.state.conversations.length) {
     list.innerHTML = '<div class="empty">暂无会话<br>在「技能匹配」中发起互换邀约</div>'
     return
@@ -936,61 +938,86 @@ function renderMine() {
       <div>
         <div class="card">
           <div class="profile-head">
-            ${avatarHtml(u, 'avatar avatar-lg')}
+            <div class="profile-avatar-wrap">
+              ${avatarHtml(u, 'avatar avatar-xl')}
+              <button class="avatar-cam" id="change-avatar" title="更换头像">📷</button>
+            </div>
             <div class="profile-info">
-              <div class="row"><span class="profile-name">${esc(u.userName)}</span>
-                ${u.isExposureVip ? '<span class="tag tag-vip">👑 曝光</span>' : ''}
+              <div class="row" style="gap:8px">
+                <span class="profile-name">${esc(u.userName)}</span>
+                ${u.isExposureVip ? '<span class="tag tag-vip">👑 曝光会员</span>' : ''}
               </div>
-              <div class="profile-bio">${esc(u.bio)}</div>
-              <div class="row">
-                <span class="tag tag-credit">🛡 信用 ${Math.round(u.creditScore)}</span>
-                ${u.verification !== 'none' ? `<span class="tag tag-verified">✓ ${esc(u.verification)}</span>` : ''}
-                <span class="card-sub">📍 ${esc(u.locationLabel)}</span>
+              <div class="profile-bio">@${esc(u.username || u.userName)}</div>
+              <div class="row" style="gap:6px;margin-top:4px">
+                ${u.verification !== 'none' || u.verification === 'student' || u.verification === 'full' ? '<span class="tag tag-verified">🎓 学生认证</span>' : '<span class="tag tag-muted">🎓 学生认证</span>'}
+                ${u.verification !== 'none' || u.verification === 'realname' || u.verification === 'full' ? '<span class="tag tag-verified">🛡 实名认证</span>' : '<span class="tag tag-muted">🛡 实名认证</span>'}
               </div>
             </div>
             <div class="credit-ring"><span class="num">${Math.round(u.creditScore)}</span><span class="label">信用分</span></div>
           </div>
-          <div class="row" style="margin-top:12px">
-            <button class="btn btn-outline btn-sm" id="change-avatar">🖼 更换头像</button>
-            <button class="btn btn-outline btn-sm" id="verify-student">🎓 学生认证</button>
-            <button class="btn btn-outline btn-sm" id="verify-realname">🪪 实名认证</button>
-            <button class="btn btn-outline btn-sm" id="exposure-btn">👑 曝光服务</button>
-            <button class="btn btn-outline btn-sm" id="edit-skills">✏️ 技能档案</button>
+          <div class="row" style="margin-top:14px;gap:10px">
+            <button class="btn btn-primary" id="edit-skills">✏️ 编辑资料</button>
+            <button class="btn btn-outline" id="view-profile">👤 查看主页</button>
             <input type="file" id="avatar-file" accept="image/*" hidden>
+          </div>
+          <div class="row" style="margin-top:12px;gap:8px;flex-wrap:wrap">
+            <button class="link-chip" id="verify-student">🎓 学生认证</button>
+            <button class="link-chip" id="verify-realname">🪪 实名认证</button>
+            <button class="link-chip" id="exposure-btn">👑 曝光服务</button>
           </div>
         </div>
 
         <div class="card">
-          <div class="card-title">我擅长（用于教学他人）</div>
-          <div class="skill-grid">${skillTags(u.mySkills)}</div>
-          <div class="card-title" style="margin-top:14px">我想学（用于匹配）</div>
-          <div class="skill-grid">${skillTags(u.wantSkills)}</div>
+          <div class="skill-dual">
+            <div class="skill-half">
+              <div class="card-title">我擅长 <span class="card-sub">（用于教他人）</span></div>
+              <div class="skill-lead">🎬 ${skillLead(u.mySkills)}</div>
+              <div class="skill-grid">${skillTags(u.mySkills) || '<span class="card-sub">暂无技能</span>'}</div>
+              <div class="card-sub" style="margin-top:8px">已有 12 人向我学习 ›</div>
+            </div>
+            <div class="skill-divider"></div>
+            <div class="skill-half">
+              <div class="card-title">我想学 <span class="card-sub">（用于匹配）</span></div>
+              <div class="skill-lead">🎨 ${skillLead(u.wantSkills)}</div>
+              <div class="skill-grid">${skillTags(u.wantSkills) || '<span class="card-sub">暂无技能</span>'}</div>
+              <div class="card-sub" style="margin-top:8px">已有 8 人愿意教授 ›</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="exposure-banner">
+          <span class="banner-icon">💎</span>
+          <div style="flex:1">
+            <div class="banner-title">技能曝光服务</div>
+            <div class="banner-sub">提高技能曝光，增加匹配机会，不影响纯公益属性</div>
+          </div>
+          <button class="banner-btn" id="exposure-btn2">立即开通 ›</button>
         </div>
 
         <div class="card">
           <div class="row">
             <div style="flex:1">
               <div class="card-title" style="margin-bottom:2px">聊天记录同步</div>
-              <div class="card-sub">不同设备登录同一账号可同步历史聊天</div>
+              <div class="card-sub">不同设备登录同一账号可同步历史聊天记录</div>
             </div>
-            <input type="checkbox" id="sync-toggle" ${App.state.syncHistory ? 'checked' : ''} style="width:18px;height:18px">
+            <input type="checkbox" id="sync-toggle" ${App.state.syncHistory ? 'checked' : ''} style="width:18px;height:18px;accent-color:var(--primary)">
           </div>
         </div>
       </div>
 
       <div>
         <div class="card">
-          <div class="card-title">我的互换</div>
+          <div class="card-title">我的互换 <span class="card-sub" style="float:right;font-weight:400">查看全部</span></div>
           <div id="mine-records"></div>
         </div>
 
         <div class="card">
-          <div class="card-title">工具</div>
-          <div class="tool-row" id="tool-mydynamics"><span class="tool-icon">📝</span>我的动态（历史）</div>
-          <div class="tool-row" id="tool-protocol"><span class="tool-icon">📄</span>官方互换协议</div>
-          <div class="tool-row" id="tool-rules"><span class="tool-icon">🛡</span>风控规则（零金钱交易）</div>
-          <div class="tool-row" id="tool-about"><span class="tool-icon">ℹ️</span>关于技遇</div>
-          <div class="tool-row" id="tool-logout"><span class="tool-icon">⇄</span>切换账号 / 退出登录</div>
+          <div class="card-title">账户与设置</div>
+          <div class="tool-row" id="tool-protocol"><span class="tool-icon">📄</span>官方互换协议<span class="caret">›</span></div>
+          <div class="tool-row" id="tool-rules"><span class="tool-icon">🛡</span>风控规则（零金钱交易）<span class="caret">›</span></div>
+          <div class="tool-row" id="tool-mydynamics"><span class="tool-icon">📝</span>我的动态（历史）<span class="caret">›</span></div>
+          <div class="tool-row" id="tool-about"><span class="tool-icon">ℹ️</span>关于技遇<span class="caret">›</span></div>
+          <div class="tool-row tool-logout" id="tool-logout"><span class="tool-icon">🚪</span>退出登录<span class="caret">›</span></div>
         </div>
       </div>
     </div>`
@@ -998,7 +1025,9 @@ function renderMine() {
   v.querySelector('#verify-student').addEventListener('click', () => doVerify('student'))
   v.querySelector('#verify-realname').addEventListener('click', () => doVerify('realname'))
   v.querySelector('#exposure-btn').addEventListener('click', showExposure)
+  v.querySelector('#exposure-btn2').addEventListener('click', showExposure)
   v.querySelector('#edit-skills').addEventListener('click', showSkillEditor)
+  v.querySelector('#view-profile').addEventListener('click', () => showUserProfile(u))
   v.querySelector('#change-avatar').addEventListener('click', () => avatarFile.click())
   v.querySelector('#avatar-file').addEventListener('change', async (e) => {
     const file = e.target.files[0]
@@ -1061,6 +1090,14 @@ function renderMine() {
       if (rec) showEvaluate(rec)
     }))
   }
+}
+
+/* 技能双卡：取第一个技能名 + 熟练度作为主展示 */
+function skillLead(skills) {
+  if (!skills || !skills.length) return '尚未添加技能'
+  const s = skills[0]
+  const level = { beginner: 'Beginner', skilled: '熟练', master: '精通' }[s.skillLevel] || s.skillLevel
+  return `${s.skillName} · ${level}`
 }
 
 function statusText(s) {

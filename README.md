@@ -85,7 +85,7 @@ node tools/release-win.mjs --tag win-v1.1.0 --name "技遇 Windows v1.1.0" \
 
 | 方案章节 | 模块 | 落地文件 |
 |---|---|---|
-| 2.1 设计风格 | 浅青蓝主色 / 暖白 / 淡橙 / 极简 iOS 风格 | `Jiyu/Support/Theme.swift` |
+| 2.1 设计风格 | 紫罗兰主色 / 浅紫灰背景 / 暖橙强调 / 现代卡片+胶囊风 / 桌面侧边栏 | `Jiyu/Support/Theme.swift` |
 | 2.2 五大模块 | 技能主页 / 双向匹配 / 线上线下交换 / 协议评价 / 风控 | 全部视图 |
 | 2.3.1 技能档案 | 我擅长 / 我想学 / 熟练度 / 交换方式 / 学生+实名认证 | `Models/SkillModel.swift`、`ProfileEditView.swift`、`MineView.swift` |
 | 2.3.2 双向匹配 | 双向交集算法 / 距离 / 类型 / 信用过滤 / VIP 加权排序 | `Core/SkillMatchManager.swift`、`MatchHomeView.swift` |

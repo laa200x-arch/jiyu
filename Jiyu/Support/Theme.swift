@@ -1,38 +1,38 @@
 import SwiftUI
 
-/// 设计系统（方案 2.1：浅青蓝主色 + 暖白/浅灰/淡橙辅助色，iOS 原生极简风格）
+/// 设计系统（紫色主题：主色紫罗兰 + 暖橙强调 + 浅紫灰背景，现代卡片风）
+/// 参考：主色 #6C5CE7 / 背景 #F5F6FC / 卡片纯白 / 强调橙 / 成功绿 / 大圆角胶囊
 enum Theme {
-    /// 主色：浅青蓝（代表成长、交换）
-    static let primary = Color(red: 0.20, green: 0.70, blue: 0.80)
-    /// 辅助色：淡橙（曝光/亮点）
-    static let secondary = Color(red: 0.95, green: 0.62, blue: 0.38)
-    /// 暖白背景
-    static let bg = Color(red: 0.98, green: 0.98, blue: 0.97)
-    /// 卡片底色
+    /// 主色：紫罗兰（主按钮、选中态、认证图标、信用环）
+    static let primary = Color(red: 0.42, green: 0.36, blue: 0.91)   // #6C5CE7
+    /// 深紫（渐变/头像底）
+    static let primaryDeep = Color(red: 0.45, green: 0.34, blue: 0.98) // #7257FA
+    /// 辅助色：暖橙（曝光/亮点/兴趣标签）
+    static let secondary = Color(red: 0.96, green: 0.62, blue: 0.04)  // #F59E0B
+    /// 浅紫灰背景
+    static let bg = Color(red: 0.96, green: 0.965, blue: 0.988)       // #F5F6FC
+    /// 卡片底色（纯白）
     static let cardBg = Color.white
-    static let textPrimary = Color(red: 0.13, green: 0.16, blue: 0.19)
-    static let textSecondary = Color(red: 0.45, green: 0.50, blue: 0.55)
-    static let divider = Color(red: 0.92, green: 0.93, blue: 0.94)
-    static let success = Color(red: 0.30, green: 0.75, blue: 0.45)
-    static let warning = Color(red: 0.95, green: 0.62, blue: 0.30)
-    static let danger = Color(red: 0.90, green: 0.35, blue: 0.35)
+    static let textPrimary = Color(red: 0.12, green: 0.16, blue: 0.22)   // #1F2937
+    static let textSecondary = Color(red: 0.42, green: 0.45, blue: 0.50) // #6B7280
+    static let divider = Color(red: 0.93, green: 0.94, blue: 0.97)      // #EEF0F6
+    static let success = Color(red: 0.13, green: 0.77, blue: 0.37)      // #22C55E
+    static let warning = Color(red: 0.96, green: 0.62, blue: 0.04)      // #F59E0B
+    static let danger = Color(red: 0.94, green: 0.27, blue: 0.27)       // #EF4444
 
     /// 品牌渐变（头像/横幅）
     static let gradient = LinearGradient(
-        colors: [
-            Color(red: 0.20, green: 0.78, blue: 0.85),
-            Color(red: 0.25, green: 0.55, blue: 0.85)
-        ],
+        colors: [primaryDeep, primary],
         startPoint: .topLeading,
         endPoint: .bottomTrailing
     )
 
-    /// 熟练度 → 颜色（入门=橙 / 熟练=青蓝 / 精通=紫）
+    /// 熟练度 → 颜色（入门=橙 / 熟练=紫 / 精通=深紫）
     static func levelColor(_ level: SkillLevel) -> Color {
         switch level {
         case .beginner: return secondary
         case .skilled: return primary
-        case .master: return Color(red: 0.55, green: 0.40, blue: 0.90)
+        case .master: return primaryDeep
         }
     }
 }

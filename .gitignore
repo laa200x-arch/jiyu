@@ -35,3 +35,5 @@ server/.env
 # Windows ×ÀÃæ°æ
 win-app/node_modules/
 win-app/dist/
+
+.dsh-vision-toolkit/

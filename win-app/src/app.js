@@ -133,6 +133,8 @@ function hide(el) { el.classList.add('hidden') }
 /* ---------- 登录成功后的进入流程 ---------- */
 function afterEnterApp() {
   document.getElementById('topbar-user-name').textContent = App.state.user.userName
+  const av = document.getElementById('topbar-avatar')
+  av.innerHTML = avatarHtml(App.state.user, 'avatar avatar-sm')
   switchView('match')
   // 版本检查
   checkVersion()
@@ -175,12 +177,24 @@ function bindTabs() {
   document.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', () => {
     switchView(t.dataset.view)
   }))
+  // 顶栏：用户下拉菜单
+  document.getElementById('user-menu').addEventListener('click', (e) => {
+    e.stopPropagation()
+    document.getElementById('user-dropdown').classList.toggle('hidden')
+  })
+  document.addEventListener('click', () => {
+    document.getElementById('user-dropdown').classList.add('hidden')
+  })
   document.getElementById('logout-btn').addEventListener('click', () => {
     if (confirm('退出当前账号？退出后可在登录页一键切换其他账号')) {
       logout()
       switchView('login')
     }
   })
+  // 顶栏：消息铃铛 → 跳转消息
+  document.getElementById('bell-btn').addEventListener('click', () => switchView('message'))
+  // 侧边栏：曝光推广卡 → 跳转「我的」
+  document.getElementById('promo-btn').addEventListener('click', () => switchView('mine'))
 }
 
 /* ---------- 启动 ---------- */
