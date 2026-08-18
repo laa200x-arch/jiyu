@@ -147,20 +147,80 @@ struct MiniAppsView: View {
     }
 }
 
-/// 小程序运行页（WKWebView 沙箱加载 HTML 内容）
+/// 小程序运行页（WKWebView 沙箱加载 HTML 内容 + 排行榜 + 分数上报桥接）
 struct MiniAppRunView: View {
     @Environment(\.dismiss) private var dismiss
     let app: MiniApp
     @State private var htmlContent: String?
+    @State private var scores: [ScoreEntry] = []
+    @State private var scoreLoaded = false
 
     var body: some View {
         NavigationStack {
-            Group {
-                if let htmlContent {
-                    MiniAppWebView(html: htmlContent)
-                } else {
-                    ProgressView("加载中…")
+            VStack(spacing: 0) {
+                Group {
+                    if let htmlContent {
+                        MiniAppWebView(html: htmlContent, scoreHandler: { score in
+                            Task {
+                                let name = MockDataStore.shared.currentUser.userName
+                                try? await APIClient.shared.submitScore(appId: app.id, score: score, playerName: name)
+                                await loadScores()
+                            }
+                        })
+                    } else {
+                        ProgressView("加载中…")
+                    }
                 }
+                .frame(maxHeight: .infinity)
+
+                // 排行榜
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text("🏆 排行榜")
+                            .font(.subheadline)
+                            .bold()
+                            .foregroundStyle(Theme.textPrimary)
+                        Spacer()
+                        Button {
+                            Task { await loadScores() }
+                        } label: {
+                            Image(systemName: "arrow.clockwise")
+                                .font(.caption)
+                                .foregroundStyle(Theme.primary)
+                        }
+                    }
+                    if !scoreLoaded {
+                        Text("加载中…")
+                            .font(.caption2)
+                            .foregroundStyle(Theme.textSecondary)
+                    } else if scores.isEmpty {
+                        Text("暂无排行，玩一局即可上榜")
+                            .font(.caption2)
+                            .foregroundStyle(Theme.textSecondary)
+                    } else {
+                        ForEach(scores.prefix(10)) { s in
+                            HStack(spacing: 10) {
+                                Text(s.rank <= 3 ? ["🥇", "🥈", "🥉"][s.rank - 1] : "\(s.rank)")
+                                    .font(.subheadline)
+                                    .frame(width: 22)
+                                Text(s.playerName)
+                                    .font(.caption)
+                                    .lineLimit(1)
+                                Spacer()
+                                Text("\(s.score)")
+                                    .font(.caption)
+                                    .bold()
+                                    .foregroundStyle(Theme.primary)
+                            }
+                        }
+                    }
+                }
+                .padding(12)
+                .background(RoundedRectangle(cornerRadius: 14).fill(Theme.cardBg))
+                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.divider, lineWidth: 1))
+                .padding(.horizontal, 12)
+                .padding(.bottom, 8)
+                .frame(maxHeight: 220)
             }
             .navigationTitle("▶ \(app.name)")
             .navigationBarTitleDisplayMode(.inline)
@@ -178,18 +238,49 @@ struct MiniAppRunView: View {
                         htmlContent = "<body style='font-family:sans-serif;text-align:center;padding-top:80px;color:#888'>加载失败，请稍后重试</body>"
                     }
                 }
+                await loadScores()
             }
         }
     }
+
+    private func loadScores() async {
+        do {
+            scores = try await APIClient.shared.fetchScores(appId: app.id)
+        } catch {
+            scores = []
+        }
+        scoreLoaded = true
+    }
 }
 
-/// WKWebView 桥接（SwiftUI）
+/// WKWebView 桥接（SwiftUI；注册 jiyuScore 消息处理器接收小程序分数上报）
 struct MiniAppWebView: UIViewRepresentable {
     let html: String
+    let scoreHandler: (Int) -> Void
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(scoreHandler: scoreHandler)
+    }
 
     func makeUIView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
         config.allowsInlineMediaPlayback = true
+        // 桥接：小程序内 window.parent.postMessage({type:'jiyuScore', score})
+        // → WKWebView 转发到 messageHandlers.jiyuScore → 原生提交排行榜
+        let bridge = WKUserScript(source: """
+        (function(){
+          if (!window.parent) return;
+          var orig = window.parent.postMessage.bind(window.parent);
+          window.parent.postMessage = function(data, origin){
+            if (data && data.type === 'jiyuScore') {
+              try { window.webkit.messageHandlers.jiyuScore.postMessage(data); } catch(e) {}
+            }
+            orig(data, origin);
+          };
+        })();
+        """, injectionTime: .atDocumentStart, forMainFrameOnly: true)
+        config.userContentController.addUserScript(bridge)
+        config.userContentController.add(context.coordinator, name: "jiyuScore")
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.isOpaque = false
         webView.backgroundColor = .white
@@ -198,4 +289,17 @@ struct MiniAppWebView: UIViewRepresentable {
     }
 
     func updateUIView(_ uiView: WKWebView, context: Context) {}
+
+    final class Coordinator: NSObject, WKScriptMessageHandler {
+        let scoreHandler: (Int) -> Void
+        init(scoreHandler: @escaping (Int) -> Void) {
+            self.scoreHandler = scoreHandler
+        }
+        func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+            guard message.name == "jiyuScore",
+                  let body = message.body as? [String: Any],
+                  let score = body["score"] as? Int else { return }
+            scoreHandler(score)
+        }
+    }
 }

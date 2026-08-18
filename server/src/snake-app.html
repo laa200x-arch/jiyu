@@ -45,7 +45,7 @@
     <span>得分 <span class="score" id="score">0</span></span>
     <button class="btn" id="btn">开始</button>
   </div>
-  <div class="hint">撞墙或撞到自己游戏结束 · 速度随长度提升</div>
+  <div class="hint">先点击游戏画面获得键盘焦点 · 方向键 / 滑动控制 · 撞墙或撞到自己结束</div>
   <div class="over" id="over">
     <div class="over-card">
       <div class="t">💀 游戏结束</div>
@@ -107,6 +107,8 @@
     running = false; clearInterval(timer)
     finalEl.textContent = '得分 ' + score
     over.classList.add('show')
+    // 上报分数给宿主（小程序桥接：宿主监听 postMessage 提交排行榜）
+    try { window.parent.postMessage({ type: 'jiyuScore', score: score }, '*') } catch (e) { /* 独立打开时忽略 */ }
   }
   document.addEventListener('keydown', function (e) {
     var k = e.key

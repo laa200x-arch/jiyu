@@ -152,7 +152,7 @@ export function chatRouter(db, bus = { io: null }) {
       }
       orderPreview = `[订单] ${order.service_name} ¥${order.price_yuan}`
     }
-    const preview = orderPreview || content || (mediaType === 'video' ? '[视频]' : mediaType === 'audio' ? '[语音]' : '[图片]')
+    const preview = orderPreview || content || (mediaType === 'video' ? '[视频]' : mediaType === 'audio' ? '[语音]' : mediaType === 'location' ? '[位置]' : '[图片]')
     // 宠物订单会话（消息携带 orderId）：放行协商词（接单/价格/佣金等），仍拦截真实金钱交易词
     const risk = checkTextRisk(content, { allowPetOrderWords: !!orderRef })
     if (risk.isIllegal) {

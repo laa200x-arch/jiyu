@@ -399,6 +399,15 @@ struct MiniAppsResponse: Decodable { let apps: [MiniApp] }
 struct MiniAppResponse: Decodable { let app: MiniApp }
 extension MiniApp: Identifiable {}
 
+/// 小程序排行榜条目
+struct ScoreEntry: Decodable, Identifiable {
+    let rank: Int
+    let playerName: String
+    let score: Int
+    var id: Int { rank }
+}
+struct ScoresResponse: Decodable { let scores: [ScoreEntry] }
+
 // MARK: - DTO → 本地模型映射
 
 extension SkillModel {

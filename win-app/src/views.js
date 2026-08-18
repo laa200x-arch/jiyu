@@ -34,8 +34,8 @@ function toast(msg) {
 }
 function openModal(html, onMount) {
   const box = document.getElementById('modal-box')
-  // 全局注入右上角关闭按钮（每个弹窗都有 ×）；data-close 由全局事件委托处理（CSP 禁 inline onclick）
-  box.innerHTML = `<button class="modal-close" data-close title="关闭">✕</button>` + html
+  // × 按钮固定在弹窗头部（不随内容滚动）；内容放入独立滚动区
+  box.innerHTML = `<button class="modal-close" data-close title="关闭">✕</button><div class="modal-scroll">${html}</div>`
   document.getElementById('modal-mask').classList.remove('hidden')
   if (onMount) onMount(box)
 }
@@ -64,6 +64,13 @@ function bindGlobalDelegates() {
     if (vid) return openFullscreen(`<video src="${vid.dataset.video}" controls autoplay></video>`)
     const au = e.target.closest('[data-audio]')
     if (au) return playAudio(au.dataset.audio)
+    const loc = e.target.closest('[data-lat]')
+    if (loc) {
+      const lat = loc.dataset.lat
+      const lng = loc.dataset.lng
+      const win = window.open('', '_blank')
+      if (win) win.location = `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=16/${lat}/${lng}`
+    }
   })
 }
 function openFullscreen(html) {
@@ -635,9 +642,9 @@ function bindUserSearch() {
                 <div class="card-sub">${esc(u.bio || u.locationLabel || '暂无简介')}</div>
               </div>
               <span class="tag tag-credit">${Math.round(u.creditScore)}分</span>
+              <button class="btn btn-primary btn-sm" data-chat="${u.id}">💬 私信</button>
             </div>`).join('')
-          res.querySelectorAll('.search-item[data-uid]').forEach((el) => el.addEventListener('click', async () => {
-            const uid = el.dataset.uid
+          const openChat = async (uid) => {
             res.classList.add('hidden')
             input.value = ''
             try {
@@ -646,7 +653,12 @@ function bindUserSearch() {
               const conv = App.state.conversations.find((c) => c.id === open.conversation.id)
               if (conv) showChat(conv)
             } catch (e) { toast('打开会话失败：' + e.message) }
+          }
+          res.querySelectorAll('[data-chat]').forEach((el) => el.addEventListener('click', (e) => {
+            e.stopPropagation()
+            openChat(el.dataset.chat)
           }))
+          res.querySelectorAll('.search-item[data-uid]').forEach((el) => el.addEventListener('click', () => openChat(el.dataset.uid)))
         }
         res.classList.remove('hidden')
       } catch (e) { /* 静默 */ }
@@ -752,6 +764,16 @@ function messageHtml(m) {
     media = `<div class="msg-media-card" data-video="${mediaUrl(m.mediaUrl)}">▶ 播放视频</div>`
   } else if (m.mediaType === 'audio' && m.mediaUrl) {
     media = `<div class="msg-media-card" data-audio="${mediaUrl(m.mediaUrl)}">🔊 语音消息</div>`
+  } else if (m.mediaType === 'location' && m.mediaUrl) {
+    const [lat, lng] = String(m.mediaUrl).split(',').map((s) => s.trim())
+    media = `<div class="msg-location-card" data-lat="${esc(lat)}" data-lng="${esc(lng)}">
+      <div class="location-icon">📍</div>
+      <div style="flex:1;min-width:0">
+        <div class="location-name">${esc(m.text || '我的位置')}</div>
+        <div class="card-sub">${esc(lat)}, ${esc(lng)} · 点击查看地图</div>
+      </div>
+      <span class="location-arrow">↗</span>
+    </div>`
   }
   const orderCard = m.orderId
     ? `<div class="msg-order-card" data-order-id="${esc(m.orderId)}"><span class="card-sub">订单卡片加载中…</span></div>`
@@ -782,6 +804,7 @@ function buildChatInput(conv) {
   return `
     <div class="chat-tools">
       <button class="icon-btn" id="ci-order" title="引用订单卡片">🧾</button>
+      <button class="icon-btn" id="ci-location" title="发送我的位置">📍</button>
       <button class="icon-btn" id="ci-image" title="发送图片">🖼</button>
       <button class="icon-btn" id="ci-video" title="发送视频">🎬</button>
       <button class="icon-btn" id="ci-camera" title="拍照发送">📷</button>
@@ -853,6 +876,22 @@ function bindChatInput(conv) {
   })
   sendBtn.addEventListener('click', send)
   document.getElementById('ci-order').addEventListener('click', () => showOrderPicker(conv))
+  // 发送我的位置（📍）：获取定位 → 发送 location 消息
+  document.getElementById('ci-location').addEventListener('click', () => {
+    if (!navigator.geolocation) return toast('当前环境不支持定位')
+    toast('正在获取位置…')
+    navigator.geolocation.getCurrentPosition(async (pos) => {
+      const lat = pos.coords.latitude.toFixed(6)
+      const lng = pos.coords.longitude.toFixed(6)
+      try {
+        const r = await sendMessageRest(conv.id, '我的位置', 'location', `${lat},${lng}`)
+        if (r.blocked) return toast('发送失败')
+        const list = (await loadMessages(conv.id)).messages
+        App.state.messages[conv.id] = list.map((m) => normalizeMessage(m, m.senderIsMe))
+        renderMessages(conv)
+      } catch (e) { toast('位置发送失败：' + e.message) }
+    }, () => toast('定位失败，请检查系统定位权限'), { timeout: 10000, maximumAge: 60000 })
+  })
 
   document.getElementById('ci-image').addEventListener('click', () => fileImage.click())
   document.getElementById('ci-video').addEventListener('click', () => fileVideo.click())
@@ -1451,7 +1490,7 @@ function showMiniApps() {
       <button class="btn btn-primary btn-sm" id="ma-publish">📤 发布</button>
     </div>
     <div id="ma-list"><div class="empty"><div class="empty-icon">⏳</div>加载中…</div></div>
-    <div class="card-sub" style="margin-top:8px">格式：单文件自包含 HTML（内联样式/脚本，无外链）· ≤ 512KB · 沙箱运行</div>`,
+    <div class="card-sub" style="margin-top:8px">格式：单文件自包含 HTML（内联样式/脚本，无外链）· ≤ 5MB · 沙箱运行</div>`,
     async (box) => {
       const listEl = box.querySelector('#ma-list')
       const search = box.querySelector('#ma-search')
@@ -1495,7 +1534,7 @@ function showMiniApps() {
     })
 }
 
-/** 运行小程序（沙箱 iframe：仅允许脚本，禁外链/导航/弹窗） */
+/** 运行小程序（沙箱 iframe：仅允许脚本，禁外链/导航/弹窗；支持全屏与分数上报） */
 async function runMiniApp(id) {
   try {
     const data = await fetchAppDetail(id)
@@ -1503,12 +1542,62 @@ async function runMiniApp(id) {
     if (!app || !app.htmlContent) return toast('小程序内容为空')
     openModal(`
       <div class="modal-title">▶ ${esc(app.name)} <span class="card-sub">by ${esc(app.authorName)}</span></div>
-      <iframe id="ma-frame" sandbox="allow-scripts" style="width:100%;height:520px;border:1px solid var(--divider);border-radius:12px;background:#fff"></iframe>
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <button class="btn btn-outline btn-sm" id="ma-fullscreen">⛶ 全屏</button>
+        <button class="btn btn-outline btn-sm" id="ma-refresh-scores">🏆 刷新榜单</button>
+      </div>
+      <iframe id="ma-frame" sandbox="allow-scripts" allowfullscreen
+        style="width:100%;height:min(540px,60vh);border:1px solid var(--divider);border-radius:12px;background:#fff"></iframe>
+      <div id="ma-scores" style="margin-top:10px"><div class="card-sub">🏆 排行榜加载中…</div></div>
       <div class="modal-actions"><button class="btn btn-outline" data-close>关闭</button></div>`)
     const frame = document.getElementById('ma-frame')
     frame.srcdoc = app.htmlContent
+    renderScores(id)
+    // 全屏运行
+    document.getElementById('ma-fullscreen').addEventListener('click', () => {
+      if (frame.requestFullscreen) frame.requestFullscreen().catch(() => toast('全屏被浏览器拦截，可点击右上角 × 缩放窗口'))
+    })
+    // 分数上报桥接：小程序内 postMessage({type:'jiyuScore', score}) → 提交排行榜
+    window.addEventListener('message', (e) => {
+      if (e.data && e.data.type === 'jiyuScore' && typeof e.data.score === 'number') {
+        submitScore(id, e.data.score)
+      }
+    })
+    document.getElementById('ma-refresh-scores').addEventListener('click', () => renderScores(id))
   } catch (e) {
     toast('加载失败：' + e.message)
+  }
+}
+
+/** 提交分数（小程序 postMessage 上报）并刷新榜单 */
+async function submitScore(appId, score) {
+  try {
+    await api(`/api/apps/${appId}/score`, { method: 'POST', body: { score, playerName: App.state.user.userName } })
+    renderScores(appId)
+    toast(`🏆 得分 ${score} 已上榜`)
+  } catch (e) { /* 静默 */ }
+}
+
+/** 渲染小程序排行榜（top 10） */
+async function renderScores(appId) {
+  const el = document.getElementById('ma-scores')
+  if (!el) return
+  try {
+    const data = await api(`/api/apps/${appId}/scores`)
+    const scores = data.scores || []
+    if (!scores.length) {
+      el.innerHTML = '<div class="card-sub">🏆 暂无排行，玩一局即可上榜</div>'
+      return
+    }
+    el.innerHTML = `<div class="card-sub" style="margin-bottom:6px">🏆 排行榜</div>` + scores.slice(0, 10).map((s) => `
+      <div class="score-row">
+        <span class="score-rank">${s.rank <= 3 ? '🥇🥈🥉'[s.rank - 1] : s.rank}</span>
+        <span class="score-name">${esc(s.playerName)}</span>
+        <span class="spacer"></span>
+        <b style="color:var(--primary)">${s.score}</b>
+      </div>`).join('')
+  } catch (e) {
+    el.innerHTML = '<div class="card-sub">🏆 排行加载失败</div>'
   }
 }
 
@@ -1525,14 +1614,14 @@ function showMiniAppPublish() {
       <button class="btn btn-outline" data-close>取消</button>
       <button class="btn btn-primary" id="mp-submit">发布</button>
     </div>
-    <p class="hint">格式要求：单文件自包含 HTML（CSS/JS 内联），禁止外链脚本/样式/iframe，≤ 512KB，沙箱运行</p>`,
+    <p class="hint">格式要求：单文件自包含 HTML（CSS/JS 内联），禁止外链脚本/样式/iframe，≤ 5MB，沙箱运行</p>`,
     (box) => {
       const err = box.querySelector('#mp-err')
       box.querySelector('#mp-file').addEventListener('change', (e) => {
         const file = e.target.files[0]
         if (!file) return
         if (!file.name.toLowerCase().endsWith('.html')) return show(err, '仅支持 .html 文件')
-        if (file.size > 512 * 1024) return show(err, '文件不能超过 512KB')
+        if (file.size > 5 * 1024 * 1024) return show(err, '文件不能超过 5MB')
         box.querySelector('#mp-submit').dataset.file = file.name
       })
       box.querySelector('#mp-submit').addEventListener('click', async () => {

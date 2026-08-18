@@ -1,14 +1,15 @@
 /**
  * 小程序市场路由（消息页下拉进入）
- * - 格式：单个自包含 HTML 文件（内联 CSS/JS，无外部依赖/网络请求，≤ 512KB）
+ * - 格式：单个自包含 HTML 文件（内联 CSS/JS，无外部依赖/网络请求，≤ 5MB）
  * - 发布：登录用户上传 name + description + htmlContent
  * - 浏览：列表（关键字搜索）+ 详情（htmlContent 供沙箱运行）
+ * - 排行：小程序内通过 postMessage 上报分数，宿主调用排行榜 API（top 20）
  */
 import { Router } from 'express'
 import { requireAuth } from '../middleware.js'
 import { checkTextRisk } from '../risk.js'
 
-const MAX_APP_KB = 512 // 小程序 HTML 上限（KB）
+const MAX_APP_KB = 5 * 1024 // 小程序 HTML 上限（5MB）
 
 export function appsRouter(db) {
   const router = Router()
@@ -102,6 +103,51 @@ export function appsRouter(db) {
     const r = db.run('DELETE FROM apps WHERE id = ? AND user_id = ?', [req.params.id, req.userId])
     if (r.changes === 0) return res.status(404).json({ error: '小程序不存在或无权删除' })
     res.json({ ok: true })
+  })
+
+  // 提交分数（小程序内 postMessage → 宿主调用；仅保留个人最高分）
+  router.post('/apps/:id/score', (req, res) => {
+    const app = db.get('SELECT id FROM apps WHERE id = ?', [req.params.id])
+    if (!app) return res.status(404).json({ error: '小程序不存在' })
+    const score = Number(req.body?.score)
+    const playerName = String(req.body?.playerName || '').trim().slice(0, 20) || '匿名'
+    if (!Number.isFinite(score) || score < 0 || score > 999999999) {
+      return res.status(400).json({ error: '分数不合法' })
+    }
+    const risk = checkTextRisk(playerName)
+    if (risk.isIllegal) return res.status(403).json({ error: risk.warning })
+    // 同用户同小程序只保留最高分（未登录按 playerName 去重）
+    const key = req.userId ? `user:${req.userId}` : `name:${playerName}`
+    const existing = db.get('SELECT * FROM app_scores WHERE app_id = ? AND player_name = ?', [app.id, playerName])
+    if (existing) {
+      if (score > existing.score) {
+        db.run('UPDATE app_scores SET score = ?, created_at = ? WHERE id = ?', [score, now(), existing.id])
+      }
+    } else {
+      db.run(
+        'INSERT INTO app_scores (app_id, user_id, player_name, score, created_at) VALUES (?,?,?,?,?)',
+        [app.id, req.userId || null, playerName, score, now()]
+      )
+    }
+    res.json({ ok: true })
+  })
+
+  // 排行榜（top 20）
+  router.get('/apps/:id/scores', (req, res) => {
+    const app = db.get('SELECT id FROM apps WHERE id = ?', [req.params.id])
+    if (!app) return res.status(404).json({ error: '小程序不存在' })
+    const rows = db.all(
+      'SELECT player_name, score, created_at FROM app_scores WHERE app_id = ? ORDER BY score DESC, id ASC LIMIT 20',
+      [app.id]
+    )
+    res.json({
+      scores: rows.map((row, i) => ({
+        rank: i + 1,
+        playerName: row.player_name,
+        score: row.score,
+        createdAt: row.created_at
+      }))
+    })
   })
 
   return router

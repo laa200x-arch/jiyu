@@ -331,6 +331,16 @@ final class APIClient {
         return response.app
     }
 
+    func fetchScores(appId: String) async throws -> [ScoreEntry] {
+        let response: ScoresResponse = try await request("/api/apps/\(appId)/scores")
+        return response.scores
+    }
+
+    func submitScore(appId: String, score: Int, playerName: String) async throws {
+        let _: OkResponse = try await request("/api/apps/\(appId)/score", method: "POST",
+            body: ["score": score, "playerName": playerName])
+    }
+
     // MARK: - 档案
 
     /// 更新资料（支持昵称/简介/位置/自定义头像）

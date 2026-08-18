@@ -3,6 +3,7 @@ import PhotosUI
 import UniformTypeIdentifiers
 import AVKit
 import AVFoundation
+import CoreLocation
 
 /// 消息列表（方案 2.3.3 线上交换：内置 IM）
 /// 顶部：好友搜索 + 小程序市场入口
@@ -164,9 +165,18 @@ struct MessageView: View {
                     .foregroundStyle(Theme.textSecondary)
                     .lineLimit(1)
             }
-            Image(systemName: "message.fill")
-                .font(.caption)
-                .foregroundStyle(Theme.primary)
+            HStack(spacing: 6) {
+                Image(systemName: "message.fill")
+                    .font(.caption)
+                    .foregroundStyle(.white)
+                Text("私信")
+                    .font(.caption)
+                    .bold()
+                    .foregroundStyle(.white)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .background(Capsule().fill(Theme.primary))
         }
         .padding(12)
         .background(RoundedRectangle(cornerRadius: 14).fill(Theme.cardBg))
@@ -458,6 +468,13 @@ struct ChatDetailView: View {
                         .foregroundStyle(store.orderDraft == nil ? Theme.primary : Theme.primary.opacity(0.4))
                 }
                 .disabled(store.orderDraft != nil)
+                Button {
+                    sendLocation()
+                } label: {
+                    Image(systemName: "location.fill")
+                        .font(.system(size: 19))
+                        .foregroundStyle(Theme.primary)
+                }
                 PhotosPicker(selection: $pickerItem, matching: .any(of: [.images, .videos])) {
                     Image(systemName: "photo.on.rectangle")
                         .font(.system(size: 20))
@@ -588,14 +605,15 @@ struct ChatDetailView: View {
             } else {
                 VStack(alignment: message.senderIsMe ? .trailing : .leading, spacing: 6) {
                     if let mediaType = message.mediaType, let mediaUrl = message.mediaUrl {
-                        mediaBubble(mediaType: mediaType, mediaUrl: mediaUrl)
+                        mediaBubble(mediaType: mediaType, mediaUrl: mediaUrl, text: message.text)
                     }
                     if let orderId = message.orderId {
                         MessageOrderCard(orderId: orderId) {
                             viewingOrderRef = OrderRef(orderId: orderId)
                         }
                     }
-                    if !message.text.isEmpty {
+                    // 位置消息的文本已在卡片内展示，避免重复
+                    if !message.text.isEmpty && message.mediaType != "location" {
                         Text(message.text)
                             .font(.subheadline)
                             .foregroundStyle(message.senderIsMe ? .white : Theme.textPrimary)
@@ -615,10 +633,49 @@ struct ChatDetailView: View {
         }
     }
 
-    /// 媒体消息气泡（图片点击放大 / 视频点击播放 / 语音点击播放）
+    /// 媒体消息气泡（图片点击放大 / 视频点击播放 / 语音点击播放 / 位置卡片）
     @ViewBuilder
-    private func mediaBubble(mediaType: String, mediaUrl: String) -> some View {
-        if let url = URL(string: AppConfig.serverBase + mediaUrl) {
+    private func mediaBubble(mediaType: String, mediaUrl: String, text: String) -> some View {
+        if mediaType == "location" {
+            // 位置卡片：mediaUrl = "lat,lng"，点击用地图 App 打开
+            let parts = mediaUrl.split(separator: ",").compactMap { Double($0.trimmingCharacters(in: .whitespaces)) }
+            if parts.count == 2 {
+                Button {
+                    openMap(lat: parts[0], lng: parts[1])
+                } label: {
+                    HStack(spacing: 10) {
+                        Text("📍")
+                            .font(.system(size: 24))
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(text.isEmpty ? "我的位置" : text)
+                                .font(.subheadline)
+                                .bold()
+                                .foregroundStyle(Theme.textPrimary)
+                            Text(String(format: "%.5f, %.5f · 点击查看地图", parts[0], parts[1]))
+                                .font(.caption2)
+                                .foregroundStyle(Theme.textSecondary)
+                        }
+                        Spacer(minLength: 0)
+                        Image(systemName: "arrow.up.right")
+                            .font(.caption)
+                            .foregroundStyle(Theme.primary)
+                    }
+                    .padding(12)
+                    .frame(width: 210, alignment: .leading)
+                    .background(
+                        RoundedRectangle(cornerRadius: 14)
+                            .fill(LinearGradient(colors: [Theme.primary.opacity(0.10), Theme.secondary.opacity(0.08)],
+                                                 startPoint: .topLeading, endPoint: .bottomTrailing))
+                    )
+                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.primary.opacity(0.25), lineWidth: 1))
+                }
+                .buttonStyle(.plain)
+            } else {
+                Text("📍 位置")
+                    .font(.caption)
+                    .foregroundStyle(Theme.textSecondary)
+            }
+        } else if let url = URL(string: AppConfig.serverBase + mediaUrl) {
             if mediaType == "image" {
                 Button {
                     viewingImageItem = IdentifiableURL(url: url)
@@ -688,7 +745,61 @@ struct ChatDetailView: View {
         }
     }
 
+    /// 发送我的位置（📍）：定位 → 发送 location 消息（mediaUrl = "lat,lng"）
+    private func sendLocation() {
+        guard let convo = conversation else { return }
+        let manager = CLLocationManager()
+        guard CLLocationManager.locationServicesEnabled() else {
+            blockedBanner = "系统定位服务未开启，请到系统设置中开启"
+            return
+        }
+        switch manager.authorizationStatus {
+        case .denied, .restricted:
+            blockedBanner = "未获得定位权限，请到系统设置允许技遇使用位置"
+            return
+        default:
+            break
+        }
+        manager.requestWhenInUseAuthorization()
+        blockedBanner = "正在获取位置…"
+        locationManager = manager
+        let delegate = LocationDelegate { [weak self] lat, lng in
+            Task { @MainActor in
+                guard let self else { return }
+                self.blockedBanner = nil
+                let result = await self.store.sendMediaMessage(
+                    conversationID: convo.id,
+                    mediaType: "location",
+                    mediaUrl: String(format: "%.6f,%.6f", lat, lng),
+                    text: "我的位置"
+                )
+                switch result {
+                case .blocked(let warning), .failed(let warning):
+                    self.blockedBanner = warning
+                case .sent:
+                    break
+                }
+                if self.store.isServerMode {
+                    await self.store.loadMessages(conversationID: convo.id)
+                }
+            }
+        }
+        locationDelegate = delegate
+        manager.delegate = delegate
+        manager.requestLocation()
+    }
+
+    @State private var locationManager: CLLocationManager?
+    @State private var locationDelegate: LocationDelegate?
+
     // MARK: - 发送
+
+    /// 用地图 App 打开坐标（位置卡片点击）
+    private func openMap(lat: Double, lng: Double) {
+        let apple = URL(string: "https://maps.apple.com/?ll=\(lat),\(lng)&q=%E6%88%91%E7%9A%84%E4%BD%8D%E7%BD%AE")
+        let osm = URL(string: "https://www.openstreetmap.org/?mlat=\(lat)&mlon=\(lng)#map=16/\(lat)/\(lng)")
+        if let apple { UIApplication.shared.open(apple) } else if let osm { UIApplication.shared.open(osm) }
+    }
 
     private func send(_ conversation: Conversation) {
         let text = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -1156,6 +1267,22 @@ private struct MessageOrderCard: View {
 private struct OrderRef: Identifiable {
     let id = UUID()
     let orderId: String
+}
+
+/// 定位回调委托（CLLocationManagerDelegate）
+private final class LocationDelegate: NSObject, CLLocationManagerDelegate {
+    let onLocation: (Double, Double) -> Void
+    init(onLocation: @escaping (Double, Double) -> Void) {
+        self.onLocation = onLocation
+    }
+    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        guard let loc = locations.last else { return }
+        onLocation(loc.coordinate.latitude, loc.coordinate.longitude)
+        manager.stopUpdatingLocation()
+    }
+    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        manager.stopUpdatingLocation()
+    }
 }
 
 // MARK: - 文件级工具（金额/订单状态显示）

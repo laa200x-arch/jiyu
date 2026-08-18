@@ -184,6 +184,15 @@ CREATE TABLE IF NOT EXISTS apps (
   downloads INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS app_scores (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  app_id INTEGER NOT NULL,
+  user_id INTEGER,
+  player_name TEXT NOT NULL,
+  score INTEGER NOT NULL,
+  created_at TEXT NOT NULL
+);
 `
 
 export const MYSQL_DDL = `
@@ -366,5 +375,15 @@ CREATE TABLE IF NOT EXISTS apps (
   size_kb INT NOT NULL DEFAULT 0,
   downloads INT NOT NULL DEFAULT 0,
   created_at DATETIME NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS app_scores (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  app_id INT NOT NULL,
+  user_id INT NULL,
+  player_name VARCHAR(32) NOT NULL,
+  score INT NOT NULL,
+  created_at DATETIME NOT NULL,
+  KEY idx_app_score (app_id, score)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 `
