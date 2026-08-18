@@ -34,8 +34,8 @@ function toast(msg) {
 }
 function openModal(html, onMount) {
   const box = document.getElementById('modal-box')
-  // 全局注入右上角关闭按钮（每个弹窗都有 ×）
-  box.innerHTML = `<button class="modal-close" onclick="closeModal()" title="关闭">✕</button>` + html
+  // 全局注入右上角关闭按钮（每个弹窗都有 ×）；data-close 由全局事件委托处理（CSP 禁 inline onclick）
+  box.innerHTML = `<button class="modal-close" data-close title="关闭">✕</button>` + html
   document.getElementById('modal-mask').classList.remove('hidden')
   if (onMount) onMount(box)
 }
@@ -46,11 +46,34 @@ function bindModalMask() {
     if (e.target.id === 'modal-mask') closeModal()
   })
 }
+/**
+ * 全局事件委托（替代被 CSP 禁用的 inline onclick）：
+ * - [data-close]          关闭当前弹窗（× 与所有取消/关闭按钮）
+ * - [data-fullscreen]     点击图片放大（img 元素，用其 src）
+ * - [data-video]          全屏播放视频
+ * - [data-audio]          播放语音
+ * 覆盖弹窗内与主视图（动态/聊天）中的全部媒体元素
+ */
+function bindGlobalDelegates() {
+  document.addEventListener('click', (e) => {
+    const close = e.target.closest('[data-close]')
+    if (close) return closeModal()
+    const fs = e.target.closest('[data-fullscreen]')
+    if (fs) return openFullscreen(`<img src="${fs.currentSrc || fs.src}" alt="">`)
+    const vid = e.target.closest('[data-video]')
+    if (vid) return openFullscreen(`<video src="${vid.dataset.video}" controls autoplay></video>`)
+    const au = e.target.closest('[data-audio]')
+    if (au) return playAudio(au.dataset.audio)
+  })
+}
 function openFullscreen(html) {
   const mask = document.createElement('div')
   mask.className = 'fullscreen-mask'
-  mask.innerHTML = html + '<button class="fullscreen-close" onclick="this.parentElement.remove()">✕</button>'
+  mask.innerHTML = html + '<button class="fullscreen-close" data-close-fullscreen title="关闭">✕</button>'
   document.body.appendChild(mask)
+  mask.addEventListener('click', (e) => {
+    if (e.target.closest('[data-close-fullscreen]') || e.target === mask) mask.remove()
+  })
 }
 
 /* 图片压缩（最长边 1280，JPEG 0.7） */
@@ -235,7 +258,7 @@ function showAgreementForm(u) {
       4. 违反协议将受扣分、限流、封禁处理。</div>
     </div>
     <div class="modal-actions">
-      <button class="btn btn-outline" onclick="closeModal()">取消</button>
+      <button class="btn btn-outline" data-close>取消</button>
       <button class="btn btn-primary" id="ag-submit">确认签署</button>
     </div>
   `, (box) => {
@@ -317,7 +340,7 @@ async function renderFeed() {
             <span class="feed-time">${fmtTime(d.time)}</span>
           </div>
           <div class="feed-content">${esc(d.content)}</div>
-          ${d.imageBase64 ? `<img class="feed-image" src="data:image/jpeg;base64,${d.imageBase64}" onclick="openFullscreen('<img src=&quot;data:image/jpeg;base64,${d.imageBase64}&quot;>')">` : ''}
+          ${d.imageBase64 ? `<img class="feed-image" src="data:image/jpeg;base64,${d.imageBase64}" data-fullscreen alt="">` : ''}
           ${orderBlock}
         </div>
       </div>`
@@ -435,7 +458,7 @@ async function showOrderDetail(orderId) {
     <div class="modal-actions" style="flex-wrap:wrap">
       ${b.initiator && b.initiator.id !== App.state.user.id ? `<button class="btn btn-primary" id="od-chat-initiator">💬 私聊下单人</button>` : ''}
       ${b.provider && b.provider.id !== App.state.user.id ? `<button class="btn btn-primary" id="od-chat-provider">💬 私聊看护人</button>` : ''}
-      <button class="btn btn-outline" onclick="closeModal()">关闭</button>
+      <button class="btn btn-outline" data-close>关闭</button>
     </div>
   `, (box) => {
     const chatWith = async (user) => {
@@ -532,7 +555,7 @@ function showFeedCompose() {
     </div>
     <div class="card-sub" style="color:#f29e4d;margin-bottom:10px">⚠️ 禁止发布收费、交易、接单等商业信息，内容将自动经过平台风控审核</div>
     <div class="modal-actions">
-      <button class="btn btn-outline" onclick="closeModal()">取消</button>
+      <button class="btn btn-outline" data-close>取消</button>
       <button class="btn btn-primary" id="fd-submit">发布</button>
     </div>
   `, (box) => {
@@ -668,11 +691,11 @@ function messageHtml(m) {
   }
   let media = ''
   if (m.mediaType === 'image' && m.mediaUrl) {
-    media = `<img class="msg-image" src="${mediaUrl(m.mediaUrl)}" onclick="openFullscreen('<img src=&quot;${mediaUrl(m.mediaUrl)}&quot;>')">`
+    media = `<img class="msg-image" src="${mediaUrl(m.mediaUrl)}" data-fullscreen alt="">`
   } else if (m.mediaType === 'video' && m.mediaUrl) {
-    media = `<div class="msg-media-card" onclick="openFullscreen('<video src=&quot;${mediaUrl(m.mediaUrl)}&quot; controls autoplay></video>')">▶ 播放视频</div>`
+    media = `<div class="msg-media-card" data-video="${mediaUrl(m.mediaUrl)}">▶ 播放视频</div>`
   } else if (m.mediaType === 'audio' && m.mediaUrl) {
-    media = `<div class="msg-media-card" onclick="playAudio('${mediaUrl(m.mediaUrl)}')">🔊 语音消息</div>`
+    media = `<div class="msg-media-card" data-audio="${mediaUrl(m.mediaUrl)}">🔊 语音消息</div>`
   }
   const orderCard = m.orderId
     ? `<div class="msg-order-card" data-order-id="${esc(m.orderId)}"><span class="card-sub">订单卡片加载中…</span></div>`
@@ -748,7 +771,7 @@ function showOrderPicker(conv) {
           </div>
         </div>
       </div>`).join('')}
-    <div class="modal-actions"><button class="btn btn-outline" onclick="closeModal()">取消</button></div>
+    <div class="modal-actions"><button class="btn btn-outline" data-close>取消</button></div>
   `, (box) => {
     box.querySelectorAll('.order-pick').forEach((el) => el.addEventListener('click', () => {
       const b = App.state.bookings.find((x) => x.id === el.dataset.oid)
@@ -1129,7 +1152,7 @@ function statusText(s) {
 async function doVerify(kind) {
   try {
     await setVerification(kind)
-    toast('✅ 已通过' + (kind === 'student' ? '学生认证' : '实名认证') + '（模拟）')
+    toast('✅ 已通过' + (kind === 'student' ? '学生认证' : '实名认证'))
     renderMine()
   } catch (e) { toast(e.message) }
 }
@@ -1226,21 +1249,21 @@ function showExposure() {
   ]
   openModal(`
     <div class="modal-title">👑 技能曝光 · 增值服务</div>
-    <div class="card-sub" style="margin-bottom:12px">仅用于主页置顶与匹配加权，不参与技能交易（演示版本模拟开通，不产生真实扣费）</div>
+    <div class="card-sub" style="margin-bottom:12px">仅用于主页置顶与匹配加权，不参与技能交易</div>
     ${pkg.map((p) => `
       <div class="card" style="display:flex;align-items:center;gap:12px">
         <div style="flex:1">
           <div class="convo-name">${p.name} <span class="card-sub">${p.days} 天</span></div>
           <div class="card-sub">${p.desc}</div>
         </div>
-        <button class="btn btn-primary btn-sm" data-pkg="${p.id}">开通（模拟）</button>
+        <button class="btn btn-primary btn-sm" data-pkg="${p.id}">立即开通</button>
       </div>`).join('')}
     ${App.state.user.isExposureVip ? '<div style="text-align:center;margin-top:10px"><button class="btn btn-danger btn-sm" id="exp-cancel">取消曝光</button></div>' : ''}
   `, (box) => {
     box.querySelectorAll('[data-pkg]').forEach((b) => b.addEventListener('click', async () => {
       try {
         await applyExposure(b.dataset.pkg)
-        closeModal(); toast('✅ 曝光已生效（模拟）'); renderMine()
+        closeModal(); toast('✅ 曝光已生效'); renderMine()
       } catch (e) { toast(e.message) }
     }))
     const c = box.querySelector('#exp-cancel')
@@ -1261,7 +1284,7 @@ function showEvaluate(rec) {
     ${starRow('communication', '沟通体验')}
     <div class="form-field"><label>评价留言</label><textarea id="ev-comment" placeholder="说说本次互换体验（可选）"></textarea></div>
     <div class="modal-actions">
-      <button class="btn btn-outline" onclick="closeModal()">取消</button>
+      <button class="btn btn-outline" data-close>取消</button>
       <button class="btn btn-primary" id="ev-submit">提交评价</button>
     </div>
   `, (box) => {
@@ -1292,7 +1315,7 @@ function starRow(key, label) {
 /* 静态文本 */
 function showStaticText(title, text) {
   openModal(`<div class="modal-title">${title}</div><div class="card-sub" style="line-height:1.9;white-space:pre-wrap">${esc(text)}</div>
-    <div class="modal-actions"><button class="btn btn-primary" onclick="closeModal()">关闭</button></div>`)
+    <div class="modal-actions"><button class="btn btn-primary" data-close>关闭</button></div>`)
 }
 function agreementText() {
   return '【技遇平台官方技能互换协议】\n1. 本次技能互换为纯个人兴趣无偿交换，双方确认无任何金钱、物资、有偿交易行为。\n2. 双方自愿交换技能教学资源，约定教学时长、教学时间、线上/线下方式。\n3. 双方承诺认真教学、守时履约，杜绝敷衍教学、无故爽约。\n4. 线下交换请选择公共场所，注意人身与财产安全，平台仅提供信息匹配服务。\n5. 若任意一方出现交易违规、爽约、敷衍行为，平台有权扣分、限流、封禁账号。\n6. 本协议为平台约束性规则，双方确认签署即认可全部条款。'
@@ -1315,7 +1338,7 @@ function showMyDynamics() {
             <button class="btn btn-danger btn-sm" data-del="${d.id}" title="删除这条动态">删除</button>
           </div>
           <div class="feed-content" style="margin-top:6px">${esc(d.content)}</div>
-          ${d.imageBase64 ? `<img class="feed-image" src="data:image/jpeg;base64,${d.imageBase64}" onclick="openFullscreen('<img src=&quot;data:image/jpeg;base64,${d.imageBase64}&quot;>')">` : ''}
+          ${d.imageBase64 ? `<img class="feed-image" src="data:image/jpeg;base64,${d.imageBase64}" data-fullscreen alt="">` : ''}
         </div>`).join('')
       : '<div class="empty"><div class="empty-icon">📝</div>你还没有发布过动态<br>去「互换动态」发布第一条吧</div>'}
   `, (box) => {
@@ -1519,7 +1542,7 @@ function showPetAdd() {
       <div class="form-field"><label>备注（≤2000 字）</label><input id="p-notes" placeholder="如：喜欢玩球，怕打雷"></div>
     </div>
     <div class="modal-actions">
-      <button class="btn btn-outline" onclick="closeModal()">取消</button>
+      <button class="btn btn-outline" data-close>取消</button>
       <button class="btn btn-primary" id="p-save">保存宠物</button>
     </div>
   `, (box) => {
@@ -1596,7 +1619,7 @@ function showBookingForm(service) {
     </div>
     <div class="card-sub" style="color:#f29e4d">⚠️ 宠物服务可收费，价格与佣金以订单为准；其他技能互换仍坚持零金钱</div>
     <div class="modal-actions">
-      <button class="btn btn-outline" onclick="closeModal()">取消</button>
+      <button class="btn btn-outline" data-close>取消</button>
       <button class="btn btn-primary" id="b-submit">发布订单</button>
     </div>
   `, (box) => {

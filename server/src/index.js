@@ -104,12 +104,12 @@ async function main() {
     res.json({ ok: true, service: 'jiyu-server', time: new Date().toISOString(), sms: smsStatus() })
   })
 
-  // 版本检查（App 启动时轮询：有新版本则提示下载）
+  // 版本检查（App 启动时轮询：仅当服务器 current 与客户端已提示版本不同时客户端才弹更新窗）
   app.get('/api/version', (req, res) => {
     res.json({
-      current: '1.1',
-      updateMessage: '新版本已发布：新增同城地图、动态图片上传、账号切换、消息推送、自动登录修复',
-      downloadUrl: 'https://github.com/laa200x-arch/jiyu/releases'
+      current: '1.1.2',
+      updateMessage: 'v1.1.2 更新：修复宠物订单风控误拦截；新增忘记密码；评价文字展示与违规申诉；安全加固（手机号隐私 / Electron 隔离 / 上传白名单）',
+      downloadUrl: 'https://github.com/laa200x-arch/jiyu/releases/tag/win-v1.1.2'
     })
   })
 

@@ -52,7 +52,7 @@ function bindLogin() {
           const r = await api('/api/auth/phone/forgot-code', { method: 'POST', body: { phone: p } })
           if (r.devCode) {
             code.value = r.devCode
-            show(err, '✅ 验证码已发送（测试通道，已自动填入）')
+            show(err, '✅ 验证码已发送（验证码已自动填入）')
           } else show(err, '✅ 验证码已发送到 ' + p + '（5 分钟内有效）')
         } catch (e) { show(err, e.message) }
       })
@@ -91,7 +91,7 @@ function bindLogin() {
       const r = await api('/api/auth/phone/send-code', { method: 'POST', body: { phone } })
       if (r.devCode) {
         document.getElementById('login-code').value = r.devCode
-        show(err, '✅ 验证码已发送（测试通道，已自动填入：' + r.devCode + '）')
+        show(err, '✅ 验证码已发送（验证码已自动填入：' + r.devCode + '）')
       } else {
         show(err, '✅ 验证码已发送到 ' + phone + '（5 分钟内有效）')
       }
@@ -200,11 +200,14 @@ async function checkVersion() {
   const v = await fetchVersion()
   if (!v) return
   if (v.current !== '1.0') {
+    // 无新版本（本机已提示过该版本）不再弹窗；服务器 current 变化后才会再次提示
+    if (localStorage.getItem('jiyu.updateShown') === String(v.current)) return
+    localStorage.setItem('jiyu.updateShown', String(v.current))
     openModal(`<div class="modal-title">发现新版本 ${esc(v.current)}</div>
       <div class="card-sub" style="line-height:1.8">${esc(v.updateMessage)}</div>
       <div class="modal-actions">
         <button class="btn btn-primary" id="ver-goto">去下载</button>
-        <button class="btn btn-outline" onclick="closeModal()">稍后再说</button>
+        <button class="btn btn-outline" data-close>稍后再说</button>
       </div>`, (box) => {
       box.querySelector('#ver-goto').addEventListener('click', () => {
         const win = window.open('', '_blank')
@@ -244,6 +247,7 @@ async function bootstrap() {
   bindLogin()
   bindTabs()
   bindModalMask()
+  bindGlobalDelegates()
   // 请求桌面通知权限（消息推送）
   if ('Notification' in window && Notification.permission === 'default') {
     try { Notification.requestPermission() } catch (e) { /* ignore */ }

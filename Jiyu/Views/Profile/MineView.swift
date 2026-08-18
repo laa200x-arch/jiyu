@@ -217,7 +217,7 @@ struct MineView: View {
                     await store.setVerification(verification)
                 }
                 alertTitle = "认证成功"
-                alertMessage = "已通过\(label)（模拟）\n认证档案将提升匹配可信度"
+                alertMessage = "已通过\(label)\n认证档案将提升匹配可信度"
                 showAlert = true
             }
         } label: {

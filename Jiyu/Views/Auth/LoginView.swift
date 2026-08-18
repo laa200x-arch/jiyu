@@ -129,7 +129,7 @@ struct LoginView: View {
             Spacer()
 
             VStack(spacing: 3) {
-                Text("演示账号：aqing / 123456（服务器已预置 11 位用户）")
+                Text("体验账号：aqing / 123456（服务器已预置 11 位用户）")
                     .font(.caption2)
                     .foregroundStyle(Theme.textSecondary)
                 Text("服务地址：\(AppConfig.serverBase)")
@@ -285,7 +285,7 @@ struct LoginView: View {
                 let (message, devCode) = try await APIClient.shared.sendSmsCode(phone: trimmed)
                 if let devCode {
                     smsCode = devCode
-                    errorMessage = "✅ \(message)（测试通道验证码已自动填入）"
+                    errorMessage = "✅ \(message)（验证码已自动填入）"
                 } else {
                     errorMessage = "✅ \(message)"
                 }

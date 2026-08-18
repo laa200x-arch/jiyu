@@ -93,7 +93,7 @@ struct ForgotPasswordView: View {
                 let (text, devCode) = try await APIClient.shared.sendForgotCode(phone: trimmedPhone)
                 if let devCode {
                     code = devCode
-                    message = "✅ \(text)（测试通道验证码已自动填入）"
+                    message = "✅ \(text)（验证码已自动填入）"
                 } else {
                     message = "✅ \(text)"
                 }

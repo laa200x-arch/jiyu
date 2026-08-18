@@ -63,7 +63,7 @@ struct ExposureView: View {
                 get: { confirmPackage != nil },
                 set: { if !$0 { confirmPackage = nil } }
             )) {
-                Button("模拟开通（本版本不扣费）") {
+                Button("确认开通") {
                     if let pkg = confirmPackage {
                         Task {
                             await store.applyExposure(package: pkg)
