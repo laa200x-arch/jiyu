@@ -4,6 +4,9 @@
  * 所有演示账号密码均为：123456
  */
 import bcrypt from 'bcryptjs'
+import { readFileSync } from 'node:fs'
+import { join, dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { pathToFileURL } from 'node:url'
 import { config } from './config.js'
 import { initDb } from './db.js'
@@ -129,20 +132,23 @@ export async function seed(db, { force = false } = {}) {
     }
   }
 
-  // 演示动态（方案 2.3.6 动态区）
-  const systemUserId = userIds['aqing']
-  const dynamics = [
-    ['平台', 'shield.lefthalf.filled', '温馨提示：技遇是纯技能无偿互换平台，严禁任何金钱交易。发现违规内容可举报，平台将给予警告、限流、封禁处理。', 1],
-    ['阿青', 'face.smiling', '和 周可 完成了「吉他 ↔ 视频剪辑」互换，互相教得很认真！已互评五星～', 0],
-    ['周可', 'guitars.fill', '本周六下午在五道口广场组织吉他弹唱小聚，纯兴趣交流，欢迎来玩～', 0],
-    ['米粒', 'music.note', '日语五十音入门笔记整理好了，需要的同学评论区扣 1', 0],
-    ['林晓', 'camera.fill', '这周六在国贸图书馆带新人学摄影构图，还有两个名额', 0]
-  ]
-  for (let i = 0; i < dynamics.length; i++) {
-    const [nickname, , content, isSystem] = dynamics[i]
-    const row = db.get('SELECT id FROM users WHERE nickname = ?', [nickname])
-    db.run(`INSERT INTO dynamics (user_id, content, is_system_post, created_at) VALUES (?,?,?,?)`,
-      [row?.id ?? systemUserId, content, isSystem, daysAgo(i)])
+  // 演示动态：已移除（动态区保持真实用户内容，不再填充模拟动态）
+
+  // 示例小程序：贪吃蛇游戏（单文件自包含 HTML，符合小程序格式规范）
+  try {
+    const __dirname = dirname(fileURLToPath(import.meta.url))
+    const snakeHtml = readFileSync(join(__dirname, 'snake-app.html'), 'utf8')
+    const existing = db.get('SELECT id FROM apps WHERE name = ?', ['贪吃蛇'])
+    if (!existing) {
+      db.run(
+        `INSERT INTO apps (user_id, name, description, icon, html_content, version, size_kb, downloads, created_at)
+         VALUES (?,?,?,?,?,?,?,?,?)`,
+        [userIds['aqing'], '贪吃蛇', '经典街机贪吃蛇：方向键/滑动控制，吃食物成长，速度随长度提升。示例小程序。',
+          '🐍', snakeHtml, '1.0.0', Math.ceil(Buffer.byteLength(snakeHtml, 'utf8') / 1024), 0, now()]
+      )
+    }
+  } catch (e) {
+    console.warn('[seed] 示例小程序插入失败:', e.message)
   }
 
   // 演示会话与消息（含一条风控拦截系统提示）
@@ -189,36 +195,35 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
 }
 
 /**
- * 为还没有动态的用户自动补充动态（幂等，不影响已有数据）
- * 让动态区覆盖"所有人的动态"
+ * 动态区不再生成任何模拟动态（需求：去除互动动态中的模拟动态）
+ * 保留函数签名以兼容启动调用，但样本表已清空，仅返回 0
  */
 export function ensureEveryoneHasDynamics(db) {
-  const users = db.all('SELECT id, nickname, avatar_symbol FROM users')
-  const samples = {
-    阿青: '想找编程搭子一起写个小项目，用剪辑技能互换～',
-    林晓: '周六下午国贸图书馆带新人学摄影构图，还有两个名额',
-    陈默: '整理了 50 个常用日语动词卡片，想换英语口语练习',
-    苏晴: '周末在文创园画水彩，欢迎来一起画（纯兴趣，颜料自备）',
-    王野: '剪了一支校园 Vlog，想学剪辑的同学可以交流',
-    周可: '本周三晚线上吉他入门互换，还剩一个名额',
-    高远: '下周末去郊外拍星空，求同好结伴，我可以教摄影基础',
-    韩雪: '想找摄影搭子，我用编程知识交换',
-    白一凡: '速写练习第 21 天，坚持就是胜利',
-    米粒: '日语五十音图口诀整理好了，需要的同学评论区扣 1',
-    阿哲: '自学编程一年了，最近想找人互换剪辑和日语'
+  return 0
+}
+
+/**
+ * 确保示例小程序存在（每次启动检查补齐，幂等）：
+ * 预置「贪吃蛇」游戏小程序，作为小程序市场的格式示例
+ */
+export function ensureSampleApps(db) {
+  try {
+    const __dirname = dirname(fileURLToPath(import.meta.url))
+    const snakeHtml = readFileSync(join(__dirname, 'snake-app.html'), 'utf8')
+    const existing = db.get('SELECT id FROM apps WHERE name = ?', ['贪吃蛇'])
+    if (existing) return 0
+    const owner = db.get('SELECT id FROM users WHERE username = ?', ['aqing'])
+    if (!owner) return 0
+    db.run(
+      `INSERT INTO apps (user_id, name, description, icon, html_content, version, size_kb, downloads, created_at)
+       VALUES (?,?,?,?,?,?,?,?,?)`,
+      [owner.id, '贪吃蛇', '经典街机贪吃蛇：方向键/滑动控制，吃食物成长，速度随长度提升。示例小程序。',
+        '🐍', snakeHtml, '1.0.0', Math.ceil(Buffer.byteLength(snakeHtml, 'utf8') / 1024), 0, new Date().toISOString()]
+    )
+    console.log('[seed] 已预置示例小程序：贪吃蛇')
+    return 1
+  } catch (e) {
+    console.warn('[seed] 示例小程序插入失败:', e.message)
+    return 0
   }
-  let added = 0
-  for (const user of users) {
-    const count = db.get('SELECT COUNT(*) AS c FROM dynamics WHERE user_id = ?', [user.id]).c
-    const sample = samples[user.nickname]
-    if (count === 0 && sample) {
-      db.run(
-        `INSERT INTO dynamics (user_id, content, is_system_post, created_at) VALUES (?,?,?,?)`,
-        [user.id, sample, 0, new Date().toISOString()]
-      )
-      added++
-    }
-  }
-  if (added > 0) console.log(`[seed] 为 ${added} 位用户补充了动态`)
-  return added
 }

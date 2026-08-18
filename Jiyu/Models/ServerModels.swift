@@ -382,6 +382,22 @@ struct EvaluationsResponse: Decodable { let evaluations: [ReceivedEvaluation] }
 struct RecordResponse: Decodable { let record: ServerExchangeRecord? }
 struct OkResponse: Decodable { let ok: Bool? }
 
+/// 小程序（市场条目；详情接口附带 htmlContent 供沙箱运行）
+struct MiniApp: Decodable {
+    let id: String
+    let userId: String
+    let authorName: String
+    let name: String
+    let description: String
+    let icon: String
+    let version: String
+    let sizeKb: Int
+    let downloads: Int
+    let htmlContent: String?
+}
+struct MiniAppsResponse: Decodable { let apps: [MiniApp] }
+struct MiniAppResponse: Decodable { let app: MiniApp }
+
 // MARK: - DTO → 本地模型映射
 
 extension SkillModel {

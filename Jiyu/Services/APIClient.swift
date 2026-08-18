@@ -142,8 +142,10 @@ final class APIClient {
         return response.user
     }
 
-    func fetchUsers() async throws -> [ServerUser] {
-        let response: UsersResponse = try await request("/api/users")
+    func fetchUsers(keyword: String = "") async throws -> [ServerUser] {
+        var query: [String: String] = [:]
+        if !keyword.isEmpty { query["keyword"] = keyword }
+        let response: UsersResponse = try await request("/api/users", query: query)
         return response.users
     }
 
@@ -313,6 +315,20 @@ final class APIClient {
     /// 对收到的评价发起申诉（V1.1 违规申诉，平台人工审核）
     func appealEvaluation(id: String, reason: String) async throws {
         let _: OkResponse = try await request("/api/evaluations/\(id)/appeal", method: "POST", body: ["reason": reason])
+    }
+
+    // MARK: - 小程序市场
+
+    func fetchApps(keyword: String = "") async throws -> [MiniApp] {
+        var query: [String: String] = [:]
+        if !keyword.isEmpty { query["keyword"] = keyword }
+        let response: MiniAppsResponse = try await request("/api/apps", query: query)
+        return response.apps
+    }
+
+    func fetchAppDetail(id: String) async throws -> MiniApp {
+        let response: MiniAppResponse = try await request("/api/apps/\(id)")
+        return response.app
     }
 
     // MARK: - 档案

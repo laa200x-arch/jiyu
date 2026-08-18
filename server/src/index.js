@@ -5,12 +5,12 @@ import express from 'express'
 import cors from 'cors'
 import http from 'node:http'
 import path from 'node:path'
-import { mkdirSync } from 'node:fs'
+import { mkdirSync, unlinkSync } from 'node:fs'
 import multer from 'multer'
 import { config } from './config.js'
 import { initDb, closeDb } from './db.js'
 import { SQLITE_DDL, MYSQL_DDL } from './schema.js'
-import { seed, ensureEveryoneHasDynamics } from './seed.js'
+import { seed, ensureEveryoneHasDynamics, ensureSampleApps } from './seed.js'
 import { requireAuth, serializeUser } from './middleware.js'
 import { authRouter } from './routes/auth.js'
 import { profileRouter } from './routes/profile.js'
@@ -18,6 +18,7 @@ import { matchRouter } from './routes/match.js'
 import { socialRouter } from './routes/social.js'
 import { chatRouter } from './routes/chat.js'
 import { petsRouter } from './routes/pets.js'
+import { appsRouter } from './routes/apps.js'
 import { setupSocket } from './socket.js'
 import { smsStatus } from './sms.js'
 
@@ -80,11 +81,13 @@ async function main() {
   // 轻量迁移：users 表补充手机号列（注册手机验证，一手机号一号）
   try { db.exec('ALTER TABLE users ADD COLUMN phone TEXT') } catch { /* 列已存在 */ }
   try { db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_phone ON users(phone)') } catch { /* 索引已存在 */ }
-  // 演示数据
+  // 演示数据（动态区不再生成模拟动态）
   if (config.autoSeed) {
     await seed(db)
     ensureEveryoneHasDynamics(db)
   }
+  // 示例小程序（贪吃蛇，幂等补齐）
+  ensureSampleApps(db)
 
   const app = express()
   // CORS：白名单配置化（CORS_ORIGINS）。原生客户端（无 Origin / file:// / null）始终放行；
@@ -140,6 +143,12 @@ async function main() {
   })
   app.post('/api/upload', requireAuth, upload.single('file'), (req, res) => {
     if (!req.file) return res.status(400).json({ error: '缺少文件' })
+    // 头像等图片限制 2MB（视频仍 50MB）；超限删除已写入的文件
+    const isImage = String(req.file.mimetype || '').startsWith('image/')
+    if (isImage && req.file.size > 2 * 1024 * 1024) {
+      try { unlinkSync(path.join(uploadDir, req.file.filename)) } catch {}
+      return res.status(400).json({ error: '图片不能超过 2MB，请压缩后重试' })
+    }
     res.status(201).json({ url: `/uploads/${req.file.filename}` })
   }, (err, req, res, next) => {
     res.status(400).json({ error: err.message || '上传失败' })
@@ -181,6 +190,8 @@ async function main() {
   app.use('/api', socialRouter(db, io))
   // 宠物护理域（旧巡六迁移；io 用于申请/确认接单的私聊系统提示）
   app.use('/api', petsRouter(db, io))
+  // 小程序市场
+  app.use('/api', appsRouter(db))
 
   // 404
   app.use((req, res) => {

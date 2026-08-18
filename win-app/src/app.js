@@ -238,12 +238,18 @@ function bindTabs() {
   })
   // 顶栏：消息铃铛 → 跳转消息
   document.getElementById('bell-btn').addEventListener('click', () => switchView('message'))
-  // 侧边栏：曝光推广卡 → 跳转「我的」
-  document.getElementById('promo-btn').addEventListener('click', () => switchView('mine'))
+  // 侧边栏：小程序市场推广卡 → 消息页并打开市场
+  document.getElementById('promo-btn').addEventListener('click', () => {
+    switchView('message')
+    setTimeout(() => showMiniApps(), 150)
+  })
 }
 
 /* ---------- 启动 ---------- */
 async function bootstrap() {
+  // 启动动画：最短展示 900ms 后淡出
+  const splash = document.getElementById('splash')
+  const t0 = Date.now()
   bindLogin()
   bindTabs()
   bindModalMask()
@@ -252,15 +258,27 @@ async function bootstrap() {
   if ('Notification' in window && Notification.permission === 'default') {
     try { Notification.requestPermission() } catch (e) { /* ignore */ }
   }
+  let entered = false
+  const enter = () => {
+    if (entered) return
+    entered = true
+    const wait = Math.max(0, 900 - (Date.now() - t0))
+    setTimeout(() => {
+      splash.classList.add('splash-out')
+      setTimeout(() => splash.remove(), 500)
+    }, wait)
+  }
   if (App.state.token) {
     // 有持久化 Token：尝试自动登录
     const ok = await autoLogin()
     if (ok) {
       afterEnterApp()
+      enter()
       return
     }
   }
   switchView('login')
+  enter()
 }
 
 document.addEventListener('DOMContentLoaded', bootstrap)

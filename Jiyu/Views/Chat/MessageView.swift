@@ -5,10 +5,79 @@ import AVKit
 import AVFoundation
 
 /// 消息列表（方案 2.3.3 线上交换：内置 IM）
+/// 顶部：好友搜索 + 小程序市场入口
 struct MessageView: View {
     @EnvironmentObject private var store: MockDataStore
 
+    @State private var searchText = ""
+    @State private var searchResults: [UserModel] = []
+    @State private var isSearching = false
+    @State private var showMiniApps = false
+
     var body: some View {
+        VStack(spacing: 0) {
+            // 工具条：好友搜索 + 小程序入口
+            HStack(spacing: 10) {
+                HStack(spacing: 6) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.caption)
+                        .foregroundStyle(Theme.textSecondary)
+                    TextField("搜索好友（昵称 / 用户名 / 技能）", text: $searchText)
+                        .font(.subheadline)
+                        .autocorrectionDisabled()
+                        .textInputAutocapitalization(.never)
+                        .onChange(of: searchText) { _ in
+                            search()
+                        }
+                    if !searchText.isEmpty {
+                        Button { searchText = "" } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.caption)
+                                .foregroundStyle(Theme.textSecondary)
+                        }
+                    }
+                }
+                .padding(10)
+                .background(RoundedRectangle(cornerRadius: 12).fill(Theme.cardBg))
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Theme.divider, lineWidth: 1))
+
+                Button {
+                    showMiniApps = true
+                } label: {
+                    Text("🛒")
+                        .font(.title3)
+                        .frame(width: 40, height: 40)
+                        .background(RoundedRectangle(cornerRadius: 12).fill(Theme.cardBg))
+                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Theme.divider, lineWidth: 1))
+                }
+                .help("小程序市场")
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
+            .padding(.bottom, 4)
+
+            if isSearching {
+                searchResultList
+            } else {
+                conversationList
+            }
+        }
+        .background(Theme.bg)
+        .navigationTitle("消息")
+        .navigationBarTitleDisplayMode(.inline)
+        .refreshable {
+            if store.isServerMode {
+                try? await store.refreshAll()
+            }
+        }
+        .sheet(isPresented: $showMiniApps) {
+            MiniAppsView()
+        }
+    }
+
+    // MARK: - 会话列表（带过渡动画）
+
+    private var conversationList: some View {
         ScrollView {
             LazyVStack(spacing: 10) {
                 if store.conversations.isEmpty {
@@ -17,23 +86,116 @@ struct MessageView: View {
                         title: "暂无会话",
                         message: "在「技能匹配」中发起互换邀约，即可与匹配伙伴建立会话"
                     )
+                    .padding(.top, 80)
                 } else {
                     ForEach(store.conversations) { convo in
                         NavigationLink(destination: ChatDetailView(conversation: convo)) {
                             conversationRow(convo)
                         }
                         .buttonStyle(.plain)
+                        .transition(.asymmetric(insertion: .opacity.combined(with: .move(edge: .bottom)), removal: .opacity))
                     }
                 }
             }
             .padding(16)
+            .animation(.easeOut(duration: 0.25), value: store.conversations.count)
         }
-        .background(Theme.bg)
-        .navigationTitle("消息")
-        .navigationBarTitleDisplayMode(.inline)
-        .refreshable {
-            if store.isServerMode {
-                try? await store.refreshAll()
+        .transition(.opacity)
+    }
+
+    // MARK: - 好友搜索结果
+
+    private var searchResultList: some View {
+        ScrollView {
+            LazyVStack(spacing: 10) {
+                if searchResults.isEmpty {
+                    EmptyStateView(
+                        icon: "person.2",
+                        title: searchText.isEmpty ? "输入关键词搜索好友" : "没有找到相关用户",
+                        message: searchText.isEmpty ? "支持昵称 / 用户名 / 技能搜索" : "换个关键词试试"
+                    )
+                    .padding(.top, 80)
+                } else {
+                    ForEach(searchResults) { user in
+                        Button {
+                            Task {
+                                do {
+                                    if store.isServerMode {
+                                        if let convo = await store.openConversation(with: user) {
+                                            // 跳转会话
+                                            if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                                               let root = windowScene.windows.first?.rootViewController {
+                                                let host = UIHostingController(rootView: ChatDetailView(conversation: convo)
+                                                    .environmentObject(store))
+                                                root.present(host, animated: true)
+                                            }
+                                        }
+                                    }
+                                } catch { /* 忽略 */ }
+                            }
+                        } label: {
+                            searchResultRow(user)
+                        }
+                        .buttonStyle(.plain)
+                        .transition(.opacity)
+                    }
+                }
+            }
+            .padding(16)
+            .animation(.easeOut(duration: 0.2), value: searchResults.count)
+        }
+        .transition(.opacity)
+    }
+
+    private func searchResultRow(_ user: UserModel) -> some View {
+        HStack(spacing: 12) {
+            AvatarView(user: user, size: 44)
+            VStack(alignment: .leading, spacing: 3) {
+                HStack {
+                    Text(user.userName)
+                        .font(.subheadline)
+                        .bold()
+                        .foregroundStyle(Theme.textPrimary)
+                    Spacer()
+                    Text("信用 \(Int(user.creditScore))")
+                        .font(.caption2)
+                        .foregroundStyle(Theme.textSecondary)
+                }
+                Text(user.bio.isEmpty ? user.locationLabel : user.bio)
+                    .font(.caption)
+                    .foregroundStyle(Theme.textSecondary)
+                    .lineLimit(1)
+            }
+            Image(systemName: "message.fill")
+                .font(.caption)
+                .foregroundStyle(Theme.primary)
+        }
+        .padding(12)
+        .background(RoundedRectangle(cornerRadius: 14).fill(Theme.cardBg))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.divider, lineWidth: 1))
+    }
+
+    /// 好友搜索（防抖 + 服务端模糊搜索）
+    private func search() {
+        let kw = searchText.trimmingCharacters(in: .whitespaces)
+        guard store.isServerMode else {
+            isSearching = false
+            return
+        }
+        if kw.isEmpty {
+            isSearching = false
+            searchResults = []
+            return
+        }
+        isSearching = true
+        Task {
+            do {
+                let users = try await APIClient.shared.fetchUsers(keyword: kw)
+                await MainActor.run {
+                    searchResults = users.filter { $0.id != store.currentUser.id }
+                }
+            } catch {
+                await MainActor.run { searchResults = [] }
             }
         }
     }

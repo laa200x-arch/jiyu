@@ -109,8 +109,12 @@ server/
 | DELETE | /api/me/skills/:kind/:id | 删除技能 |
 | PUT | /api/me/verification | 认证 `{verification:'student'\|'realname'\|'full'}` |
 | PUT/DELETE | /api/me/exposure | 开通/取消曝光 `{packageId:'day'\|'week'\|'month'}` |
-| GET | /api/users | 全部用户（公开档案） |
+| GET | /api/users | 全部用户（公开档案；`?keyword=` 按昵称/用户名/技能模糊搜索） |
 | GET | /api/match | 双向匹配 `?nearbyOnly=1&type=online&keyword=日语&minCredit=80` |
+| GET | /api/apps | 小程序列表 `?keyword=`（名称/描述/作者搜索） |
+| GET | /api/apps/:id | 小程序详情（含 htmlContent，沙箱运行；访问计数 +1） |
+| POST | /api/apps | 发布小程序 `{name,description,icon,htmlContent}`（≤512KB，单文件自包含） |
+| DELETE | /api/apps/:id | 删除自己的小程序 |
 | GET/POST | /api/agreements | 协议列表 / 签署（生成互换记录 + match:push 推送） |
 | GET | /api/exchanges | 我的互换记录 |
 | POST | /api/exchanges/:id/complete | 标记完成 |

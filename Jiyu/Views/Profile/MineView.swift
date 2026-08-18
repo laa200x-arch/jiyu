@@ -28,7 +28,6 @@ struct MineView: View {
             VStack(spacing: 14) {
                 profileHeader
                 skillsDualCard
-                exposureCard
                 exchangeSection
                 settingsSection
                 toolsSection
@@ -121,11 +120,6 @@ struct MineView: View {
                         .background(Capsule().stroke(Theme.primary, lineWidth: 1.2))
                 }
             }
-
-            HStack(spacing: 8) {
-                verificationButton(.student, label: "学生认证")
-                verificationButton(.realname, label: "实名认证")
-            }
         }
         .padding(16)
         .background(RoundedRectangle(cornerRadius: 18).fill(Theme.cardBg))
@@ -149,6 +143,12 @@ struct MineView: View {
                   let jpeg = downscaledJPEG(image) else {
                 alertTitle = "提示"
                 alertMessage = "头像读取失败，请重试"
+                showAlert = true
+                return
+            }
+            guard jpeg.count <= 1024 * 1024 else {
+                alertTitle = "提示"
+                alertMessage = "头像过大（压缩后仍超过 1MB），请更换更小的图片"
                 showAlert = true
                 return
             }

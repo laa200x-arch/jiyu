@@ -222,6 +222,20 @@ async function appealEvaluation(id, reason) {
   return api(`/api/evaluations/${id}/appeal`, { method: 'POST', body: { reason } })
 }
 
+/* ---------- 小程序市场 ---------- */
+async function fetchApps(keyword) {
+  return api('/api/apps' + (keyword ? '?keyword=' + encodeURIComponent(keyword) : ''))
+}
+async function fetchAppDetail(id) {
+  return api('/api/apps/' + id)
+}
+async function publishApp({ name, description, icon, htmlContent }) {
+  return api('/api/apps', { method: 'POST', body: { name, description, icon, htmlContent } })
+}
+async function deleteApp(id) {
+  return api('/api/apps/' + id, { method: 'DELETE' })
+}
+
 /* ---------- 动态 ---------- */
 async function postDynamic(content, imageBase64) {
   return api('/api/dynamics', { method: 'POST', body: { content, imageBase64 } })

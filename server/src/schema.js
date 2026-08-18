@@ -171,6 +171,19 @@ CREATE TABLE IF NOT EXISTS appeals (
   created_at TEXT NOT NULL,
   UNIQUE (evaluation_id, user_id)
 );
+
+CREATE TABLE IF NOT EXISTS apps (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  name TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  icon TEXT NOT NULL DEFAULT '🎮',
+  html_content TEXT NOT NULL,
+  version TEXT NOT NULL DEFAULT '1.0.0',
+  size_kb INTEGER NOT NULL DEFAULT 0,
+  downloads INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL
+);
 `
 
 export const MYSQL_DDL = `
@@ -340,5 +353,18 @@ CREATE TABLE IF NOT EXISTS appeals (
   status ENUM('pending','accepted','rejected') NOT NULL DEFAULT 'pending',
   created_at DATETIME NOT NULL,
   UNIQUE KEY uq_appeal (evaluation_id, user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS apps (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  name VARCHAR(64) NOT NULL,
+  description VARCHAR(500) NOT NULL DEFAULT '',
+  icon VARCHAR(16) NOT NULL DEFAULT '🎮',
+  html_content LONGTEXT NOT NULL,
+  version VARCHAR(16) NOT NULL DEFAULT '1.0.0',
+  size_kb INT NOT NULL DEFAULT 0,
+  downloads INT NOT NULL DEFAULT 0,
+  created_at DATETIME NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 `

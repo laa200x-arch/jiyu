@@ -175,6 +175,10 @@ struct ProfileEditView: View {
                 errorMessage = "头像读取失败，请重试"
                 return
             }
+            guard jpeg.count <= 1024 * 1024 else {
+                errorMessage = "头像过大（压缩后仍超过 1MB），请更换更小的图片"
+                return
+            }
             guard let url = try? await APIClient.shared.uploadMedia(data: jpeg, fileName: "avatar.jpg", mimeType: "image/jpeg") else {
                 errorMessage = "头像上传失败，请检查网络"
                 return

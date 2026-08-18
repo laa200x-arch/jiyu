@@ -86,9 +86,22 @@ export function profileRouter(db) {
     res.json({ user: userWithSkills(req.userId, true) })
   })
 
-  // 用户列表（公开档案，用于匹配与展示）
+  // 用户列表（公开档案，用于匹配/好友搜索；?keyword= 按昵称/用户名/技能模糊搜索）
   router.get('/users', (req, res) => {
-    const rows = db.all('SELECT * FROM users ORDER BY id ASC')
+    const keyword = String(req.query.keyword || '').trim()
+    let rows
+    if (keyword) {
+      rows = db.all(
+        `SELECT * FROM users
+         WHERE nickname LIKE ? OR username LIKE ? OR id IN (
+           SELECT user_id FROM skills WHERE name LIKE ?
+         )
+         ORDER BY id ASC LIMIT 50`,
+        [`%${keyword}%`, `%${keyword}%`, `%${keyword}%`]
+      )
+    } else {
+      rows = db.all('SELECT * FROM users ORDER BY id ASC')
+    }
     res.json({ users: rows.map((row) => {
       const skills = db.all('SELECT * FROM skills WHERE user_id = ?', [row.id])
       return serializeUser(row, { skills })

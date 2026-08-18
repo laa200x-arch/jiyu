@@ -590,6 +590,13 @@ function showFeedCompose() {
 async function renderMessage() {
   const v = document.getElementById('view')
   v.innerHTML = `
+    <div class="msg-tools">
+      <div class="search-box">
+        <input id="user-search" placeholder="🔍 搜索好友（昵称 / 用户名 / 技能）" autocomplete="off">
+        <div id="user-search-res" class="search-res hidden"></div>
+      </div>
+      <button class="btn btn-outline btn-sm" id="mini-apps-btn" title="小程序市场">🛒 小程序</button>
+    </div>
     <div class="chat-layout">
       <div class="chat-list-panel" id="convo-list"></div>
       <div class="chat-main" id="chat-main">
@@ -598,7 +605,56 @@ async function renderMessage() {
         <div class="chat-input" id="chat-input"></div>
       </div>
     </div>`
+  bindUserSearch()
+  v.querySelector('#mini-apps-btn').addEventListener('click', showMiniApps)
   await renderConvoList()
+}
+
+/* 好友搜索（消息页顶部；按昵称/用户名/技能，结果点击直达私聊） */
+function bindUserSearch() {
+  const input = document.getElementById('user-search')
+  const res = document.getElementById('user-search-res')
+  if (!input) return
+  let timer = null
+  input.addEventListener('input', () => {
+    clearTimeout(timer)
+    const kw = input.value.trim()
+    if (!kw) { res.classList.add('hidden'); return }
+    timer = setTimeout(async () => {
+      try {
+        const data = await api('/api/users?keyword=' + encodeURIComponent(kw))
+        const users = (data.users || []).filter((u) => String(u.id) !== String(App.state.user.id)).slice(0, 8)
+        if (!users.length) {
+          res.innerHTML = '<div class="search-item card-sub" style="padding:10px">没有找到相关用户</div>'
+        } else {
+          res.innerHTML = users.map((u) => `
+            <div class="search-item" data-uid="${u.id}">
+              ${avatarHtml(u, 'avatar avatar-sm')}
+              <div style="flex:1;min-width:0">
+                <div class="convo-name">${esc(u.userName)}</div>
+                <div class="card-sub">${esc(u.bio || u.locationLabel || '暂无简介')}</div>
+              </div>
+              <span class="tag tag-credit">${Math.round(u.creditScore)}分</span>
+            </div>`).join('')
+          res.querySelectorAll('.search-item[data-uid]').forEach((el) => el.addEventListener('click', async () => {
+            const uid = el.dataset.uid
+            res.classList.add('hidden')
+            input.value = ''
+            try {
+              const open = await api('/api/conversations/open', { method: 'POST', body: { partnerId: uid } })
+              await refreshAll()
+              const conv = App.state.conversations.find((c) => c.id === open.conversation.id)
+              if (conv) showChat(conv)
+            } catch (e) { toast('打开会话失败：' + e.message) }
+          }))
+        }
+        res.classList.remove('hidden')
+      } catch (e) { /* 静默 */ }
+    }, 300)
+  })
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.search-box')) res.classList.add('hidden')
+  })
 }
 
 async function renderConvoList() {
@@ -988,13 +1044,8 @@ function renderMine() {
             <div class="profile-info">
               <div class="row" style="gap:8px">
                 <span class="profile-name">${esc(u.userName)}</span>
-                ${u.isExposureVip ? '<span class="tag tag-vip">👑 曝光会员</span>' : ''}
               </div>
               <div class="profile-bio">@${esc(u.username || u.userName)}</div>
-              <div class="row" style="gap:6px;margin-top:4px">
-                ${u.verification !== 'none' || u.verification === 'student' || u.verification === 'full' ? '<span class="tag tag-verified">🎓 学生认证</span>' : '<span class="tag tag-muted">🎓 学生认证</span>'}
-                ${u.verification !== 'none' || u.verification === 'realname' || u.verification === 'full' ? '<span class="tag tag-verified">🛡 实名认证</span>' : '<span class="tag tag-muted">🛡 实名认证</span>'}
-              </div>
             </div>
             <div class="credit-ring"><span class="num">${Math.round(u.creditScore)}</span><span class="label">信用分</span></div>
           </div>
@@ -1002,11 +1053,6 @@ function renderMine() {
             <button class="btn btn-primary" id="edit-skills">✏️ 编辑资料</button>
             <button class="btn btn-outline" id="view-profile">👤 查看主页</button>
             <input type="file" id="avatar-file" accept="image/*" hidden>
-          </div>
-          <div class="row" style="margin-top:12px;gap:8px;flex-wrap:wrap">
-            <button class="link-chip" id="verify-student">🎓 学生认证</button>
-            <button class="link-chip" id="verify-realname">🪪 实名认证</button>
-            <button class="link-chip" id="exposure-btn">👑 曝光服务</button>
           </div>
         </div>
 
@@ -1026,15 +1072,6 @@ function renderMine() {
               <div class="card-sub" style="margin-top:8px">已有 8 人愿意教授 ›</div>
             </div>
           </div>
-        </div>
-
-        <div class="exposure-banner">
-          <span class="banner-icon">💎</span>
-          <div style="flex:1">
-            <div class="banner-title">技能曝光服务</div>
-            <div class="banner-sub">提高技能曝光，增加匹配机会，不影响纯公益属性</div>
-          </div>
-          <button class="banner-btn" id="exposure-btn2">立即开通 ›</button>
         </div>
 
         <div class="card">
@@ -1066,10 +1103,6 @@ function renderMine() {
       </div>
     </div>`
 
-  v.querySelector('#verify-student').addEventListener('click', () => doVerify('student'))
-  v.querySelector('#verify-realname').addEventListener('click', () => doVerify('realname'))
-  v.querySelector('#exposure-btn').addEventListener('click', showExposure)
-  v.querySelector('#exposure-btn2').addEventListener('click', showExposure)
   v.querySelector('#edit-skills').addEventListener('click', showSkillEditor)
   v.querySelector('#view-profile').addEventListener('click', () => showUserProfile(u))
   v.querySelector('#change-avatar').addEventListener('click', () => avatarFile.click())
@@ -1078,6 +1111,12 @@ function renderMine() {
     if (!file) return
     try {
       const blob = await compressImage(file)
+      // 头像限制：压缩后仍超过 1MB 则拒绝（服务端上限 2MB）
+      if (blob.size > 1024 * 1024) {
+        toast('头像过大（压缩后仍超过 1MB），请更换更小的图片')
+        e.target.value = ''
+        return
+      }
       const url = await uploadMedia(await blob.arrayBuffer(), 'avatar.jpg', 'image/jpeg')
       await updateProfile({ avatarUrl: url })
       toast('✅ 头像已更新')
@@ -1201,6 +1240,11 @@ function showSkillEditor() {
       if (!file) return
       try {
         const blob = await compressImage(file)
+        if (blob.size > 1024 * 1024) {
+          toast('头像过大（压缩后仍超过 1MB），请更换更小的图片')
+          e.target.value = ''
+          return
+        }
         const url = await uploadMedia(await blob.arrayBuffer(), 'avatar.jpg', 'image/jpeg')
         await updateProfile({ avatarUrl: url })
         toast('✅ 头像已更新')
@@ -1394,6 +1438,123 @@ function showReceivedEvaluations() {
       }).catch((e) => toast('申诉失败：' + e.message))
     }))
   })
+}
+
+/* ================= 小程序市场 ================= */
+
+/** 小程序市场（消息页「🛒 小程序」进入）：搜索 + 列表 + 运行 + 发布 */
+function showMiniApps() {
+  openModal(`
+    <div class="modal-title">🛒 小程序市场</div>
+    <div style="display:flex;gap:8px;margin-bottom:10px">
+      <input id="ma-search" placeholder="🔍 搜索小程序（名称 / 描述 / 作者）" style="flex:1" autocomplete="off">
+      <button class="btn btn-primary btn-sm" id="ma-publish">📤 发布</button>
+    </div>
+    <div id="ma-list"><div class="empty"><div class="empty-icon">⏳</div>加载中…</div></div>
+    <div class="card-sub" style="margin-top:8px">格式：单文件自包含 HTML（内联样式/脚本，无外链）· ≤ 512KB · 沙箱运行</div>`,
+    async (box) => {
+      const listEl = box.querySelector('#ma-list')
+      const search = box.querySelector('#ma-search')
+      const render = async (kw) => {
+        try {
+          const data = await fetchApps(kw)
+          const apps = data.apps || []
+          if (!apps.length) {
+            listEl.innerHTML = '<div class="empty"><div class="empty-icon">🎮</div>暂无小程序<br>点击「发布」上传你的第一个作品</div>'
+            return
+          }
+          listEl.innerHTML = apps.map((a) => `
+            <div class="card" style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
+              <div style="font-size:26px">${esc(a.icon)}</div>
+              <div style="flex:1;min-width:0">
+                <div class="convo-name">${esc(a.name)} <span class="card-sub">v${esc(a.version)}</span></div>
+                <div class="card-sub">${esc(a.description || '暂无简介')} · ${a.sizeKb}KB · ${a.downloads} 次运行</div>
+                <div class="card-sub">作者：${esc(a.authorName)}</div>
+              </div>
+              ${String(a.userId) === String(App.state.user.id)
+                ? `<button class="btn btn-danger btn-sm" data-del="${a.id}">删除</button>`
+                : ''}
+              <button class="btn btn-primary btn-sm" data-run="${a.id}">▶ 运行</button>
+            </div>`).join('')
+          listEl.querySelectorAll('[data-run]').forEach((b) => b.addEventListener('click', () => runMiniApp(b.dataset.run)))
+          listEl.querySelectorAll('[data-del]').forEach((b) => b.addEventListener('click', async () => {
+            if (!confirm('删除这个小程序？')) return
+            try { await deleteApp(b.dataset.del); toast('已删除'); showMiniApps() } catch (e) { toast('删除失败：' + e.message) }
+          }))
+        } catch (e) {
+          listEl.innerHTML = `<div class="empty"><div class="empty-icon">⚠️</div>加载失败：${esc(e.message)}</div>`
+        }
+      }
+      let timer = null
+      search.addEventListener('input', () => {
+        clearTimeout(timer)
+        timer = setTimeout(() => render(search.value.trim()), 300)
+      })
+      box.querySelector('#ma-publish').addEventListener('click', showMiniAppPublish)
+      await render('')
+    })
+}
+
+/** 运行小程序（沙箱 iframe：仅允许脚本，禁外链/导航/弹窗） */
+async function runMiniApp(id) {
+  try {
+    const data = await fetchAppDetail(id)
+    const app = data.app
+    if (!app || !app.htmlContent) return toast('小程序内容为空')
+    openModal(`
+      <div class="modal-title">▶ ${esc(app.name)} <span class="card-sub">by ${esc(app.authorName)}</span></div>
+      <iframe id="ma-frame" sandbox="allow-scripts" style="width:100%;height:520px;border:1px solid var(--divider);border-radius:12px;background:#fff"></iframe>
+      <div class="modal-actions"><button class="btn btn-outline" data-close>关闭</button></div>`)
+    const frame = document.getElementById('ma-frame')
+    frame.srcdoc = app.htmlContent
+  } catch (e) {
+    toast('加载失败：' + e.message)
+  }
+}
+
+/** 发布小程序（选择 .html 文件 + 名称/描述） */
+function showMiniAppPublish() {
+  openModal(`
+    <div class="modal-title">📤 发布小程序</div>
+    <div class="field"><input id="mp-name" placeholder="小程序名称（30 字内）"></div>
+    <div class="field"><input id="mp-desc" placeholder="简介（选填）"></div>
+    <div class="field"><input id="mp-icon" placeholder="图标 Emoji（选填，默认 🎮）" maxlength="4"></div>
+    <div class="field"><input type="file" id="mp-file" accept=".html,text/html" style="padding:6px"></div>
+    <div id="mp-err" class="error-text hidden"></div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" data-close>取消</button>
+      <button class="btn btn-primary" id="mp-submit">发布</button>
+    </div>
+    <p class="hint">格式要求：单文件自包含 HTML（CSS/JS 内联），禁止外链脚本/样式/iframe，≤ 512KB，沙箱运行</p>`,
+    (box) => {
+      const err = box.querySelector('#mp-err')
+      box.querySelector('#mp-file').addEventListener('change', (e) => {
+        const file = e.target.files[0]
+        if (!file) return
+        if (!file.name.toLowerCase().endsWith('.html')) return show(err, '仅支持 .html 文件')
+        if (file.size > 512 * 1024) return show(err, '文件不能超过 512KB')
+        box.querySelector('#mp-submit').dataset.file = file.name
+      })
+      box.querySelector('#mp-submit').addEventListener('click', async () => {
+        const fileInput = box.querySelector('#mp-file')
+        const file = fileInput.files[0]
+        const name = box.querySelector('#mp-name').value.trim()
+        if (!name) return show(err, '请输入小程序名称')
+        if (!file) return show(err, '请选择 .html 文件')
+        const htmlContent = await file.text()
+        try {
+          await publishApp({
+            name,
+            description: box.querySelector('#mp-desc').value.trim(),
+            icon: box.querySelector('#mp-icon').value.trim() || '🎮',
+            htmlContent
+          })
+          toast('✅ 发布成功')
+          closeModal()
+          showMiniApps()
+        } catch (e2) { show(err, e2.message) }
+      })
+    })
 }
 
 /* 新消息应用内弹窗（右下角，点击跳转会话） */

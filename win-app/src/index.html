@@ -7,6 +7,14 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <!-- 启动动画 -->
+  <div id="splash" class="splash">
+    <div class="splash-logo">⇄</div>
+    <div class="splash-title">技遇</div>
+    <div class="splash-sub">纯公益 · 无金钱交易的技能互换平台</div>
+    <div class="splash-bar"><div class="splash-bar-inner"></div></div>
+  </div>
+
   <!-- 登录页 -->
   <div id="login-page" class="page center-page hidden">
     <div class="login-card">
@@ -56,11 +64,11 @@
         <button class="tab" data-view="pet"><span class="tab-icon">🐾</span><span>宠物</span></button>
         <button class="tab" data-view="mine"><span class="tab-icon">👤</span><span>我的</span></button>
       </nav>
-      <div class="sidebar-promo">
-        <div class="promo-icon">⭐</div>
-        <div class="promo-title">技能曝光</div>
-        <div class="promo-sub">提升曝光 · 精准匹配</div>
-        <button class="promo-btn" id="promo-btn">去开通</button>
+      <div class="sidebar-promo" id="sidebar-promo">
+        <div class="promo-icon">🛒</div>
+        <div class="promo-title">小程序市场</div>
+        <div class="promo-sub">消息页进入 · 人人可发布</div>
+        <button class="promo-btn" id="promo-btn">去看看</button>
       </div>
     </aside>
 
