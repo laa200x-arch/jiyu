@@ -763,9 +763,8 @@ struct ChatDetailView: View {
         manager.requestWhenInUseAuthorization()
         blockedBanner = "正在获取位置…"
         locationManager = manager
-        let delegate = LocationDelegate { [weak self] lat, lng in
+        let delegate = LocationDelegate { [self] lat, lng in
             Task { @MainActor in
-                guard let self else { return }
                 self.blockedBanner = nil
                 let result = await self.store.sendMediaMessage(
                     conversationID: convo.id,
