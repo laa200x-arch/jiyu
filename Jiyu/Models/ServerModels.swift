@@ -397,6 +397,7 @@ struct MiniApp: Decodable {
 }
 struct MiniAppsResponse: Decodable { let apps: [MiniApp] }
 struct MiniAppResponse: Decodable { let app: MiniApp }
+extension MiniApp: Identifiable {}
 
 // MARK: - DTO → 本地模型映射
 

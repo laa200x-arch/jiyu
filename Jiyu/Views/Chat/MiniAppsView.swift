@@ -9,6 +9,7 @@ struct MiniAppsView: View {
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var runningApp: MiniApp?
+    @State private var loadTask: Task<Void, Never>?
 
     var body: some View {
         NavigationStack {
@@ -101,8 +102,6 @@ struct MiniAppsView: View {
             }
         }
     }
-
-    private var loadTask: Task<Void, Never>?
 
     private func appRow(_ app: MiniApp) -> some View {
         HStack(spacing: 12) {

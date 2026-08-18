@@ -119,19 +119,17 @@ struct MessageView: View {
                     ForEach(searchResults) { user in
                         Button {
                             Task {
-                                do {
-                                    if store.isServerMode {
-                                        if let convo = await store.openConversation(with: user) {
-                                            // 跳转会话
-                                            if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-                                               let root = windowScene.windows.first?.rootViewController {
-                                                let host = UIHostingController(rootView: ChatDetailView(conversation: convo)
-                                                    .environmentObject(store))
-                                                root.present(host, animated: true)
-                                            }
+                                if store.isServerMode {
+                                    if let convo = await store.openConversation(with: user) {
+                                        // 跳转会话
+                                        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                                           let root = windowScene.windows.first?.rootViewController {
+                                            let host = UIHostingController(rootView: ChatDetailView(conversation: convo)
+                                                .environmentObject(store))
+                                            root.present(host, animated: true)
                                         }
                                     }
-                                } catch { /* 忽略 */ }
+                                }
                             }
                         } label: {
                             searchResultRow(user)
@@ -190,9 +188,12 @@ struct MessageView: View {
         isSearching = true
         Task {
             do {
-                let users = try await APIClient.shared.fetchUsers(keyword: kw)
+                let results = try await APIClient.shared.fetchUsers(keyword: kw)
+                let mineID = store.currentUser.id
                 await MainActor.run {
-                    searchResults = users.filter { $0.id != store.currentUser.id }
+                    searchResults = results
+                        .filter { UUID(serverID: $0.id) != mineID }
+                        .map { UserModel(server: $0) }
                 }
             } catch {
                 await MainActor.run { searchResults = [] }
