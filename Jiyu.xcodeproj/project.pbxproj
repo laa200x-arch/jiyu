@@ -48,6 +48,7 @@
 		A00000000000000000000027 /* ForgotPasswordView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000128 /* ForgotPasswordView.swift */; };
 		A00000000000000000000028 /* ReceivedEvaluationsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000129 /* ReceivedEvaluationsView.swift */; };
 		A00000000000000000000029 /* MiniAppsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000130 /* MiniAppsView.swift */; };
+		A00000000000000000000030 /* BookingHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000131 /* BookingHistoryView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -83,6 +84,7 @@
 		A00000000000000000000128 /* ForgotPasswordView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ForgotPasswordView.swift; sourceTree = "<group>"; };
 		A00000000000000000000129 /* ReceivedEvaluationsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReceivedEvaluationsView.swift; sourceTree = "<group>"; };
 		A00000000000000000000130 /* MiniAppsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MiniAppsView.swift; sourceTree = "<group>"; };
+		A00000000000000000000131 /* BookingHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookingHistoryView.swift; sourceTree = "<group>"; };
 		A0000000000000000000011E /* MatchMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MatchMapView.swift; sourceTree = "<group>"; };
 		A0000000000000000000011F /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
 		A00000000000000000000120 /* UserProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserProfileView.swift; sourceTree = "<group>"; };
@@ -213,6 +215,7 @@
 			children = (
 				A00000000000000000000123 /* PetTabView.swift */,
 				A00000000000000000000127 /* OrderDetailView.swift */,
+				A00000000000000000000131 /* BookingHistoryView.swift */,
 			);
 			path = Pet;
 			sourceTree = "<group>";
@@ -406,6 +409,7 @@
 				A00000000000000000000028 /* ReceivedEvaluationsView.swift in Sources */,
 				A00000000000000000000025 /* PetTabView.swift in Sources */,
 				A00000000000000000000026 /* OrderDetailView.swift in Sources */,
+				A00000000000000000000030 /* BookingHistoryView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -770,7 +770,7 @@ function messageHtml(m) {
       <div class="location-icon">📍</div>
       <div style="flex:1;min-width:0">
         <div class="location-name">${esc(m.text || '我的位置')}</div>
-        <div class="card-sub">${esc(lat)}, ${esc(lng)} · 点击查看地图</div>
+        <div class="location-meta">${esc(lat)}, ${esc(lng)} · 点击查看地图</div>
       </div>
       <span class="location-arrow">↗</span>
     </div>`
@@ -1706,10 +1706,14 @@ async function renderPet() {
       </div>
     </div>
     <div class="pet-section">
-      <div class="pet-section-head"><span class="pet-section-title">我的预约</span></div>
+      <div class="pet-section-head">
+        <span class="pet-section-title">我的预约</span>
+        <button class="pet-edit-btn" id="pet-history" title="查看历史订单" style="width:auto;padding:0 14px;border-radius:999px;font-weight:700">📜 历史订单</button>
+      </div>
       <div id="booking-list"></div>
     </div>`
   v.querySelector('#pet-add').addEventListener('click', () => showPetForm())
+  v.querySelector('#pet-history').addEventListener('click', showBookingHistory)
   v.querySelectorAll('.chip').forEach((c) => c.addEventListener('click', () => {
     v.querySelectorAll('.chip').forEach((x) => x.classList.remove('active'))
     c.classList.add('active')
@@ -2124,16 +2128,33 @@ function showPetForm(pet) {
 }
 
 /* 发起看护订单（两种模式：指定认识的看护人 / 发布到动态让有资历的人接单） */
+/* ============================================================
+ * 发起订单（多选服务 + 自定义价格 + 苹果滚轮时间选择 + 自动结算）
+ * ============================================================ */
 function showBookingForm(service) {
   const pets = App.state.pets
   if (!pets.length) return toast('请先添加宠物档案')
   const providers = App.state.users.filter((u) => u.id !== App.state.user.id)
+  const services = App.state.careServices || []
   openModal(`
-    <div class="modal-title">发起订单 · ${esc(service.name)}</div>
-    <div class="card-sub" style="margin-bottom:12px">服务价 <b style="color:#d97b2e">¥${service.priceYuan}</b> · 平台佣金 10% · 其余归服务人员</div>
+    <div class="modal-title">发起订单</div>
     <div class="form-field"><label>宠物 *</label>
       <select id="b-pet">${pets.map((p) => `<option value="${p.id}">${esc(p.name)}（${esc(p.breed)}）</option>`).join('')}</select>
     </div>
+    <div class="form-field">
+      <label>选择服务 *（可多选，价格可自定义）</label>
+      <div id="b-services">${services.map((s) => `
+        <div class="svc-pick ${s.id === service.id ? 'sel' : ''}" data-svc="${esc(s.id)}">
+          <input type="checkbox" ${s.id === service.id ? 'checked' : ''} data-check>
+          <div class="svc-pick-info">
+            <div class="convo-name">${esc(s.name)}</div>
+            <div class="card-sub">${esc(s.desc)} · ${esc(s.duration)} · 默认 ¥${s.priceYuan}</div>
+          </div>
+          <input class="svc-price-input" type="number" min="0" step="1" value="${s.priceYuan}" data-price title="自定义价格（元）">
+        </div>`).join('')}</div>
+    </div>
+    <div class="form-field"><label>约定时间 *</label><div id="b-wheel"></div></div>
+    <div class="form-field"><label>地点 *（公共场所）</label><input id="b-location" placeholder="如：小区门口/图书馆旁"></div>
     <div class="form-field"><label>接单方式 *</label>
       <select id="b-mode">
         <option value="direct">指定认识的看护人</option>
@@ -2143,28 +2164,86 @@ function showBookingForm(service) {
     <div class="form-field" id="b-provider-wrap"><label>看护人 *（信用分供参考）</label>
       <select id="b-provider">${providers.map((u) => `<option value="${u.id}">${esc(u.userName)}（信用 ${Math.round(u.creditScore)} · ${esc(u.locationLabel)}）</option>`).join('')}</select>
     </div>
-    <div class="form-row">
-      <div class="form-field"><label>约定时间 *</label><input id="b-time" placeholder="如：本周六 18:00"></div>
-      <div class="form-field"><label>地点 *（公共场所）</label><input id="b-location" placeholder="如：小区门口/图书馆旁"></div>
-    </div>
-    <div class="card-sub" style="color:#f29e4d">⚠️ 宠物服务可收费，价格与佣金以订单为准；其他技能互换仍坚持零金钱</div>
+    <div class="bill-box" id="b-bill"></div>
+    <div class="card-sub" style="color:#f29e4d;margin-top:8px">⚠️ 宠物服务可收费，价格与佣金以订单为准；其他技能互换仍坚持零金钱</div>
     <div class="modal-actions">
       <button class="btn btn-outline" data-close>取消</button>
-      <button class="btn btn-primary" id="b-submit">发布订单</button>
+      <button class="btn btn-primary" id="b-submit" disabled>发布订单</button>
     </div>
   `, (box) => {
     const modeWrap = box.querySelector('#b-provider-wrap')
     box.querySelector('#b-mode').addEventListener('change', (e) => {
       modeWrap.style.display = e.target.value === 'direct' ? '' : 'none'
     })
+
+    // ---- 多服务选择 + 自定义价格 ----
+    const svcMap = {}
+    services.forEach((s) => { svcMap[s.id] = s })
+    const updateBill = () => {
+      let total = 0
+      let count = 0
+      box.querySelectorAll('.svc-pick').forEach((row) => {
+        const check = row.querySelector('[data-check]')
+        const priceInput = row.querySelector('[data-price]')
+        if (check.checked) {
+          const p = Number(priceInput.value)
+          total += Number.isFinite(p) && p > 0 ? p : 0
+          count++
+        }
+      })
+      total = Math.round(total * 100) / 100
+      const commission = Math.round(total * 0.1 * 100) / 100
+      const worker = Math.round((total - commission) * 100) / 100
+      box.querySelector('#b-bill').innerHTML = `
+        <div class="bill-row"><span>已选服务</span><b>${count} 项</b></div>
+        <div class="bill-row"><span>服务费合计</span><b>¥${total.toFixed(2)}</b></div>
+        <div class="bill-row"><span>平台佣金（10%）</span><b>¥${commission.toFixed(2)}</b></div>
+        <div class="bill-row worker"><span>服务人员所得</span><b>¥${worker.toFixed(2)}</b></div>
+        <div class="bill-row total"><span>应付合计</span><b>¥${total.toFixed(2)}</b></div>`
+      box.querySelector('#b-submit').disabled = count === 0 || wheelState.past
+    }
+    box.querySelectorAll('.svc-pick').forEach((row) => {
+      const check = row.querySelector('[data-check]')
+      const priceInput = row.querySelector('[data-price]')
+      const sync = () => {
+        row.classList.toggle('sel', check.checked)
+        priceInput.disabled = !check.checked
+        updateBill()
+      }
+      row.addEventListener('click', (e) => {
+        if (e.target === priceInput) return
+        check.checked = !check.checked
+        sync()
+      })
+      check.addEventListener('change', sync)
+      priceInput.addEventListener('input', updateBill)
+      priceInput.disabled = !check.checked
+    })
+
+    // ---- 苹果滚轮时间选择器（过去时间不可选，默认最新时间） ----
+    const wheelState = { past: false }
+    buildWheelPicker(box.querySelector('#b-wheel'), wheelState, updateBill)
+    updateBill()
+    if (wheelState.past) box.querySelector('#b-submit').disabled = true
+
     box.querySelector('#b-submit').addEventListener('click', async () => {
-      const scheduledTime = box.querySelector('#b-time').value.trim()
+      const scheduledTime = wheelState.label
       const location = box.querySelector('#b-location').value.trim()
       const mode = box.querySelector('#b-mode').value
       if (!scheduledTime || !location) return toast('请填写时间与地点（公共场所）')
+      const services = []
+      box.querySelectorAll('.svc-pick').forEach((row) => {
+        const check = row.querySelector('[data-check]')
+        if (!check.checked) return
+        const p = Number(row.querySelector('[data-price]').value)
+        services.push({
+          serviceId: row.dataset.svc,
+          ...(Number.isFinite(p) && p > 0 ? { customPrice: p } : {})
+        })
+      })
       const body = {
         petId: box.querySelector('#b-pet').value,
-        serviceId: service.id,
+        services,
         scheduledTime,
         location
       }
@@ -2182,6 +2261,99 @@ function showBookingForm(service) {
       } catch (e) { toast('发布失败：' + e.message) }
     })
   })
+}
+
+/**
+ * 苹果风格滚轮时间选择器（年/月/日/时/分 5 列）
+ * - 过去的时间不在选项内（天然灰色不可选）
+ * - 默认定位到当前时间（最新）
+ */
+function buildWheelPicker(container, state, onChange) {
+  const now = new Date()
+  const Y = now.getFullYear()
+  const years = []
+  for (let y = Y; y <= Y + 3; y++) years.push(y)
+
+  // 各列选项生成（依赖前序选中值，保证不出现过去时间）
+  const range = (sel) => {
+    const y = sel.y, m = sel.m, d = sel.d, h = sel.h
+    const daysInMonth = new Date(y, m + 1, 0).getDate()
+    const months = y === Y ? Array.from({ length: 12 - now.getMonth() }, (_, i) => now.getMonth() + i) : Array.from({ length: 12 }, (_, i) => i)
+    const days = (y === Y && m === now.getMonth())
+      ? Array.from({ length: daysInMonth - now.getDate() + 1 }, (_, i) => now.getDate() + i)
+      : Array.from({ length: daysInMonth }, (_, i) => i + 1)
+    const hours = (y === Y && m === now.getMonth() && d === now.getDate())
+      ? Array.from({ length: 24 - now.getHours() }, (_, i) => now.getHours() + i)
+      : Array.from({ length: 24 }, (_, i) => i)
+    const minutes = (y === Y && m === now.getMonth() && d === now.getDate() && h === now.getHours())
+      ? Array.from({ length: 60 - now.getMinutes() }, (_, i) => now.getMinutes() + i)
+      : Array.from({ length: 60 }, (_, i) => i)
+    return { months, days, hours, minutes }
+  }
+
+  let sel = { y: Y, m: now.getMonth(), d: now.getDate(), h: now.getHours(), min: now.getMinutes() }
+  const pad = (n) => String(n).padStart(2, '0')
+
+  const makeCol = (label, getOptions, getValue, setValue) => {
+    const col = document.createElement('div')
+    col.className = 'wheel-col'
+    col.innerHTML = `<div class="wheel-selection"></div><div class="wheel-mask"></div><div class="wheel-col-inner"></div>`
+    const inner = col.querySelector('.wheel-col-inner')
+    const paint = () => {
+      const opts = getOptions()
+      const val = getValue()
+      inner.innerHTML = opts.map((o, i) => `<div class="wheel-item ${o === val ? 'sel' : ''}" data-i="${i}">${label === '年' ? o + ' 年' : label === '月' ? o + 1 + ' 月' : label === '日' ? o + ' 日' : label === '时' ? pad(o) + ' 时' : pad(o) + ' 分'}</div>`).join('')
+      const idx = Math.max(0, opts.indexOf(val))
+      col.scrollTop = idx * 40
+    }
+    col.addEventListener('scroll', () => {
+      const idx = Math.round(col.scrollTop / 40)
+      const opts = getOptions()
+      if (opts[idx] !== undefined && opts[idx] !== getValue()) {
+        setValue(opts[idx])
+        // 后续列范围可能变化：重算
+        const { months, days, hours, minutes } = range(sel)
+        if (months.indexOf(sel.m) < 0) sel.m = months[0]
+        if (days.indexOf(sel.d) < 0) sel.d = days[0]
+        if (hours.indexOf(sel.h) < 0) sel.h = hours[0]
+        if (minutes.indexOf(sel.min) < 0) sel.min = minutes[0]
+        refreshAllCols()
+        updateLabel()
+      }
+    })
+    container.appendChild(col)
+    return { paint, refresh: () => { const o = getOptions(); const idx = Math.max(0, o.indexOf(getValue())); col.scrollTop = idx * 40; paint() } }
+  }
+
+  const cols = {}
+  const buildCols = () => {
+    container.innerHTML = ''
+    cols.year = makeCol('年', () => years, () => sel.y, (v) => { sel.y = v })
+    cols.month = makeCol('月', () => range(sel).months, () => sel.m, (v) => { sel.m = v })
+    cols.day = makeCol('日', () => range(sel).days, () => sel.d, (v) => { sel.d = v })
+    cols.hour = makeCol('时', () => range(sel).hours, () => sel.h, (v) => { sel.h = v })
+    cols.minute = makeCol('分', () => range(sel).minutes, () => sel.min, (v) => { sel.min = v })
+    const label = document.createElement('div')
+    label.className = 'wheel-time'
+    label.id = 'b-wheel-time'
+    container.appendChild(label)
+  }
+  const refreshAllCols = () => {
+    const { months, days, hours, minutes } = range(sel)
+    cols.month.refresh(); cols.day.refresh(); cols.hour.refresh(); cols.minute.refresh()
+  }
+  const updateLabel = () => {
+    const label = container.querySelector('#b-wheel-time')
+    const time = new Date(sel.y, sel.m, sel.d, sel.h, sel.min)
+    const past = time.getTime() < Date.now()
+    state.past = past
+    state.label = `${sel.y}-${pad(sel.m + 1)}-${pad(sel.d)} ${pad(sel.h)}:${pad(sel.min)}`
+    label.textContent = past ? '⛔ 请选择未来的时间' : `📅 ${state.label}`
+    label.className = 'wheel-time' + (past ? ' past' : '')
+    if (onChange) onChange()
+  }
+  buildCols()
+  updateLabel()
 }
 
 function renderBookings() {
@@ -2216,6 +2388,69 @@ function renderBookings() {
 }
 function orderStatusText(s) {
   return { open: '待接单', assigned: '已接单', ongoing: '服务中', completed: '已完成', cancelled: '已取消' }[s] || s
+}
+
+/* ============================================================
+ * 历史订单（宠物页入口）：状态筛选 + 完整列表 + 详情/标记完成
+ * ============================================================ */
+function showBookingHistory() {
+  openModal(`
+    <div class="modal-title">📜 历史订单</div>
+    <div class="history-chips" id="bh-chips">
+      <button class="chip active" data-f="">全部</button>
+      <button class="chip" data-f="open">待接单</button>
+      <button class="chip" data-f="assigned">已接单</button>
+      <button class="chip" data-f="ongoing">服务中</button>
+      <button class="chip" data-f="completed">已完成</button>
+      <button class="chip" data-f="cancelled">已取消</button>
+    </div>
+    <div id="bh-list"><div class="empty"><div class="empty-icon">⏳</div>加载中…</div></div>`,
+    async (box) => {
+      const listEl = box.querySelector('#bh-list')
+      const render = async (filter) => {
+        try {
+          await fetchBookings()
+        } catch (e) { /* 保留现有 */ }
+        const list = App.state.bookings
+          .filter((b) => !filter || b.status === filter)
+          .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
+        if (!list.length) {
+          listEl.innerHTML = '<div class="empty"><div class="empty-icon">📜</div>暂无订单记录</div>'
+          return
+        }
+        const isMine = (b) => String(b.userId) === String(App.state.user.id)
+        listEl.innerHTML = list.map((b) => `
+          <div class="card" style="margin-bottom:8px;cursor:pointer" data-bid="${b.id}">
+            <div class="row">
+              <div style="flex:1">
+                <div class="convo-name">${esc(b.serviceName)} <span class="tag tag-verified">${esc(b.pet ? b.pet.name : '')}</span></div>
+                <div class="card-sub">🕐 ${esc(b.scheduledTime)} · 📍 ${esc(b.location || '—')}</div>
+                <div class="card-sub">${isMine(b) ? '看护人：' + esc(b.provider ? b.provider.userName : '待接单…') : '下单人：' + esc(b.initiator ? b.initiator.userName : '—')}</div>
+                ${b.priceYuan != null ? `<div class="card-sub">💰 服务费 <b style="color:#d97b2e">¥${b.priceYuan}</b> · 佣金 ¥${b.commissionYuan} · 服务人员 ¥${b.workerIncome}</div>` : ''}
+                <div class="card-sub" style="color:#9aa0ae">🕓 ${fmtTime(b.createdAt)}</div>
+              </div>
+              <span class="exchange-status ${b.status}">${orderStatusText(b.status)}</span>
+            </div>
+            ${(b.status === 'assigned' || b.status === 'ongoing') && (isMine(b) || String(b.providerId) === String(App.state.user.id))
+              ? `<div class="row" style="margin-top:8px"><span class="spacer"></span><button class="btn btn-outline btn-sm" data-done="${b.id}">标记完成</button></div>`
+              : ''}
+          </div>`).join('')
+        listEl.querySelectorAll('[data-bid]').forEach((c) => c.addEventListener('click', (e) => {
+          if (e.target.closest('[data-done]')) return
+          showOrderDetail(c.dataset.bid)
+        }))
+        listEl.querySelectorAll('[data-done]').forEach((btn) => btn.addEventListener('click', async () => {
+          await completeBooking(btn.dataset.done)
+          render(filter)
+        }))
+      }
+      box.querySelectorAll('#bh-chips .chip').forEach((c) => c.addEventListener('click', () => {
+        box.querySelectorAll('#bh-chips .chip').forEach((x) => x.classList.remove('active'))
+        c.classList.add('active')
+        render(c.dataset.f)
+      }))
+      await render('')
+    })
 }
 
 /* 注册视图入口（供 app.js 调用） */

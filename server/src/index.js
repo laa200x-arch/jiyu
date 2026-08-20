@@ -41,6 +41,7 @@ async function main() {
   try { db.exec('ALTER TABLE bookings ADD COLUMN commission_yuan REAL') } catch { /* 列已存在 */ }
   try { db.exec('ALTER TABLE bookings ADD COLUMN worker_income REAL') } catch { /* 列已存在 */ }
   try { db.exec('ALTER TABLE bookings ADD COLUMN open_to_feed INTEGER NOT NULL DEFAULT 0') } catch { /* 列已存在 */ }
+  try { db.exec('ALTER TABLE bookings ADD COLUMN services_json TEXT') } catch { /* 列已存在 */ }
   try { db.exec('ALTER TABLE dynamics ADD COLUMN order_id TEXT') } catch { /* 列已存在 */ }
   try { db.exec('ALTER TABLE messages ADD COLUMN order_id TEXT') } catch { /* 列已存在 */ }
   // 迁移：旧 bookings 表 provider_id 为 NOT NULL，需重建为可空（订单可发布待接单）

@@ -8,6 +8,7 @@ struct PetTabView: View {
     @State private var showAdd = false
     @State private var editingPet: ServerPet?
     @State private var bookingService: ServerCareService?
+    @State private var showHistory = false
 
     var body: some View {
         ScrollView {
@@ -45,6 +46,9 @@ struct PetTabView: View {
         }
         .sheet(item: $bookingService) { service in
             BookingSheet(service: service)
+        }
+        .sheet(isPresented: $showHistory) {
+            BookingHistoryView()
         }
     }
 
@@ -236,10 +240,21 @@ struct PetTabView: View {
 
     private var bookingsSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("我的订单（我发布 + 我接单）")
-                .font(.subheadline)
-                .bold()
-                .foregroundStyle(Theme.textPrimary)
+            HStack {
+                Text("我的订单（我发布 + 我接单）")
+                    .font(.subheadline)
+                    .bold()
+                    .foregroundStyle(Theme.textPrimary)
+                Spacer()
+                Button {
+                    showHistory = true
+                } label: {
+                    Label("历史订单", systemImage: "clock.arrow.circlepath")
+                        .font(.caption)
+                        .bold()
+                        .foregroundStyle(Theme.primary)
+                }
+            }
             if store.bookings.isEmpty {
                 Text("暂无订单，从服务目录发起第一笔订单吧（可指定看护人，或发布到动态区等有资历的人接单）")
                     .font(.caption)
@@ -799,34 +814,119 @@ struct BookingSheet: View {
     @EnvironmentObject private var store: MockDataStore
     @Environment(\.dismiss) private var dismiss
 
+    /// 进入时默认选中的服务（从服务目录点入）
     let service: ServerCareService
 
     /// 0 = 指定看护人；1 = 发布到动态区（有资历者接单）
     @State private var orderMode = 0
     @State private var petID: String?
     @State private var providerID: String?
-    @State private var scheduledTime = ""
+    @State private var scheduleDate = Date()
     @State private var location = ""
     @State private var errorMessage: String?
+    /// 服务选择：serviceId → 是否选中；价格：serviceId → 自定义价（nil 用默认）
+    @State private var selectedServices: Set<String>
+    @State private var customPrices: [String: String]
 
-    private var commission: Double {
-        (service.priceYuan * 0.1 * 100).rounded() / 100
+    init(service: ServerCareService) {
+        self.service = service
+        _selectedServices = State(initialValue: [service.id])
+        _customPrices = State(initialValue: [:])
     }
 
-    private var workerIncome: Double {
-        ((service.priceYuan - commission) * 100).rounded() / 100
+    private var dateFormatter: DateFormatter {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd HH:mm"
+        return f
+    }
+
+    /// 结算：合计 / 佣金 10% / 服务人员所得
+    private var bill: (total: Double, commission: Double, worker: Double, count: Int) {
+        var total = 0.0
+        var count = 0
+        for s in store.careServices where selectedServices.contains(s.id) {
+            if let custom = customPrices[s.id], let v = Double(custom), v > 0 {
+                total += v
+            } else {
+                total += s.priceYuan
+            }
+            count += 1
+        }
+        let rounded = (total * 100).rounded() / 100
+        let commission = (rounded * 0.1 * 100).rounded() / 100
+        return (rounded, commission, ((rounded - commission) * 100).rounded() / 100, count)
     }
 
     var body: some View {
         NavigationStack {
             Form {
-                Section("服务") {
-                    LabeledContent("服务", value: service.name)
-                    Text("¥\(yuanText(service.priceYuan))/次 · 平台佣金 ¥\(yuanText(commission)) · 服务人员得 ¥\(yuanText(workerIncome))")
+                Section {
+                    Text("选择服务（可多选，价格可自定义）")
                         .font(.caption)
-                        .bold()
-                        .foregroundStyle(Theme.warning)
+                        .foregroundStyle(Theme.textSecondary)
+                    ForEach(store.careServices) { s in
+                        HStack(spacing: 10) {
+                            Image(systemName: selectedServices.contains(s.id) ? "checkmark.circle.fill" : "circle")
+                                .font(.title3)
+                                .foregroundStyle(selectedServices.contains(s.id) ? Theme.primary : .gray)
+                                .onTapGesture {
+                                    if selectedServices.contains(s.id) { selectedServices.remove(s.id) }
+                                    else { selectedServices.insert(s.id) }
+                                }
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(s.name)
+                                    .font(.subheadline)
+                                    .bold()
+                                    .foregroundStyle(Theme.textPrimary)
+                                Text("\(s.duration) · 默认 ¥\(yuanText(s.priceYuan))")
+                                    .font(.caption2)
+                                    .foregroundStyle(Theme.textSecondary)
+                            }
+                            Spacer()
+                            HStack(spacing: 2) {
+                                Text("¥")
+                                    .font(.caption)
+                                    .foregroundStyle(Theme.textSecondary)
+                                TextField("\(yuanText(s.priceYuan))", text: Binding(
+                                    get: { customPrices[s.id] ?? "" },
+                                    set: { customPrices[s.id] = $0 }
+                                ))
+                                .keyboardType(.decimalPad)
+                                .multilineTextAlignment(.trailing)
+                                .frame(width: 64)
+                                .font(.subheadline)
+                                .disabled(!selectedServices.contains(s.id))
+                                .opacity(selectedServices.contains(s.id) ? 1 : 0.4)
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 5)
+                            .background(RoundedRectangle(cornerRadius: 8).fill(Theme.inputBg))
+                        }
+                        .padding(.vertical, 2)
+                    }
+                    // 账单自动计算
+                    VStack(spacing: 6) {
+                        billRow("已选服务", "\(bill.count) 项")
+                        billRow("服务费合计", "¥\(String(format: "%.2f", bill.total))", bold: true)
+                        billRow("平台佣金（10%）", "¥\(String(format: "%.2f", bill.commission))")
+                        billRow("服务人员所得", "¥\(String(format: "%.2f", bill.worker))", color: Theme.success)
+                        Divider()
+                        HStack {
+                            Text("应付合计")
+                                .font(.subheadline)
+                                .bold()
+                            Spacer()
+                            Text("¥\(String(format: "%.2f", bill.total))")
+                                .font(.headline)
+                                .foregroundStyle(Theme.warning)
+                        }
+                    }
+                    .padding(10)
+                    .background(RoundedRectangle(cornerRadius: 12).fill(Theme.bg))
+                } header: {
+                    Text("服务 *")
                 }
+
                 Section("宠物 *") {
                     Picker("选择宠物", selection: $petID) {
                         ForEach(store.pets) { pet in
@@ -834,6 +934,22 @@ struct BookingSheet: View {
                         }
                     }
                 }
+
+                Section("约定时间 *") {
+                    DatePicker("约定时间", selection: $scheduleDate, in: Date()..., displayedComponents: [.date, .hourAndMinute])
+                        .datePickerStyle(.wheel) // 苹果滑动选择器：过去时间灰色不可选，默认最新时间
+                        .labelsHidden()
+                        .frame(maxHeight: 160)
+                    Text("\(dateFormatter.string(from: scheduleDate))")
+                        .font(.subheadline)
+                        .bold()
+                        .foregroundStyle(Theme.primary)
+                }
+
+                Section("地点 *") {
+                    TextField("公共场所，如：小区门口/图书馆旁", text: $location)
+                }
+
                 Section("下单方式 *") {
                     Picker("下单方式", selection: $orderMode) {
                         Text("指定认识的看护人").tag(0)
@@ -852,28 +968,40 @@ struct BookingSheet: View {
                             .foregroundStyle(Theme.textSecondary)
                     }
                 }
-                Section("约定") {
-                    TextField("约定时间 *（如：本周六 18:00）", text: $scheduledTime)
-                    TextField("地点 *（公共场所）", text: $location)
-                }
+
                 if let errorMessage {
                     Section {
                         Text(errorMessage).font(.caption).foregroundStyle(Theme.danger)
                     }
                 }
+
                 Section {
                     Button(orderMode == 0 ? "发起订单" : "发布订单") { submit() }
                         .frame(maxWidth: .infinity)
                         .font(.headline)
+                        .disabled(bill.count == 0)
                 }
             }
-            .navigationTitle("发起订单 · \(service.name)")
+            .navigationTitle("发起订单")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("取消") { dismiss() }
                 }
             }
+        }
+    }
+
+    private func billRow(_ label: String, _ value: String, bold: Bool = false, color: Color = Theme.textPrimary) -> some View {
+        HStack {
+            Text(label)
+                .font(.caption)
+                .foregroundStyle(Theme.textSecondary)
+            Spacer()
+            Text(value)
+                .font(bold ? .subheadline : .caption)
+                .bold()
+                .foregroundStyle(color)
         }
     }
 
@@ -887,20 +1015,36 @@ struct BookingSheet: View {
             errorMessage = "请选择宠物（可先添加宠物档案）"
             return
         }
-        let time = scheduledTime.trimmingCharacters(in: .whitespaces)
+        guard bill.count > 0 else {
+            errorMessage = "请至少选择一个服务"
+            return
+        }
         let place = location.trimmingCharacters(in: .whitespaces)
-        guard !time.isEmpty, !place.isEmpty else {
-            errorMessage = "请填写约定时间与地点"
+        guard !place.isEmpty else {
+            errorMessage = "请填写服务地点（公共场所）"
             return
         }
         if orderMode == 0, providerID == nil {
             errorMessage = "请选择看护人"
             return
         }
+        // 服务列表：选中项 + 自定义价格（校验）
+        var services: [[String: Any]] = []
+        for s in store.careServices where selectedServices.contains(s.id) {
+            var item: [String: Any] = ["serviceId": s.id]
+            if let custom = customPrices[s.id]?.trimmingCharacters(in: .whitespaces), !custom.isEmpty {
+                guard let v = Double(custom), v >= 0, v <= 10000 else {
+                    errorMessage = "「\(s.name)」自定义价格不合法"
+                    return
+                }
+                item["customPrice"] = v
+            }
+            services.append(item)
+        }
         var body: [String: Any] = [
             "petId": petID,
-            "serviceId": service.id,
-            "scheduledTime": time,
+            "services": services,
+            "scheduledTime": dateFormatter.string(from: scheduleDate),
             "location": place
         ]
         if orderMode == 0, let providerID {

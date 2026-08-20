@@ -309,6 +309,7 @@ struct ServerBooking: Decodable, Identifiable {
     let petId: String
     let serviceId: String
     let serviceName: String
+    let services: [BookingServiceItem]?
     let scheduledTime: String
     let location: String?
     var status: String
@@ -322,6 +323,14 @@ struct ServerBooking: Decodable, Identifiable {
     let provider: BookingUser?
     let applications: [BookingApplication]?
     let myApplication: MyApplication?
+    let createdAt: String?
+}
+
+/// 订单服务明细（多选服务 + 自定义价格）
+struct BookingServiceItem: Decodable {
+    let serviceId: String
+    let name: String
+    let price: Double
 }
 
 struct BookingsResponse: Decodable { let bookings: [ServerBooking] }

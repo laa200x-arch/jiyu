@@ -547,6 +547,7 @@ body {
 .msg-location-card:hover { transform: translateY(-1px); }
 .location-icon { font-size: 22px; }
 .location-name { font-weight: 700; font-size: 13px; color: var(--text); }
+.location-meta { font-size: 12px; font-weight: 600; color: #374151; margin-top: 2px; } /* 高对比度：深灰文字 */
 .location-arrow { color: var(--primary); font-weight: 700; }
 
 /* 小程序排行榜 */
@@ -751,3 +752,59 @@ body {
 }
 .pet-back-btn:hover { background: #e4e7ee; }
 .pet-topbar-title { font-size: 16px; font-weight: 700; color: var(--text); flex: 1; }
+
+/* ===== 苹果风格滚轮时间选择器 ===== */
+.wheel-picker {
+  display: flex; justify-content: space-between; gap: 4px;
+  background: #f7f8fb; border-radius: 16px; padding: 8px 4px; user-select: none;
+}
+.wheel-col {
+  flex: 1; height: 168px; overflow-y: scroll; scroll-snap-type: y mandatory;
+  scrollbar-width: none; -ms-overflow-style: none; position: relative;
+}
+.wheel-col::-webkit-scrollbar { display: none; }
+.wheel-col-inner { padding: 64px 0; }
+.wheel-item {
+  height: 40px; line-height: 40px; text-align: center; font-size: 15px;
+  color: #9aa0ae; scroll-snap-align: center; cursor: pointer; transition: color .15s;
+}
+.wheel-item.sel { color: #1f2937; font-weight: 700; font-size: 17px; }
+.wheel-mask {
+  position: absolute; inset: 0; pointer-events: none; border-radius: 16px;
+  background: linear-gradient(180deg, #f7f8fb 0%, rgba(247,248,251,0) 30%, rgba(247,248,251,0) 70%, #f7f8fb 100%);
+}
+.wheel-selection {
+  position: absolute; left: 4px; right: 4px; top: 64px; height: 40px;
+  border-radius: 10px; background: #fff; box-shadow: 0 1px 6px rgba(15,20,25,.08);
+  pointer-events: none;
+}
+.wheel-label { text-align: center; font-size: 11px; color: #9aa0ae; margin-top: 4px; }
+.wheel-time {
+  text-align: center; font-size: 15px; font-weight: 700; color: var(--primary); margin-top: 8px;
+}
+.wheel-time.past { color: #b3b8c4; font-weight: 600; }
+
+/* 多服务选择（发起订单） */
+.svc-pick { display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+  border: 1.5px solid var(--divider); border-radius: 12px; margin-bottom: 8px; cursor: pointer;
+  transition: border-color .2s, background .2s; background: #fff; }
+.svc-pick.sel { border-color: var(--primary); background: #f0f4ff; }
+.svc-pick input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--primary); flex-shrink: 0; }
+.svc-pick-info { flex: 1; min-width: 0; }
+.svc-price-input {
+  width: 86px; padding: 7px 10px; font-size: 14px; font-family: inherit; text-align: right;
+  border: 1px solid var(--divider); border-radius: 10px; outline: none; background: #fff;
+}
+.svc-price-input:focus { border-color: var(--primary); }
+.bill-box {
+  background: #f7f8fb; border-radius: 14px; padding: 12px 14px; margin-top: 4px;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.bill-row { display: flex; justify-content: space-between; font-size: 13px; color: var(--text-2); }
+.bill-row.total { font-size: 15px; font-weight: 800; color: var(--text); border-top: 1px dashed var(--divider); padding-top: 8px; }
+.bill-row.total b { color: #d97b2e; }
+.bill-row.worker b { color: var(--success); }
+.bill-row b { color: var(--text); font-weight: 700; }
+
+/* 订单历史筛选 */
+.history-chips { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }

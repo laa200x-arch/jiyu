@@ -169,6 +169,7 @@ export function petsRouter(db, bus = { io: null }) {
       petId: String(row.pet_id),
       serviceId: row.service_id,
       serviceName: row.service_name,
+      services: row.services_json ? JSON.parse(row.services_json) : null,
       scheduledTime: row.scheduled_time,
       location: row.location || null,
       status: row.status,
@@ -203,12 +204,13 @@ export function petsRouter(db, bus = { io: null }) {
     res.json({ booking: serializeBooking(row, req.userId) })
   })
 
-  // 发起看护订单（收费模式：价格 = 服务定价；平台佣金 10%，其余归服务人员）
+  // 发起看护订单（收费模式：可多选服务 + 自定义价格；平台佣金 10% 自动计算，其余归服务人员）
   // 两种方式：providerId 指定认识的看护人；或 openToFeed 发布到互换动态让有资历的人接单
+  // body.services: [{serviceId, customPrice?}]（多选）；兼容旧参数 serviceId（单服务）
   router.post('/bookings', (req, res) => {
-    const { petId, serviceId, providerId, scheduledTime, location, openToFeed } = req.body || {}
-    if (!petId || !serviceId || !scheduledTime) {
-      return res.status(400).json({ error: 'petId/serviceId/scheduledTime 必填' })
+    const { petId, serviceId, services, providerId, scheduledTime, location, openToFeed } = req.body || {}
+    if (!petId || !scheduledTime) {
+      return res.status(400).json({ error: 'petId/scheduledTime 必填' })
     }
     if (!providerId && !openToFeed) {
       return res.status(400).json({ error: '请选择看护人，或发布到动态区等待接单' })
@@ -216,25 +218,38 @@ export function petsRouter(db, bus = { io: null }) {
     if (providerId && Number(providerId) === req.userId) return res.status(400).json({ error: '不能下单给自己' })
     const pet = db.get('SELECT * FROM pets WHERE id = ? AND user_id = ?', [petId, req.userId])
     if (!pet) return res.status(404).json({ error: '宠物不存在' })
-    const service = CARE_SERVICES.find((s) => s.id === serviceId)
-    if (!service) return res.status(404).json({ error: '服务不存在' })
-    if (providerId) {
-      const provider = db.get('SELECT id FROM users WHERE id = ?', [providerId])
-      if (!provider) return res.status(404).json({ error: '看护人不存在' })
+    // 归一化为多服务列表：新格式 services 数组 / 旧格式单 serviceId
+    const rawServices = Array.isArray(services) && services.length
+      ? services
+      : (serviceId ? [{ serviceId }] : [])
+    if (!rawServices.length) return res.status(400).json({ error: '请至少选择一个服务' })
+    // 校验服务 + 计算金额（自定义价格优先，未填用服务定价）
+    const items = []
+    for (const s of rawServices) {
+      const svc = CARE_SERVICES.find((x) => x.id === s.serviceId)
+      if (!svc) return res.status(404).json({ error: `服务不存在: ${s.serviceId}` })
+      let price = svc.priceYuan
+      if (s.customPrice !== undefined && s.customPrice !== null && s.customPrice !== '') {
+        const custom = Number(s.customPrice)
+        if (!Number.isFinite(custom) || custom < 0 || custom > 10000) {
+          return res.status(400).json({ error: `「${svc.name}」自定义价格不合法` })
+        }
+        price = Math.round(custom * 100) / 100
+      }
+      items.push({ serviceId: svc.id, name: svc.name, price })
     }
-    if (!location) return res.status(400).json({ error: '请填写服务地点（公共场所）' })
-
-    // 金额结算：平台佣金 = 价格 × 佣金率；服务人员所得 = 价格 - 佣金
-    const price = service.priceYuan
-    const commission = Math.round(price * COMMISSION_RATE * 100) / 100
-    const workerIncome = Math.round((price - commission) * 100) / 100
+    const totalPrice = Math.round(items.reduce((sum, i) => sum + i.price, 0) * 100) / 100
+    const commission = Math.round(totalPrice * COMMISSION_RATE * 100) / 100
+    const workerIncome = Math.round((totalPrice - commission) * 100) / 100
     const status = openToFeed ? 'open' : 'assigned'
+    const primary = items[0]
+    const serviceNames = items.map((i) => i.name).join(' + ')
 
     const r = db.run(
-      `INSERT INTO bookings (user_id, provider_id, pet_id, service_id, service_name, scheduled_time, location, status, price_yuan, commission_rate, commission_yuan, worker_income, open_to_feed, created_at)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-      [req.userId, providerId || null, petId, serviceId, service.name, scheduledTime, location, status,
-        price, COMMISSION_RATE, commission, workerIncome, openToFeed ? 1 : 0, now()]
+      `INSERT INTO bookings (user_id, provider_id, pet_id, service_id, service_name, services_json, scheduled_time, location, status, price_yuan, commission_rate, commission_yuan, worker_income, open_to_feed, created_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      [req.userId, providerId || null, petId, primary.serviceId, serviceNames, JSON.stringify(items), scheduledTime, location, status,
+        totalPrice, COMMISSION_RATE, commission, workerIncome, openToFeed ? 1 : 0, now()]
     )
     const orderId = r.lastInsertRowid
 
@@ -242,10 +257,12 @@ export function petsRouter(db, bus = { io: null }) {
     if (openToFeed) {
       db.run(
         `INSERT INTO dynamics (user_id, content, image_base64, is_system_post, order_id, created_at) VALUES (?,?,?,?,?,?)`,
-        [req.userId, `【宠物护理订单】${service.name} · ${pet.name} · ¥${price}/次 · ${scheduledTime}`, null, 0, String(orderId), now()]
+        [req.userId, `【宠物护理订单】${serviceNames} · ${pet.name} · ¥${totalPrice} · ${scheduledTime}`, null, 0, String(orderId), now()]
       )
     }
-    res.status(201).json({ booking: { id: String(orderId), status, priceYuan: price, commissionYuan: commission, workerIncome } })
+    res.status(201).json({
+      booking: { id: String(orderId), status, priceYuan: totalPrice, commissionYuan: commission, workerIncome, services: items }
+    })
   })
 
   // 接单申请（"有资历的人可以接单"：信用 ≥75 且已完成认证；不能申请自己的单；仅 open 状态）

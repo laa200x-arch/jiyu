@@ -655,13 +655,15 @@ struct ChatDetailView: View {
                                 .bold()
                                 .foregroundStyle(Theme.textPrimary)
                             Text(String(format: "%.5f, %.5f · 点击查看地图", parts[0], parts[1]))
-                                .font(.caption2)
-                                .foregroundStyle(Theme.textSecondary)
+                                .font(.caption)
+                                .fontWeight(.semibold)
+                                .foregroundStyle(Theme.textPrimary.opacity(0.8)) // 高对比度：深色文字
                         }
                         Spacer(minLength: 0)
                         Image(systemName: "arrow.up.right")
                             .font(.caption)
-                            .foregroundStyle(Theme.primary)
+                            .bold()
+                            .foregroundStyle(Theme.primaryDeep)
                     }
                     .padding(12)
                     .frame(width: 210, alignment: .leading)
