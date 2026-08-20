@@ -584,7 +584,8 @@ struct PetAddSheet: View {
                 .disabled(isSaving || isUploadingPhoto)
                 .padding(.horizontal, 16)
                 .padding(.top, 8)
-                .background(.ultraThinMaterial)
+                // 固定浅色背景（不用系统 Material，防止暗黑模式反转成灰色遮罩）
+                .background(Theme.bg.opacity(0.98))
             }
         }
     }
@@ -602,7 +603,7 @@ struct PetAddSheet: View {
             .font(.system(size: 26))
             .foregroundStyle(.tertiary)
             .frame(width: 84, height: 84)
-            .background(RoundedRectangle(cornerRadius: 18).fill(Color(.systemGray6)))
+            .background(RoundedRectangle(cornerRadius: 18).fill(Theme.inputBg))
             .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [5])))
             .foregroundStyle(.quaternary)
     }
@@ -632,7 +633,7 @@ struct PetAddSheet: View {
                 .font(.body)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 12)
-                .background(RoundedRectangle(cornerRadius: 13).fill(Color(.systemGray6)))
+                .background(RoundedRectangle(cornerRadius: 13).fill(Theme.inputBg))
         }
     }
 
@@ -646,7 +647,7 @@ struct PetAddSheet: View {
                 .padding(.vertical, 14)
                 .background(
                     RoundedRectangle(cornerRadius: 15)
-                        .fill(selected ? Theme.primary.opacity(0.10) : Color(.systemGray6))
+                        .fill(selected ? Theme.primary.opacity(0.10) : Theme.inputBg)
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 15)
@@ -671,7 +672,7 @@ struct PetAddSheet: View {
             .padding(.vertical, 12)
             .background(
                 RoundedRectangle(cornerRadius: 15)
-                    .fill(selected ? Theme.primary.opacity(0.10) : Color(.systemGray6))
+                    .fill(selected ? Theme.primary.opacity(0.10) : Theme.inputBg)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 15)
@@ -696,7 +697,7 @@ struct PetAddSheet: View {
                         .padding(.vertical, 8)
                         .frame(maxWidth: .infinity)
                         .background(
-                            Capsule().fill(selected.wrappedValue.contains(item) ? Theme.primary.opacity(0.10) : Color(.systemGray6))
+                            Capsule().fill(selected.wrappedValue.contains(item) ? Theme.primary.opacity(0.10) : Theme.inputBg)
                         )
                         .overlay(
                             Capsule().stroke(selected.wrappedValue.contains(item) ? Theme.primary : .clear, lineWidth: 1)

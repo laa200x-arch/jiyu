@@ -13,6 +13,8 @@ enum Theme {
     static let bg = Color(red: 0.96, green: 0.965, blue: 0.988)       // #F5F6FC
     /// 卡片底色（纯白）
     static let cardBg = Color.white
+    /// 输入框/未选中按钮固定浅灰（不使用 systemGray 语义色，防止暗黑模式反转成黑块）
+    static let inputBg = Color(red: 0.949, green: 0.953, blue: 0.969)   // #F2F3F7
     static let textPrimary = Color(red: 0.12, green: 0.16, blue: 0.22)   // #1F2937
     static let textSecondary = Color(red: 0.42, green: 0.45, blue: 0.50) // #6B7280
     static let divider = Color(red: 0.93, green: 0.94, blue: 0.97)      // #EEF0F6

@@ -1,6 +1,9 @@
 // 技遇 Windows 桌面版 - Electron 主进程
-const { app, BrowserWindow, Notification, shell, ipcMain, dialog, Tray, Menu, nativeImage } = require('electron')
+const { app, BrowserWindow, Notification, shell, ipcMain, dialog, Tray, Menu, nativeImage, nativeTheme } = require('electron')
 const path = require('path')
+
+// 强制浅色模式：应用仅设计浅色 UI，禁用系统暗黑模式反转（黑块/灰遮罩根因）
+nativeTheme.themeSource = 'light'
 
 let mainWindow = null
 let tray = null

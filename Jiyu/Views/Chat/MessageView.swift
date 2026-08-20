@@ -515,7 +515,7 @@ struct ChatDetailView: View {
                     .lineLimit(1...4)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
-                    .background(RoundedRectangle(cornerRadius: 18).fill(Color(.systemGray6)))
+                    .background(RoundedRectangle(cornerRadius: 18).fill(Theme.inputBg))
                     .focused($inputFocused)
                     .id(editorID) // 发送后强制重建输入框，修复多行输入框清空不生效的问题
                 Button {
