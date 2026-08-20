@@ -105,7 +105,8 @@ export function appsRouter(db) {
     res.json({ ok: true })
   })
 
-  // 提交分数（小程序内 postMessage → 宿主调用；仅保留个人最高分）
+  // 提交分数（小程序内 postMessage → 宿主调用）
+  // 规则：每个账号独立计分，同账号只保留最高分（未登录匿名按 playerName 去重）
   router.post('/apps/:id/score', (req, res) => {
     const app = db.get('SELECT id FROM apps WHERE id = ?', [req.params.id])
     if (!app) return res.status(404).json({ error: '小程序不存在' })
@@ -116,12 +117,14 @@ export function appsRouter(db) {
     }
     const risk = checkTextRisk(playerName)
     if (risk.isIllegal) return res.status(403).json({ error: risk.warning })
-    // 同用户同小程序只保留最高分（未登录按 playerName 去重）
-    const key = req.userId ? `user:${req.userId}` : `name:${playerName}`
-    const existing = db.get('SELECT * FROM app_scores WHERE app_id = ? AND player_name = ?', [app.id, playerName])
+    // 登录用户：按 user_id 去重（同账号只保留最高分）；匿名：按 playerName 去重
+    const existing = req.userId
+      ? db.get('SELECT * FROM app_scores WHERE app_id = ? AND user_id = ?', [app.id, req.userId])
+      : db.get('SELECT * FROM app_scores WHERE app_id = ? AND player_name = ? AND user_id IS NULL', [app.id, playerName])
     if (existing) {
       if (score > existing.score) {
-        db.run('UPDATE app_scores SET score = ?, created_at = ? WHERE id = ?', [score, now(), existing.id])
+        db.run('UPDATE app_scores SET score = ?, player_name = ?, created_at = ? WHERE id = ?',
+          [score, playerName, now(), existing.id])
       }
     } else {
       db.run(

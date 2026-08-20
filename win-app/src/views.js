@@ -1547,6 +1547,7 @@ async function runMiniApp(id) {
         <button class="btn btn-outline btn-sm" id="ma-refresh-scores">🏆 刷新榜单</button>
       </div>
       <iframe id="ma-frame" sandbox="allow-scripts" allowfullscreen
+        csp="script-src 'unsafe-inline'"
         style="width:100%;height:min(540px,60vh);border:1px solid var(--divider);border-radius:12px;background:#fff"></iframe>
       <div id="ma-scores" style="margin-top:10px"><div class="card-sub">🏆 排行榜加载中…</div></div>
       <div class="modal-actions"><button class="btn btn-outline" data-close>关闭</button></div>`)
@@ -1575,7 +1576,10 @@ async function submitScore(appId, score) {
     await api(`/api/apps/${appId}/score`, { method: 'POST', body: { score, playerName: App.state.user.userName } })
     renderScores(appId)
     toast(`🏆 得分 ${score} 已上榜`)
-  } catch (e) { /* 静默 */ }
+  } catch (e) {
+    console.error('[score] 提交失败:', e)
+    toast('比分提交失败：' + (e.message || '网络异常'))
+  }
 }
 
 /** 渲染小程序排行榜（top 10） */
