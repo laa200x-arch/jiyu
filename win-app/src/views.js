@@ -2147,10 +2147,13 @@ function showBookingForm(service) {
         <div class="svc-pick ${s.id === service.id ? 'sel' : ''}" data-svc="${esc(s.id)}">
           <input type="checkbox" ${s.id === service.id ? 'checked' : ''} data-check>
           <div class="svc-pick-info">
-            <div class="convo-name">${esc(s.name)}</div>
-            <div class="card-sub">${esc(s.desc)} · ${esc(s.duration)} · 默认 ¥${s.priceYuan}</div>
+            <div class="svc-pick-name">${esc(s.name)}</div>
+            <div class="svc-pick-desc">${esc(s.desc)} · ${esc(s.duration)} · 默认 ¥${s.priceYuan}</div>
           </div>
-          <input class="svc-price-input" type="number" min="0" step="1" value="${s.priceYuan}" data-price title="自定义价格（元）">
+          <div class="svc-pick-price">
+            <span class="cur">¥</span>
+            <input class="svc-price-input" type="number" min="0" step="1" value="${s.priceYuan}" data-price title="自定义价格（元）">
+          </div>
         </div>`).join('')}</div>
     </div>
     <div class="form-field"><label>约定时间 *</label><div id="b-wheel"></div></div>
@@ -2171,6 +2174,8 @@ function showBookingForm(service) {
       <button class="btn btn-primary" id="b-submit" disabled>发布订单</button>
     </div>
   `, (box) => {
+    // 发起订单内容较多：弹窗加宽，保证服务行与滚轮时间不挤压变形
+    box.style.maxWidth = '720px'
     const modeWrap = box.querySelector('#b-provider-wrap')
     box.querySelector('#b-mode').addEventListener('change', (e) => {
       modeWrap.style.display = e.target.value === 'direct' ? '' : 'none'
@@ -2295,14 +2300,19 @@ function buildWheelPicker(container, state, onChange) {
   const pad = (n) => String(n).padStart(2, '0')
 
   const makeCol = (label, getOptions, getValue, setValue) => {
-    const col = document.createElement('div')
-    col.className = 'wheel-col'
-    col.innerHTML = `<div class="wheel-selection"></div><div class="wheel-mask"></div><div class="wheel-col-inner"></div>`
-    const inner = col.querySelector('.wheel-col-inner')
+    const wrap = document.createElement('div')
+    wrap.className = 'wheel-col-wrap'
+    wrap.innerHTML = `
+      <div class="wheel-selection"></div>
+      <div class="wheel-col"><div class="wheel-col-inner"></div></div>
+      <div class="wheel-mask"></div>
+      <div class="wheel-label">${label}</div>`
+    const col = wrap.querySelector('.wheel-col')
+    const inner = wrap.querySelector('.wheel-col-inner')
     const paint = () => {
       const opts = getOptions()
       const val = getValue()
-      inner.innerHTML = opts.map((o, i) => `<div class="wheel-item ${o === val ? 'sel' : ''}" data-i="${i}">${label === '年' ? o + ' 年' : label === '月' ? o + 1 + ' 月' : label === '日' ? o + ' 日' : label === '时' ? pad(o) + ' 时' : pad(o) + ' 分'}</div>`).join('')
+      inner.innerHTML = opts.map((o, i) => `<div class="wheel-item ${o === val ? 'sel' : ''}" data-i="${i}">${label === '年' ? o : label === '月' ? o + 1 : label === '日' ? o : label === '时' ? pad(o) : pad(o)}</div>`).join('')
       const idx = Math.max(0, opts.indexOf(val))
       col.scrollTop = idx * 40
     }
@@ -2321,7 +2331,7 @@ function buildWheelPicker(container, state, onChange) {
         updateLabel()
       }
     })
-    container.appendChild(col)
+    container.appendChild(wrap)
     return { paint, refresh: () => { const o = getOptions(); const idx = Math.max(0, o.indexOf(getValue())); col.scrollTop = idx * 40; paint() } }
   }
 

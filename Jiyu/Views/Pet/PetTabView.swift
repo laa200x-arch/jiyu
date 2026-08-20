@@ -878,28 +878,31 @@ struct BookingSheet: View {
                                     .font(.subheadline)
                                     .bold()
                                     .foregroundStyle(Theme.textPrimary)
+                                    .lineLimit(1)
                                 Text("\(s.duration) · 默认 ¥\(yuanText(s.priceYuan))")
                                     .font(.caption2)
                                     .foregroundStyle(Theme.textSecondary)
+                                    .lineLimit(1)
                             }
-                            Spacer()
+                            Spacer(minLength: 8)
                             HStack(spacing: 2) {
                                 Text("¥")
                                     .font(.caption)
+                                    .bold()
                                     .foregroundStyle(Theme.textSecondary)
                                 TextField("\(yuanText(s.priceYuan))", text: Binding(
                                     get: { customPrices[s.id] ?? "" },
                                     set: { customPrices[s.id] = $0 }
                                 ))
                                 .keyboardType(.decimalPad)
-                                .multilineTextAlignment(.trailing)
-                                .frame(width: 64)
+                                .multilineTextAlignment(.center)
+                                .frame(width: 60)
                                 .font(.subheadline)
                                 .disabled(!selectedServices.contains(s.id))
                                 .opacity(selectedServices.contains(s.id) ? 1 : 0.4)
                             }
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 5)
+                            .frame(height: 32)
+                            .padding(.horizontal, 4)
                             .background(RoundedRectangle(cornerRadius: 8).fill(Theme.inputBg))
                         }
                         .padding(.vertical, 2)
@@ -939,11 +942,14 @@ struct BookingSheet: View {
                     DatePicker("约定时间", selection: $scheduleDate, in: Date()..., displayedComponents: [.date, .hourAndMinute])
                         .datePickerStyle(.wheel) // 苹果滑动选择器：过去时间灰色不可选，默认最新时间
                         .labelsHidden()
-                        .frame(maxHeight: 160)
+                        .frame(height: 150)
+                        .frame(maxWidth: .infinity)
+                        .clipped()
                     Text("\(dateFormatter.string(from: scheduleDate))")
                         .font(.subheadline)
                         .bold()
                         .foregroundStyle(Theme.primary)
+                        .frame(maxWidth: .infinity)
                 }
 
                 Section("地点 *") {
