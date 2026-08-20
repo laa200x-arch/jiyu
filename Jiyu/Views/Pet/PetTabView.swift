@@ -1,17 +1,30 @@
 import SwiftUI
 import PhotosUI
 
-/// 宠物护理 Tab（旧巡六迁移 → 收费订单：服务定价 + 平台佣金 10%，其余归服务人员）
+/// 宠物护理 Tab（Apple 风格：大标题 + 圆角卡片 + 横滑宠物档案）
 struct PetTabView: View {
     @EnvironmentObject private var store: MockDataStore
 
     @State private var showAdd = false
+    @State private var editingPet: ServerPet?
     @State private var bookingService: ServerCareService?
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
-                header
+            VStack(alignment: .leading, spacing: 16) {
+                // 大标题（Apple Large Title）
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("宠物")
+                        .font(.system(size: 34, weight: .bold))
+                        .tracking(-0.5)
+                        .foregroundStyle(Theme.textPrimary)
+                    Text("创建宠物档案，为它预约专业看护服务（收费订单 · 平台佣金 10%）")
+                        .font(.subheadline)
+                        .foregroundStyle(Theme.textSecondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.top, 4)
+
                 myPetsSection
                 servicesSection
                 bookingsSection
@@ -19,7 +32,7 @@ struct PetTabView: View {
             .padding(16)
         }
         .background(Theme.bg)
-        .navigationTitle("宠物护理")
+        .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .task {
             await store.refreshPetData()
@@ -27,34 +40,11 @@ struct PetTabView: View {
         .sheet(isPresented: $showAdd) {
             PetAddSheet()
         }
+        .sheet(item: $editingPet) { pet in
+            PetAddSheet(pet: pet)
+        }
         .sheet(item: $bookingService) { service in
             BookingSheet(service: service)
-        }
-    }
-
-    private var header: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 3) {
-                Text("🐾 宠物护理")
-                    .font(.title3)
-                    .bold()
-                    .foregroundStyle(Theme.textPrimary)
-                Text("收费订单 · 平台佣金 10%，其余归服务人员")
-                    .font(.caption)
-                    .foregroundStyle(Theme.textSecondary)
-            }
-            Spacer()
-            Button {
-                showAdd = true
-            } label: {
-                Label("添加宠物", systemImage: "plus")
-                    .font(.caption)
-                    .bold()
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
-                    .background(Capsule().fill(Theme.primary))
-            }
         }
     }
 
@@ -62,70 +52,127 @@ struct PetTabView: View {
 
     private var myPetsSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("我的宠物")
-                .font(.subheadline)
-                .bold()
-                .foregroundStyle(Theme.textPrimary)
-            if store.pets.isEmpty {
-                Text("还没有宠物档案，点击「添加宠物」创建（含行为/体重/照片等完整档案）")
-                    .font(.caption)
-                    .foregroundStyle(Theme.textSecondary)
-            } else {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 10) {
-                        ForEach(store.pets) { pet in
-                            petCard(pet)
-                        }
-                    }
-                }
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(14)
-        .background(RoundedRectangle(cornerRadius: 16).fill(Theme.cardBg))
-        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Theme.divider, lineWidth: 1))
-    }
-
-    private func petCard(_ pet: ServerPet) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Text(pet.name)
+                Text("我的宠物")
                     .font(.subheadline)
                     .bold()
                     .foregroundStyle(Theme.textPrimary)
                 Spacer()
                 Button {
-                    Task {
-                        await store.deletePet(id: pet.id)
-                    }
+                    showAdd = true
                 } label: {
-                    Image(systemName: "trash")
+                    Label("添加", systemImage: "plus")
                         .font(.caption)
-                        .foregroundStyle(Theme.danger)
+                        .bold()
+                        .foregroundStyle(Theme.primary)
                 }
             }
-            Text("\(pet.petType == "dog" ? "🐕 狗" : pet.petType == "cat" ? "🐈 猫" : "🐾 其他") · \(pet.breed) · \(pet.ageMonths) 月")
-                .font(.caption)
-                .foregroundStyle(Theme.textSecondary)
-            Text("\(pet.neutered ? "已绝育" : "未绝育") · \(pet.gender == "male" ? "公" : "母")\(pet.weightKg != nil ? " · \(String(format: "%.1f", pet.weightKg!))kg" : "")")
-                .font(.caption2)
-                .foregroundStyle(Theme.textSecondary)
-            if let behaviors = pet.behaviors, !behaviors.isEmpty {
-                Text(behaviors.joined(separator: "、"))
-                    .font(.caption2)
-                    .foregroundStyle(Theme.primary)
-            }
-            if !pet.notes.isEmpty {
-                Text("📝 \(pet.notes)")
-                    .font(.caption2)
-                    .foregroundStyle(Theme.textSecondary)
-                    .lineLimit(2)
+            if store.pets.isEmpty {
+                VStack(spacing: 12) {
+                    Text("🐾")
+                        .font(.system(size: 44))
+                        .padding(20)
+                        .background(
+                            RoundedRectangle(cornerRadius: 22)
+                                .fill(LinearGradient(colors: [Theme.primary.opacity(0.10), Theme.secondary.opacity(0.08)],
+                                                     startPoint: .topLeading, endPoint: .bottomTrailing))
+                        )
+                    Text("添加你的第一位宠物")
+                        .font(.headline)
+                        .foregroundStyle(Theme.textPrimary)
+                    Text("建立完整档案（照片 / 年龄 / 体重 / 性格），让看护人更了解你的宝贝")
+                        .font(.caption)
+                        .foregroundStyle(Theme.textSecondary)
+                        .multilineTextAlignment(.center)
+                    Button {
+                        showAdd = true
+                    } label: {
+                        Text("添加宠物")
+                            .font(.subheadline)
+                            .bold()
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 28)
+                            .padding(.vertical, 11)
+                            .background(Capsule().fill(Theme.primary))
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 26)
+                .padding(.horizontal, 16)
+                .background(RoundedRectangle(cornerRadius: 22).fill(Theme.cardBg))
+                .overlay(RoundedRectangle(cornerRadius: 22).stroke(Theme.divider, lineWidth: 1))
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        ForEach(store.pets) { pet in
+                            petCard(pet)
+                        }
+                    }
+                    .padding(.vertical, 2)
+                }
             }
         }
-        .padding(12)
-        .frame(width: 210, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 12).fill(Theme.bg))
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Theme.divider, lineWidth: 1))
+    }
+
+    private func petCard(_ pet: ServerPet) -> some View {
+        Button {
+            editingPet = pet
+        } label: {
+            HStack(spacing: 12) {
+                if let photoUrl = pet.photoUrl, let url = URL(string: AppConfig.serverBase + photoUrl) {
+                    AsyncImage(url: url) { phase in
+                        if let image = phase.image {
+                            image.resizable().scaledToFill()
+                        } else {
+                            petTypeIcon(pet)
+                        }
+                    }
+                    .frame(width: 64, height: 64)
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                } else {
+                    petTypeIcon(pet)
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(pet.name)
+                        .font(.headline)
+                        .foregroundStyle(Theme.textPrimary)
+                    Text("\(pet.petType == "dog" ? "狗" : pet.petType == "cat" ? "猫" : "其他") · \(pet.breed) · \(pet.ageMonths) 月 · \(pet.gender == "male" ? "公" : "母") · \(pet.neutered ? "已绝育" : "未绝育")")
+                        .font(.caption)
+                        .foregroundStyle(Theme.textSecondary)
+                        .lineLimit(1)
+                    if let behaviors = pet.behaviors, !behaviors.isEmpty {
+                        HStack(spacing: 4) {
+                            ForEach(behaviors.prefix(3), id: \.self) { b in
+                                Text(b)
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 3)
+                                    .background(Capsule().fill(Theme.primary.opacity(0.10)))
+                                    .foregroundStyle(Theme.primary)
+                            }
+                        }
+                    }
+                }
+                Spacer(minLength: 4)
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(12)
+            .frame(width: 300, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: 20).fill(Theme.cardBg))
+            .overlay(RoundedRectangle(cornerRadius: 20).stroke(Theme.divider, lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func petTypeIcon(_ pet: ServerPet) -> some View {
+        Text(pet.petType == "dog" ? "🐕" : pet.petType == "cat" ? "🐈" : "🐾")
+            .font(.system(size: 30))
+            .frame(width: 64, height: 64)
+            .background(RoundedRectangle(cornerRadius: 16)
+                .fill(LinearGradient(colors: [Theme.primary.opacity(0.10), Theme.secondary.opacity(0.08)],
+                                     startPoint: .topLeading, endPoint: .bottomTrailing)))
     }
 
     // MARK: 服务目录
@@ -276,131 +323,438 @@ struct PetTabView: View {
     }
 }
 
-/// 添加宠物表单（类型/品种/年龄/性别/绝育/体重/行为/家中反应/备注 + 校验）
+/// 添加/编辑宠物（Apple 风格：大标题 + 分层卡片 + 年龄滑块 + 选择网格 + 照片 + Sticky 保存）
 struct PetAddSheet: View {
     @EnvironmentObject private var store: MockDataStore
     @Environment(\.dismiss) private var dismiss
 
-    @State private var name = ""
-    @State private var petType = "dog"
-    @State private var breed = ""
-    @State private var ageText = ""
-    @State private var gender = "male"
-    @State private var neutered = true
-    @State private var weightText = ""
-    @State private var selectedBehaviors: Set<String> = []
-    @State private var selectedReactions: Set<String> = []
-    @State private var notes = ""
+    /// 编辑模式：传入已有宠物档案
+    let pet: ServerPet?
+
+    @State private var name: String
+    @State private var petType: String
+    @State private var breed: String
+    @State private var ageMonths: Double
+    @State private var gender: String
+    @State private var neuteredChoice: String
+    @State private var weightBucket: String
+    @State private var weightText: String
+    @State private var selectedBehaviors: Set<String>
+    @State private var selectedReactions: Set<String>
+    @State private var notes: String
+    @State private var photoItem: PhotosPickerItem?
+    @State private var photoUrl: String?
+    @State private var isUploadingPhoto = false
     @State private var errorMessage: String?
+    @State private var isSaving = false
+
+    init(pet: ServerPet? = nil) {
+        self.pet = pet
+        _name = State(initialValue: pet?.name ?? "")
+        _petType = State(initialValue: pet?.petType ?? "dog")
+        _breed = State(initialValue: pet?.breed ?? "")
+        _ageMonths = State(initialValue: Double(pet?.ageMonths ?? 24))
+        _gender = State(initialValue: pet?.gender ?? "male")
+        _neuteredChoice = State(initialValue: pet == nil ? "yes" : (pet!.neutered ? "yes" : "no"))
+        let w = pet?.weightKg
+        _weightBucket = State(initialValue: w == nil ? "" : (w! < 5 ? "<5" : w! <= 10 ? "5-10" : w! <= 25 ? "10-25" : ">25"))
+        _weightText = State(initialValue: w == nil ? "" : String(format: "%.1f", w!))
+        _selectedBehaviors = State(initialValue: Set(pet?.behaviors ?? []))
+        _selectedReactions = State(initialValue: Set(pet?.homeReactions ?? []))
+        _notes = State(initialValue: pet?.notes ?? "")
+        _photoUrl = State(initialValue: pet?.photoUrl)
+    }
+
+    private var isEditing: Bool { pet != nil }
 
     private var behaviorOptions: [String] {
         guard let options = store.careOptions else { return [] }
-        return petType == "dog" ? options.dogBehaviors : options.catBehaviors
+        return petType == "dog" ? options.dogBehaviors : petType == "cat" ? options.catBehaviors : options.dogBehaviors
     }
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section("基本信息") {
-                    TextField("宠物名称 *", text: $name)
-                    Picker("类型 *", selection: $petType) {
-                        Text("🐕 狗").tag("dog")
-                        Text("🐈 猫").tag("cat")
-                        Text("🐾 其他").tag("other")
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    // 大标题
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(isEditing ? "编辑宠物" : "添加宠物")
+                            .font(.system(size: 30, weight: .bold))
+                            .tracking(-0.5)
+                            .foregroundStyle(Theme.textPrimary)
+                        Text(isEditing ? "更新 \(pet?.name ?? "") 的档案信息" : "创建完整档案，让看护人更了解你的宝贝")
+                            .font(.subheadline)
+                            .foregroundStyle(Theme.textSecondary)
                     }
-                    TextField("品种 *", text: $breed)
-                    HStack {
-                        TextField("年龄（月，0-180）*", text: $ageText)
-                            .keyboardType(.numberPad)
-                        Picker("性别", selection: $gender) {
-                            Text("公").tag("male")
-                            Text("母").tag("female")
-                        }
-                        .pickerStyle(.segmented)
-                    }
-                    Toggle("已绝育", isOn: $neutered)
-                    HStack {
-                        Text("体重 kg（猫必填）")
-                        Spacer()
-                        TextField("如：5.5", text: $weightText)
-                            .keyboardType(.decimalPad)
-                            .frame(width: 90)
-                            .multilineTextAlignment(.trailing)
-                    }
-                }
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
-                Section("行为特点") {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 8) {
-                            ForEach(behaviorOptions, id: \.self) { b in
-                                chip(b, selected: selectedBehaviors.contains(b)) {
-                                    if selectedBehaviors.contains(b) { selectedBehaviors.remove(b) }
-                                    else { selectedBehaviors.insert(b) }
-                                }
+                    // 基本信息
+                    appleSection("基本信息") {
+                        VStack(spacing: 14) {
+                            Picker("类型", selection: $petType) {
+                                Text("🐕 狗").tag("dog")
+                                Text("🐈 猫").tag("cat")
+                                Text("🐾 其他").tag("other")
+                            }
+                            .pickerStyle(.segmented)
+                            .onChange(of: petType) { _ in selectedBehaviors = [] }
+                            appleField("宠物名称 *") {
+                                TextField("如：豆豆", text: $name)
+                            }
+                            appleField("品种 *") {
+                                TextField("如：柯基 / 英短", text: $breed)
                             }
                         }
-                        .padding(.vertical, 4)
                     }
-                }
 
-                Section("家中反应") {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 8) {
-                            ForEach(store.careOptions?.homeReactions ?? [], id: \.self) { r in
-                                chip(r, selected: selectedReactions.contains(r)) {
-                                    if selectedReactions.contains(r) { selectedReactions.remove(r) }
-                                    else { selectedReactions.insert(r) }
-                                }
+                    // 年龄（滑块）
+                    appleSection("年龄") {
+                        VStack(spacing: 8) {
+                            HStack {
+                                Text(ageText)
+                                    .font(.system(size: 17, weight: .bold))
+                                    .foregroundStyle(Theme.primary)
+                                Spacer()
+                                Text("\(Int(ageMonths)) 个月")
+                                    .font(.caption)
+                                    .foregroundStyle(Theme.textSecondary)
+                            }
+                            Slider(value: $ageMonths, in: 0...180, step: 1)
+                                .tint(Theme.primary)
+                            HStack {
+                                Text("0 月（幼崽）")
+                                Spacer()
+                                Text("180 月（15 岁）")
+                            }
+                            .font(.caption2)
+                            .foregroundStyle(Theme.textSecondary)
+                        }
+                    }
+
+                    // 性别（双列）
+                    appleSection("性别") {
+                        HStack(spacing: 10) {
+                            choiceCard("♂ 公", selected: gender == "male") { gender = "male" }
+                            choiceCard("♀ 母", selected: gender == "female") { gender = "female" }
+                        }
+                    }
+
+                    // 绝育（三列）
+                    appleSection("绝育状态") {
+                        HStack(spacing: 10) {
+                            choiceCard("已绝育", selected: neuteredChoice == "yes") { neuteredChoice = "yes" }
+                            choiceCard("未绝育", selected: neuteredChoice == "no") { neuteredChoice = "no" }
+                            choiceCard("不确定", selected: neuteredChoice == "unknown") { neuteredChoice = "unknown" }
+                        }
+                    }
+
+                    // 体重（四列 + 精确输入）
+                    appleSection("体重") {
+                        VStack(spacing: 12) {
+                            HStack(spacing: 8) {
+                                weightCard("<5kg", sub: "小型", selected: weightBucket == "<5") { pickWeight("<5") }
+                                weightCard("5-10kg", sub: "中型", selected: weightBucket == "5-10") { pickWeight("5-10") }
+                                weightCard("10-25kg", sub: "大型", selected: weightBucket == "10-25") { pickWeight("10-25") }
+                                weightCard(">25kg", sub: "巨型", selected: weightBucket == ">25") { pickWeight(">25") }
+                            }
+                            appleField("精确体重（kg，猫必填）") {
+                                TextField("如：5.5", text: $weightText)
+                                    .keyboardType(.decimalPad)
                             }
                         }
-                        .padding(.vertical, 4)
                     }
-                }
 
-                Section("备注") {
-                    TextField("如：喜欢玩球，怕打雷（≤2000 字）", text: $notes, axis: .vertical)
-                        .lineLimit(2...4)
-                }
+                    // 照片
+                    appleSection("宠物照片") {
+                        HStack(spacing: 14) {
+                            if let photoUrl, let url = URL(string: AppConfig.serverBase + photoUrl) {
+                                AsyncImage(url: url) { phase in
+                                    if let image = phase.image {
+                                        image.resizable().scaledToFill()
+                                    } else {
+                                        photoPlaceholder
+                                    }
+                                }
+                                .frame(width: 84, height: 84)
+                                .clipShape(RoundedRectangle(cornerRadius: 18))
+                            } else {
+                                photoPlaceholder
+                            }
+                            VStack(alignment: .leading, spacing: 8) {
+                                PhotosPicker(selection: $photoItem, matching: .images) {
+                                    Label(isUploadingPhoto ? "上传中…" : "上传照片", systemImage: "camera")
+                                        .font(.subheadline)
+                                        .bold()
+                                        .foregroundStyle(Theme.primary)
+                                        .padding(.horizontal, 16)
+                                        .padding(.vertical, 9)
+                                        .background(Capsule().fill(Theme.primary.opacity(0.10)))
+                                }
+                                .disabled(isUploadingPhoto)
+                                Text("建议正方形照片，展示更佳")
+                                    .font(.caption2)
+                                    .foregroundStyle(Theme.textSecondary)
+                            }
+                        }
+                    }
+                    .onChange(of: photoItem) { _ in
+                        uploadPhoto()
+                    }
 
-                if let errorMessage {
-                    Section {
+                    // 行为
+                    appleSection("行为特点") {
+                        chipFlow(behaviorOptions, selected: $selectedBehaviors)
+                    }
+
+                    // 家中反应
+                    appleSection("有人进入你家时") {
+                        chipFlow(store.careOptions?.homeReactions ?? [], selected: $selectedReactions)
+                    }
+
+                    // 备注
+                    appleSection("其他备注") {
+                        TextField("如：喜欢玩球，怕打雷，对陌生人有戒心…", text: $notes, axis: .vertical)
+                            .lineLimit(3...6)
+                    }
+
+                    // 危险区（编辑模式）
+                    if isEditing, let pet {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("危险区")
+                                .font(.caption)
+                                .bold()
+                                .foregroundStyle(Theme.danger)
+                                .textCase(.uppercase)
+                            Text("删除后将无法恢复，该宠物的预约记录仍会保留。")
+                                .font(.caption)
+                                .foregroundStyle(Theme.textSecondary)
+                            Button {
+                                Task {
+                                    await store.deletePet(id: pet.id)
+                                    dismiss()
+                                }
+                            } label: {
+                                Text("删除宠物")
+                                    .font(.subheadline)
+                                    .bold()
+                                    .foregroundStyle(Theme.danger)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 12)
+                                    .background(RoundedRectangle(cornerRadius: 14).fill(Theme.danger.opacity(0.10)))
+                            }
+                        }
+                        .padding(14)
+                        .background(RoundedRectangle(cornerRadius: 18).fill(Theme.danger.opacity(0.04)))
+                        .overlay(RoundedRectangle(cornerRadius: 18).stroke(Theme.danger.opacity(0.25), lineWidth: 1))
+                    }
+
+                    if let errorMessage {
                         Text(errorMessage)
                             .font(.caption)
                             .foregroundStyle(Theme.danger)
                     }
                 }
-
-                Section {
-                    Button("保存宠物") { save() }
-                        .frame(maxWidth: .infinity)
-                        .font(.headline)
-                }
+                .padding(16)
+                .padding(.bottom, 90)
             }
-            .navigationTitle("添加宠物")
+            .background(Theme.bg)
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("取消") { dismiss() }
                 }
             }
+            // Sticky 底部保存栏
+            .safeAreaInset(edge: .bottom) {
+                Button {
+                    save()
+                } label: {
+                    HStack {
+                        if isSaving { ProgressView().tint(.white) }
+                        Text(isEditing ? "保存修改" : "保存宠物")
+                            .font(.headline)
+                    }
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 15)
+                    .background(RoundedRectangle(cornerRadius: 16).fill(Theme.primary))
+                    .shadow(color: Theme.primary.opacity(0.3), radius: 12, y: 6)
+                }
+                .disabled(isSaving || isUploadingPhoto)
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+                .background(.ultraThinMaterial)
+            }
         }
     }
 
-    private func chip(_ text: String, selected: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(text)
+    private var ageText: String {
+        let m = Int(ageMonths)
+        if m < 12 { return "\(m) 个月" }
+        let y = m / 12
+        let r = m % 12
+        return r == 0 ? "\(y) 岁" : "\(y) 岁 \(r) 个月"
+    }
+
+    private var photoPlaceholder: some View {
+        Image(systemName: "camera")
+            .font(.system(size: 26))
+            .foregroundStyle(.tertiary)
+            .frame(width: 84, height: 84)
+            .background(RoundedRectangle(cornerRadius: 18).fill(Color(.systemGray6)))
+            .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [5])))
+            .foregroundStyle(.quaternary)
+    }
+
+    private func appleSection<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
                 .font(.caption)
-                .foregroundStyle(selected ? .white : Theme.primary)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(Capsule().fill(selected ? Theme.primary : Theme.primary.opacity(0.10)))
+                .bold()
+                .foregroundStyle(Theme.textSecondary)
+                .textCase(.uppercase)
+                .padding(.horizontal, 6)
+            VStack(spacing: 14) { content() }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(16)
+                .background(RoundedRectangle(cornerRadius: 18).fill(Theme.cardBg))
+                .overlay(RoundedRectangle(cornerRadius: 18).stroke(Theme.divider, lineWidth: 1))
         }
+    }
+
+    private func appleField<Content: View>(_ label: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(label)
+                .font(.subheadline)
+                .foregroundStyle(Theme.textPrimary)
+            content()
+                .font(.body)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
+                .background(RoundedRectangle(cornerRadius: 13).fill(Color(.systemGray6)))
+        }
+    }
+
+    private func choiceCard(_ title: String, selected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.subheadline)
+                .bold()
+                .foregroundStyle(selected ? Theme.primary : Theme.textPrimary)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .background(
+                    RoundedRectangle(cornerRadius: 15)
+                        .fill(selected ? Theme.primary.opacity(0.10) : Color(.systemGray6))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 15)
+                        .stroke(selected ? Theme.primary : .clear, lineWidth: 1.5)
+                )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func weightCard(_ title: String, sub: String, selected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(spacing: 3) {
+                Text(title)
+                    .font(.subheadline)
+                    .bold()
+                Text(sub)
+                    .font(.caption2)
+                    .opacity(0.7)
+            }
+            .foregroundStyle(selected ? Theme.primary : Theme.textPrimary)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 15)
+                    .fill(selected ? Theme.primary.opacity(0.10) : Color(.systemGray6))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 15)
+                    .stroke(selected ? Theme.primary : .clear, lineWidth: 1.5)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func chipFlow(_ options: [String], selected: Binding<Set<String>>) -> some View {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 92), spacing: 8)], spacing: 8) {
+            ForEach(options, id: \.self) { item in
+                Button {
+                    if selected.wrappedValue.contains(item) { selected.wrappedValue.remove(item) }
+                    else { selected.wrappedValue.insert(item) }
+                } label: {
+                    Text(item)
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(selected.wrappedValue.contains(item) ? Theme.primary : Theme.textPrimary)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .frame(maxWidth: .infinity)
+                        .background(
+                            Capsule().fill(selected.wrappedValue.contains(item) ? Theme.primary.opacity(0.10) : Color(.systemGray6))
+                        )
+                        .overlay(
+                            Capsule().stroke(selected.wrappedValue.contains(item) ? Theme.primary : .clear, lineWidth: 1)
+                        )
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private func pickWeight(_ bucket: String) {
+        weightBucket = bucket
+        weightText = bucket == "<5" ? "3" : bucket == "5-10" ? "7.5" : bucket == "10-25" ? "17" : "30"
+    }
+
+    private func uploadPhoto() {
+        guard let photoItem else { return }
+        Task {
+            isUploadingPhoto = true
+            defer { isUploadingPhoto = false }
+            guard let data = try? await photoItem.loadTransferable(type: Data.self),
+                  let image = UIImage(data: data),
+                  let jpeg = compressImage(image) else {
+                errorMessage = "照片读取失败，请重试"
+                return
+            }
+            guard jpeg.count <= 1024 * 1024 else {
+                errorMessage = "照片过大（压缩后仍超过 1MB），请更换更小的图片"
+                return
+            }
+            do {
+                photoUrl = try await APIClient.shared.uploadMedia(data: jpeg, fileName: "pet.jpg", mimeType: "image/jpeg")
+                errorMessage = nil
+            } catch {
+                errorMessage = "照片上传失败，请检查网络"
+            }
+        }
+    }
+
+    /// 压缩至最长边 1024px JPEG
+    private func compressImage(_ image: UIImage) -> Data? {
+        let maxSide: CGFloat = 1024
+        let size = image.size
+        var target = image
+        if max(size.width, size.height) > maxSide {
+            let scale = maxSide / max(size.width, size.height)
+            let newSize = CGSize(width: size.width * scale, height: size.height * scale)
+            target = UIGraphicsImageRenderer(size: newSize).image { _ in
+                image.draw(in: CGRect(origin: .zero, size: newSize))
+            }
+        }
+        return target.jpegData(compressionQuality: 0.75)
     }
 
     private func save() {
         let trimmedName = name.trimmingCharacters(in: .whitespaces)
         let trimmedBreed = breed.trimmingCharacters(in: .whitespaces)
-        let age = Int(ageText) ?? -1
+        let age = Int(ageMonths)
         guard !trimmedName.isEmpty, !trimmedBreed.isEmpty, age >= 0, age <= 180 else {
             errorMessage = "请填写名称、品种，年龄需在 0-180 月之间"
             return
@@ -409,6 +763,7 @@ struct PetAddSheet: View {
             errorMessage = "猫咪体重必填"
             return
         }
+        isSaving = true
         Task {
             do {
                 var body: [String: Any] = [
@@ -417,16 +772,22 @@ struct PetAddSheet: View {
                     "breed": trimmedBreed,
                     "ageMonths": age,
                     "gender": gender,
-                    "neutered": neutered,
+                    "neutered": neuteredChoice == "yes",
                     "behaviors": Array(selectedBehaviors),
                     "homeReactions": Array(selectedReactions),
                     "notes": notes.trimmingCharacters(in: .whitespacesAndNewlines)
                 ]
                 if let weight = Double(weightText), weight > 0 { body["weightKg"] = weight }
-                try await store.addPet(body)
+                if let photoUrl { body["photoUrl"] = photoUrl }
+                if isEditing, let pet {
+                    try await store.updatePet(id: pet.id, body)
+                } else {
+                    try await store.addPet(body)
+                }
                 dismiss()
             } catch {
                 errorMessage = (error as? LocalizedError)?.errorDescription ?? "保存失败"
+                isSaving = false
             }
         }
     }

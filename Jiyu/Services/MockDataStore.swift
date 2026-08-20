@@ -642,6 +642,11 @@ final class MockDataStore: ObservableObject {
         pets.insert(created, at: 0)
     }
 
+    func updatePet(id: String, _ pet: [String: Any]) async throws {
+        let updated = try await APIClient.shared.updatePet(id: id, pet)
+        pets = pets.map { $0.id == id ? updated : $0 }
+    }
+
     func deletePet(id: String) async {
         guard isServerMode else { return }
         try? await APIClient.shared.deletePet(id: id)

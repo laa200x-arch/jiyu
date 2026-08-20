@@ -1678,29 +1678,34 @@ let careOptions = { dogBehaviors: [], catBehaviors: [], homeReactions: [], weigh
 async function renderPet() {
   const v = document.getElementById('view')
   v.innerHTML = `
-    <div class="row" style="margin-bottom:12px">
-      <span class="section-title" style="margin:0;flex:1">🐾 宠物护理（互换语义 · 零金钱）</span>
-      <button class="btn btn-primary btn-sm" id="pet-add">＋ 添加宠物</button>
+    <div class="apple-header">
+      <div class="apple-title">宠物</div>
+      <div class="apple-subtitle">创建宠物档案，为它预约专业看护服务（收费订单 · 平台佣金 10%）</div>
     </div>
-    <div class="card">
-      <div class="card-title">我的宠物</div>
-      <div id="pet-list" class="skill-grid"></div>
-    </div>
-    <div class="card">
-      <div class="card-title">护理服务目录 <span class="card-sub">以技能互换换取看护</span></div>
-      <div class="filter-bar" style="margin-bottom:10px">
-        <button class="chip active" data-cat="">全部</button>
-        <button class="chip" data-cat="overnight">过夜</button>
-        <button class="chip" data-cat="day">当日</button>
-        <button class="chip" data-cat="other">其他</button>
+    <div class="pet-section">
+      <div class="pet-section-head">
+        <span class="pet-section-title">我的宠物</span>
+        <button class="pet-edit-btn" id="pet-add" title="添加宠物" style="width:auto;padding:0 14px;border-radius:999px;font-weight:700">＋ 添加</button>
       </div>
-      <div id="service-list"></div>
+      <div id="pet-list"></div>
     </div>
-    <div class="card">
-      <div class="card-title">我的预约</div>
+    <div class="pet-section">
+      <div class="pet-section-head"><span class="pet-section-title">护理服务目录</span></div>
+      <div class="pet-group" style="padding:12px">
+        <div class="filter-bar" style="margin-bottom:10px">
+          <button class="chip active" data-cat="">全部</button>
+          <button class="chip" data-cat="overnight">过夜</button>
+          <button class="chip" data-cat="day">当日</button>
+          <button class="chip" data-cat="other">其他</button>
+        </div>
+        <div id="service-list"></div>
+      </div>
+    </div>
+    <div class="pet-section">
+      <div class="pet-section-head"><span class="pet-section-title">我的预约</span></div>
       <div id="booking-list"></div>
     </div>`
-  v.querySelector('#pet-add').addEventListener('click', showPetAdd)
+  v.querySelector('#pet-add').addEventListener('click', () => showPetForm())
   v.querySelectorAll('.chip').forEach((c) => c.addEventListener('click', () => {
     v.querySelectorAll('.chip').forEach((x) => x.classList.remove('active'))
     c.classList.add('active')
@@ -1717,26 +1722,35 @@ async function renderPet() {
 function renderPets() {
   const el = document.getElementById('pet-list')
   if (!App.state.pets.length) {
-    el.innerHTML = '<span class="card-sub">还没有宠物档案，点击右上角「添加宠物」创建</span>'
+    el.innerHTML = `
+      <div class="pet-group pet-empty">
+        <div class="pet-empty-icon">🐾</div>
+        <div class="pet-empty-title">添加你的第一位宠物</div>
+        <div class="pet-empty-sub">建立完整档案（照片 / 年龄 / 体重 / 性格），让看护人更了解你的宝贝</div>
+      </div>`
     return
   }
   el.innerHTML = App.state.pets.map((p) => `
-    <div class="card" style="width:200px;margin:0">
-      <div class="row">
-        ${p.photoUrl ? `<img class="avatar avatar-img" src="${mediaUrl(p.photoUrl)}">` : `<div class="avatar">${p.petType === 'dog' ? '🐕' : p.petType === 'cat' ? '🐈' : '🐾'}</div>`}
-        <div style="flex:1;min-width:0">
-          <div class="convo-name">${esc(p.name)}</div>
-          <div class="card-sub">${esc(p.petType === 'dog' ? '🐕 狗' : p.petType === 'cat' ? '🐈 猫' : '🐾 其他')} · ${esc(p.breed)} · ${p.ageMonths} 月${p.weightKg ? ' · ' + p.weightKg + 'kg' : ''}</div>
-          <div class="card-sub">${p.neutered ? '已绝育' : '未绝育'} · ${p.gender === 'male' ? '公' : '母'}</div>
-        </div>
-        <button class="btn btn-danger btn-sm" data-delpet="${p.id}" title="删除">✕</button>
+    <div class="pet-card-main" data-editpet="${p.id}" style="margin-bottom:10px">
+      ${p.photoUrl
+        ? `<img class="pet-card-avatar" src="${mediaUrl(p.photoUrl)}" alt="">`
+        : `<div class="pet-card-avatar">${p.petType === 'dog' ? '🐕' : p.petType === 'cat' ? '🐈' : '🐾'}</div>`}
+      <div class="pet-card-info">
+        <div class="pet-card-name">${esc(p.name)}</div>
+        <div class="pet-card-meta">${esc(p.petType === 'dog' ? '狗' : p.petType === 'cat' ? '猫' : '其他')} · ${esc(p.breed)} · ${p.ageMonths} 月 · ${p.gender === 'male' ? '公' : '母'} · ${p.neutered ? '已绝育' : '未绝育'}${p.weightKg ? ' · ' + p.weightKg + 'kg' : ''}</div>
+        ${p.behaviors && p.behaviors.length
+          ? `<div class="pet-card-tags">${p.behaviors.slice(0, 4).map((b) => `<span class="pet-tag">${esc(b)}</span>`).join('')}</div>`
+          : ''}
       </div>
-      ${p.behaviors && p.behaviors.length ? '<div style="margin-top:8px">' + p.behaviors.map((b) => `<span class="tag tag-skilled">${esc(b)}</span>`).join(' ') + '</div>' : ''}
-      ${p.notes ? `<div class="card-sub" style="margin-top:6px">📝 ${esc(p.notes)}</div>` : ''}
+      <button class="pet-edit-btn" data-editpet-btn="${p.id}" title="编辑宠物">✎</button>
+      <span class="pet-card-chevron">›</span>
     </div>`).join('')
-  el.querySelectorAll('[data-delpet]').forEach((b) => b.addEventListener('click', async () => {
-    if (!confirm('删除宠物 ' + App.state.pets.find((p) => p.id === b.dataset.delpet)?.name + '？')) return
-    try { await deletePet(b.dataset.delpet); renderPets() } catch (e) { toast(e.message) }
+  el.querySelectorAll('[data-editpet]').forEach((card) => card.addEventListener('click', (e) => {
+    if (e.target.closest('[data-editpet-btn]')) return
+    showPetForm(App.state.pets.find((p) => p.id === card.dataset.editpet))
+  }))
+  el.querySelectorAll('[data-editpet-btn]').forEach((b) => b.addEventListener('click', () => {
+    showPetForm(App.state.pets.find((p) => p.id === b.dataset.editpetBtn))
   }))
 }
 
@@ -1764,83 +1778,345 @@ function renderServices(category) {
 }
 function catName(c) { return { overnight: '过夜', day: '当日', other: '其他' }[c] || c }
 
-/* 添加宠物（F-21~F-24：结构化档案 + 校验） */
-function showPetAdd() {
-  openModal(`
-    <div class="modal-title">添加宠物</div>
-    <div class="form-row">
-      <div class="form-field"><label>宠物名称 *</label><input id="p-name" placeholder="如：豆豆"></div>
-      <div class="form-field"><label>类型 *</label>
-        <select id="p-type"><option value="dog">🐕 狗</option><option value="cat">🐈 猫</option><option value="other">🐾 其他</option></select>
+/* ============================================================
+ * 添加/编辑宠物（Apple 风格全屏表单：顶栏 + 进度条 + 分层卡片 + Sticky CTA）
+ * 步骤 1：基本信息（类型/名称/品种/年龄滑块/性别/绝育/体重）
+ * 步骤 2：更多信息（照片/行为/家中反应/备注 + 编辑模式危险区）
+ * ============================================================ */
+function showPetForm(pet) {
+  const editing = Boolean(pet)
+  const v = document.getElementById('view')
+  v.innerHTML = `
+    <div class="pet-page">
+      <div class="pet-topbar">
+        <button class="pet-back-btn" id="pf-back" title="返回">←</button>
+        <span class="pet-topbar-title">${editing ? '编辑宠物' : '添加宠物'}</span>
       </div>
-      <div class="form-field"><label>品种 *</label><input id="p-breed" placeholder="如：柯基"></div>
-    </div>
-    <div class="form-row">
-      <div class="form-field"><label>年龄（月，0-180）*</label><input id="p-age" type="number" min="0" max="180" placeholder="如：24"></div>
-      <div class="form-field"><label>性别 *</label>
-        <select id="p-gender"><option value="male">公</option><option value="female">母</option></select>
+      <div class="pet-progress">
+        <div class="pet-progress-step" id="pf-prog-1"><i></i></div>
+        <div class="pet-progress-step" id="pf-prog-2"><i></i></div>
       </div>
-      <div class="form-field"><label>绝育 *</label>
-        <select id="p-neutered"><option value="1">已绝育</option><option value="0">未绝育</option></select>
-      </div>
-      <div class="form-field"><label>体重 kg（猫必填）</label><input id="p-weight" type="number" step="0.1" placeholder="如：5.5"></div>
-    </div>
-    <div class="form-field"><label>行为特点</label><div id="p-behaviors" class="skill-grid"></div></div>
-    <div class="form-field"><label>家中反应</label><div id="p-reactions" class="skill-grid"></div></div>
-    <div class="form-row">
-      <div class="form-field"><label>照片</label><input type="file" id="p-photo" accept="image/*"></div>
-      <div class="form-field"><label>备注（≤2000 字）</label><input id="p-notes" placeholder="如：喜欢玩球，怕打雷"></div>
-    </div>
-    <div class="modal-actions">
-      <button class="btn btn-outline" data-close>取消</button>
-      <button class="btn btn-primary" id="p-save">保存宠物</button>
-    </div>
-  `, (box) => {
-    const renderBehavior = () => {
-      const type = box.querySelector('#p-type').value
-      const opts = type === 'dog' ? careOptions.dogBehaviors : type === 'cat' ? careOptions.catBehaviors : careOptions.dogBehaviors
-      box.querySelector('#p-behaviors').innerHTML = opts.map((b) =>
-        `<span class="chip" data-b="${esc(b)}">${esc(b)}</span>`).join('')
-      box.querySelector('#p-reactions').innerHTML = careOptions.homeReactions.map((b) =>
-        `<span class="chip" data-r="${esc(b)}">${esc(b)}</span>`).join('')
-      box.querySelectorAll('.chip').forEach((c) => c.addEventListener('click', () => c.classList.toggle('active')))
-    }
-    renderBehavior()
-    box.querySelector('#p-type').addEventListener('change', renderBehavior)
+      <div id="pf-body"></div>
+    </div>`
+  v.querySelector('#pf-back').addEventListener('click', () => renderPet())
 
-    let photoUrl = null
-    box.querySelector('#p-photo').addEventListener('change', async (e) => {
+  const state = {
+    petType: pet?.petType || 'dog',
+    name: pet?.name || '',
+    breed: pet?.breed || '',
+    ageMonths: pet?.ageMonths ?? 24,
+    gender: pet?.gender || 'male',
+    neutered: pet ? (pet.neutered ? 'yes' : 'no') : 'yes',
+    weightBucket: pet?.weightKg != null
+      ? (pet.weightKg < 5 ? '<5' : pet.weightKg <= 10 ? '5-10' : pet.weightKg <= 25 ? '10-25' : '>25')
+      : '',
+    weightKg: pet?.weightKg != null ? String(pet.weightKg) : '',
+    photoUrl: pet?.photoUrl || null,
+    behaviors: pet?.behaviors || [],
+    homeReactions: pet?.homeReactions || [],
+    notes: pet?.notes || ''
+  }
+  let step = 1
+  const body = v.querySelector('#pf-body')
+
+  const behaviorOptions = () => {
+    const t = state.petType
+    return (t === 'dog' ? careOptions.dogBehaviors : t === 'cat' ? careOptions.catBehaviors : careOptions.dogBehaviors) || []
+  }
+
+  const renderStep = () => {
+    document.getElementById('pf-prog-1').className = 'pet-progress-step ' + (step >= 1 ? (step === 1 ? 'active' : 'done') : '')
+    document.getElementById('pf-prog-2').className = 'pet-progress-step ' + (step >= 2 ? (step === 2 ? 'active' : 'done') : '')
+    if (step === 1) renderStep1()
+    else renderStep2()
+    v.scrollTop = 0
+  }
+
+  const renderStep1 = () => {
+    const agePct = Math.round((state.ageMonths / 180) * 100)
+    body.innerHTML = `
+      <div class="apple-header">
+        <div class="apple-title">${editing ? '编辑宠物' : '添加宠物'}</div>
+        <div class="apple-subtitle">${editing ? '更新 ' + esc(pet.name) + ' 的档案信息' : '创建完整档案，让看护人更了解你的宝贝'}</div>
+      </div>
+
+      <div class="pet-section">
+        <div class="pet-section-head"><span class="pet-section-title">基本信息</span></div>
+        <div class="pet-group">
+          <div class="pet-field">
+            <label>宠物类型</label>
+            <div class="pet-seg" id="pf-type">
+              <button class="pet-seg-btn" data-t="dog">🐕 狗</button>
+              <button class="pet-seg-btn" data-t="cat">🐈 猫</button>
+              <button class="pet-seg-btn" data-t="other">🐾 其他</button>
+            </div>
+          </div>
+          <div class="pet-field"><label>宠物名称 *</label><input class="pet-input" id="pf-name" placeholder="如：豆豆" maxlength="20" value="${esc(state.name)}"></div>
+          <div class="pet-field" style="margin-bottom:0"><label>品种 *</label><input class="pet-input" id="pf-breed" placeholder="如：柯基 / 英短" maxlength="30" value="${esc(state.breed)}"></div>
+        </div>
+      </div>
+
+      <div class="pet-section">
+        <div class="pet-section-head">
+          <span class="pet-section-title">年龄</span>
+          <span class="pet-section-value" id="pf-age-value">${state.ageMonths} 个月</span>
+        </div>
+        <div class="pet-group">
+          <input type="range" class="pet-slider" id="pf-age" min="0" max="180" step="1" value="${state.ageMonths}" style="--fill:${agePct}%">
+          <div class="pet-range-labels"><span>0 月（幼崽）</span><span>180 月（15 岁）</span></div>
+        </div>
+      </div>
+
+      <div class="pet-section">
+        <div class="pet-section-head"><span class="pet-section-title">性别</span></div>
+        <div class="pet-group">
+          <div class="pet-choice-grid cols-2" id="pf-gender">
+            <button class="pet-choice ${state.gender === 'male' ? 'active' : ''}" data-g="male">♂ 公</button>
+            <button class="pet-choice ${state.gender === 'female' ? 'active' : ''}" data-g="female">♀ 母</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="pet-section">
+        <div class="pet-section-head"><span class="pet-section-title">绝育状态</span></div>
+        <div class="pet-group">
+          <div class="pet-choice-grid cols-3" id="pf-neutered">
+            <button class="pet-choice ${state.neutered === 'yes' ? 'active' : ''}" data-n="yes">已绝育</button>
+            <button class="pet-choice ${state.neutered === 'no' ? 'active' : ''}" data-n="no">未绝育</button>
+            <button class="pet-choice ${state.neutered === 'unknown' ? 'active' : ''}" data-n="unknown">不确定</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="pet-section">
+        <div class="pet-section-head"><span class="pet-section-title">体重</span><span class="pet-section-value" id="pf-weight-label">${state.weightKg || '—'} kg</span></div>
+        <div class="pet-group">
+          <div class="pet-choice-grid cols-4" id="pf-weight">
+            ${(['<5', '5-10', '10-25', '>25']).map((w) => `
+              <button class="pet-choice ${state.weightBucket === w ? 'active' : ''}" data-w="${w}">
+                ${w.replace('<', '&lt;').replace('>', '&gt;')}kg<small>${w === '<5' ? '小型' : w === '5-10' ? '中型' : w === '10-25' ? '大型' : '巨型'}</small>
+              </button>`).join('')}
+          </div>
+          <div class="pet-field" style="margin:12px 0 0">
+            <label>精确体重（kg，猫必填）</label>
+            <input class="pet-input" id="pf-weight-input" type="number" step="0.1" min="0" placeholder="如：5.5" value="${esc(state.weightKg)}">
+          </div>
+        </div>
+      </div>
+
+      <div class="pet-bottom-bar">
+        <button class="pet-cta" id="pf-next">下一步</button>
+      </div>`
+
+    // 类型
+    const segBtns = body.querySelectorAll('#pf-type .pet-seg-btn')
+    const setType = (t) => {
+      state.petType = t
+      segBtns.forEach((b) => b.classList.toggle('active', b.dataset.t === t))
+      // 类型切换时清空已选行为（选项集不同）
+      state.behaviors = []
+    }
+    setType(state.petType)
+    segBtns.forEach((b) => b.addEventListener('click', () => setType(b.dataset.t)))
+
+    // 名称/品种
+    body.querySelector('#pf-name').addEventListener('input', (e) => { state.name = e.target.value })
+    body.querySelector('#pf-breed').addEventListener('input', (e) => { state.breed = e.target.value })
+
+    // 年龄滑块
+    const slider = body.querySelector('#pf-age')
+    const ageValue = body.querySelector('#pf-age-value')
+    slider.addEventListener('input', () => {
+      state.ageMonths = Number(slider.value)
+      ageValue.textContent = state.ageMonths + ' 个月'
+      slider.style.setProperty('--fill', Math.round((state.ageMonths / 180) * 100) + '%')
+    })
+
+    // 性别
+    body.querySelectorAll('#pf-gender .pet-choice').forEach((b) => b.addEventListener('click', () => {
+      state.gender = b.dataset.g
+      body.querySelectorAll('#pf-gender .pet-choice').forEach((x) => x.classList.toggle('active', x === b))
+    }))
+
+    // 绝育
+    body.querySelectorAll('#pf-neutered .pet-choice').forEach((b) => b.addEventListener('click', () => {
+      state.neutered = b.dataset.n
+      body.querySelectorAll('#pf-neutered .pet-choice').forEach((x) => x.classList.toggle('active', x === b))
+    }))
+
+    // 体重（网格 + 输入联动）
+    const weightLabel = body.querySelector('#pf-weight-label')
+    body.querySelectorAll('#pf-weight .pet-choice').forEach((b) => b.addEventListener('click', () => {
+      state.weightBucket = b.dataset.w
+      body.querySelectorAll('#pf-weight .pet-choice').forEach((x) => x.classList.toggle('active', x === b))
+      const bucketVal = b.dataset.w === '<5' ? '3' : b.dataset.w === '5-10' ? '7.5' : b.dataset.w === '10-25' ? '17' : '30'
+      body.querySelector('#pf-weight-input').value = bucketVal
+      state.weightKg = bucketVal
+      weightLabel.textContent = bucketVal + ' kg'
+    }))
+    body.querySelector('#pf-weight-input').addEventListener('input', (e) => {
+      state.weightKg = e.target.value
+      state.weightBucket = ''
+      body.querySelectorAll('#pf-weight .pet-choice').forEach((x) => x.classList.remove('active'))
+      weightLabel.textContent = (e.target.value || '—') + ' kg'
+    })
+
+    body.querySelector('#pf-next').addEventListener('click', () => {
+      if (!state.name.trim()) return toast('请填写宠物名称')
+      if (!state.breed.trim()) return toast('请填写品种')
+      step = 2
+      renderStep()
+    })
+  }
+
+  const renderStep2 = () => {
+    body.innerHTML = `
+      <div class="apple-header">
+        <div class="apple-title">更多信息</div>
+        <div class="apple-subtitle">补充照片与性格细节，帮助看护人更好地照顾它</div>
+      </div>
+
+      <div class="pet-section">
+        <div class="pet-section-head"><span class="pet-section-title">宠物照片</span></div>
+        <div class="pet-group">
+          <div class="pet-photo-box">
+            <img class="pet-photo-preview" id="pf-photo-preview" src="${state.photoUrl ? mediaUrl(state.photoUrl) : ''}" alt="" ${state.photoUrl ? '' : 'data-empty'}>
+            <button class="pet-photo-btn" id="pf-photo-btn">📷 上传照片</button>
+            <input type="file" id="pf-photo" accept="image/*" hidden>
+          </div>
+        </div>
+      </div>
+
+      <div class="pet-section">
+        <div class="pet-section-head"><span class="pet-section-title">行为特点</span></div>
+        <div class="pet-group">
+          <div class="pet-chips" id="pf-behaviors"></div>
+        </div>
+      </div>
+
+      <div class="pet-section">
+        <div class="pet-section-head"><span class="pet-section-title">有人进入你家时</span></div>
+        <div class="pet-group">
+          <div class="pet-chips" id="pf-reactions"></div>
+        </div>
+      </div>
+
+      <div class="pet-section">
+        <div class="pet-section-head"><span class="pet-section-title">其他备注</span></div>
+        <div class="pet-group">
+          <textarea class="pet-input" id="pf-notes" rows="4" maxlength="2000" placeholder="如：喜欢玩球，怕打雷，对陌生人有戒心…" style="resize:vertical">${esc(state.notes)}</textarea>
+        </div>
+      </div>
+
+      ${editing ? `
+      <div class="pet-section">
+        <div class="pet-danger">
+          <div class="pet-danger-title">危险区</div>
+          <div class="pet-danger-sub">删除后将无法恢复，该宠物的预约记录仍会保留。</div>
+          <button class="pet-danger-btn" id="pf-delete">删除宠物</button>
+        </div>
+      </div>` : ''}
+
+      <div class="pet-bottom-bar">
+        <button class="pet-cta secondary" id="pf-prev">上一步</button>
+        <button class="pet-cta" id="pf-save">${editing ? '保存修改' : '保存宠物'}</button>
+      </div>`
+
+    // 照片
+    const preview = body.querySelector('#pf-photo-preview')
+    const renderPreview = () => {
+      if (state.photoUrl) {
+        preview.src = mediaUrl(state.photoUrl)
+        preview.removeAttribute('data-empty')
+      } else {
+        preview.removeAttribute('src')
+        preview.setAttribute('data-empty', '')
+      }
+    }
+    renderPreview()
+    body.querySelector('#pf-photo').addEventListener('change', async (e) => {
       const file = e.target.files[0]
       if (!file) return
       try {
         const blob = await compressImage(file)
-        photoUrl = await uploadMedia(await blob.arrayBuffer(), 'pet.jpg', 'image/jpeg')
+        if (blob.size > 1024 * 1024) return toast('照片过大（压缩后仍超过 1MB），请更换更小的图片')
+        state.photoUrl = await uploadMedia(await blob.arrayBuffer(), 'pet.jpg', 'image/jpeg')
+        renderPreview()
         toast('✓ 照片已上传')
       } catch (err) { toast(err.message) }
+      e.target.value = ''
     })
+    body.querySelector('#pf-photo-btn').addEventListener('click', () => body.querySelector('#pf-photo').click())
 
-    box.querySelector('#p-save').addEventListener('click', async () => {
-      const body = {
-        name: box.querySelector('#p-name').value.trim(),
-        petType: box.querySelector('#p-type').value,
-        breed: box.querySelector('#p-breed').value.trim(),
-        ageMonths: Number(box.querySelector('#p-age').value),
-        gender: box.querySelector('#p-gender').value,
-        neutered: box.querySelector('#p-neutered').value === '1',
-        weightKg: box.querySelector('#p-weight').value ? Number(box.querySelector('#p-weight').value) : undefined,
-        behaviors: [...box.querySelectorAll('#p-behaviors .chip.active')].map((c) => c.dataset.b),
-        homeReactions: [...box.querySelectorAll('#p-reactions .chip.active')].map((c) => c.dataset.r),
-        photoUrl,
-        notes: box.querySelector('#p-notes').value.trim()
+    // 行为 / 家中反应 chips
+    const renderChips = () => {
+      body.querySelector('#pf-behaviors').innerHTML = behaviorOptions().map((b) =>
+        `<button class="pet-chip ${state.behaviors.includes(b) ? 'active' : ''}" data-b="${esc(b)}">${esc(b)}</button>`).join('')
+      body.querySelector('#pf-reactions').innerHTML = (careOptions.homeReactions || []).map((r) =>
+        `<button class="pet-chip ${state.homeReactions.includes(r) ? 'active' : ''}" data-r="${esc(r)}">${esc(r)}</button>`).join('')
+      body.querySelectorAll('#pf-behaviors .pet-chip').forEach((c) => c.addEventListener('click', () => {
+        c.classList.toggle('active')
+        const v = c.dataset.b
+        state.behaviors = c.classList.contains('active')
+          ? [...state.behaviors, v]
+          : state.behaviors.filter((x) => x !== v)
+      }))
+      body.querySelectorAll('#pf-reactions .pet-chip').forEach((c) => c.addEventListener('click', () => {
+        c.classList.toggle('active')
+        const v = c.dataset.r
+        state.homeReactions = c.classList.contains('active')
+          ? [...state.homeReactions, v]
+          : state.homeReactions.filter((x) => x !== v)
+      }))
+    }
+    renderChips()
+    body.querySelector('#pf-notes').addEventListener('input', (e) => { state.notes = e.target.value })
+
+    body.querySelector('#pf-prev').addEventListener('click', () => { step = 1; renderStep() })
+
+    if (editing) {
+      body.querySelector('#pf-delete').addEventListener('click', async () => {
+        if (!confirm(`删除宠物「${pet.name}」？删除后无法恢复`)) return
+        try {
+          await deletePet(pet.id)
+          toast('已删除')
+          renderPet()
+        } catch (e) { toast('删除失败：' + e.message) }
+      })
+    }
+
+    body.querySelector('#pf-save').addEventListener('click', async () => {
+      const age = Number(state.ageMonths)
+      if (!state.name.trim()) return toast('请填写宠物名称')
+      if (!state.breed.trim()) return toast('请填写品种')
+      if (!Number.isFinite(age) || age < 0 || age > 180) return toast('年龄需在 0-180 月之间')
+      if (state.petType === 'cat' && !state.weightKg) return toast('猫咪体重必填')
+      const payload = {
+        name: state.name.trim(),
+        petType: state.petType,
+        breed: state.breed.trim(),
+        ageMonths: age,
+        gender: state.gender,
+        neutered: state.neutered === 'yes',
+        weightKg: state.weightKg ? Number(state.weightKg) : undefined,
+        behaviors: state.behaviors,
+        homeReactions: state.homeReactions,
+        photoUrl: state.photoUrl || undefined,
+        notes: state.notes.trim()
       }
       try {
-        await addPet(body)
-        closeModal()
-        toast('✅ 宠物档案已创建')
-        renderPets()
+        if (editing) {
+          await updatePet(pet.id, payload)
+        } else {
+          await addPet(payload)
+        }
+        toast(editing ? '✅ 宠物档案已更新' : '✅ 宠物档案已创建')
+        renderPet()
       } catch (e) { toast('保存失败：' + e.message) }
     })
-  })
+  }
+
+  renderStep()
 }
 
 /* 发起看护订单（两种模式：指定认识的看护人 / 发布到动态让有资历的人接单） */

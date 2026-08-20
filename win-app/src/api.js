@@ -347,6 +347,11 @@ async function addPet(pet) {
   App.state.pets.unshift(data.pet)
   return data.pet
 }
+async function updatePet(id, pet) {
+  const data = await api('/api/pets/' + id, { method: 'PUT', body: pet })
+  App.state.pets = App.state.pets.map((p) => (p.id === String(id) ? data.pet : p))
+  return data.pet
+}
 async function deletePet(id) {
   await api('/api/pets/' + id, { method: 'DELETE' })
   App.state.pets = App.state.pets.filter((p) => p.id !== String(id))

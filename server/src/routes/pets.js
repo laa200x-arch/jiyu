@@ -107,6 +107,25 @@ export function petsRouter(db, bus = { io: null }) {
     res.json({ pet: serializePet(row) })
   })
 
+  // 更新宠物（编辑模式：保留宠物 id，历史订单关联不受影响）
+  router.put('/pets/:id', (req, res) => {
+    const row = db.get('SELECT * FROM pets WHERE id = ? AND user_id = ?', [req.params.id, req.userId])
+    if (!row) return res.status(404).json({ error: '宠物不存在' })
+    const error = validatePet(req.body)
+    if (error) return res.status(400).json({ error })
+    const { name, petType, breed, ageMonths, gender, neutered, weightKg, behaviors, homeReactions, photoUrl, notes } = req.body
+    db.run(
+      `UPDATE pets SET name = ?, pet_type = ?, breed = ?, age_months = ?, gender = ?, neutered = ?,
+        weight_kg = ?, behaviors = ?, home_reactions = ?, photo_url = ?, notes = ? WHERE id = ?`,
+      [String(name).trim(), petType, String(breed).trim(), Number(ageMonths), gender,
+        neutered ? 1 : 0, weightKg ?? null,
+        behaviors && behaviors.length ? JSON.stringify(behaviors) : null,
+        homeReactions && homeReactions.length ? JSON.stringify(homeReactions) : null,
+        photoUrl || null, String(notes || '').trim(), row.id]
+    )
+    res.json({ pet: serializePet(db.get('SELECT * FROM pets WHERE id = ?', [row.id])) })
+  })
+
   // 删除宠物
   router.delete('/pets/:id', (req, res) => {
     const r = db.run('DELETE FROM pets WHERE id = ? AND user_id = ?', [req.params.id, req.userId])

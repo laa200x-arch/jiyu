@@ -542,3 +542,197 @@ body {
 .score-row:last-child { border-bottom: none; }
 .score-rank { width: 22px; text-align: center; font-weight: 700; }
 .score-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ============================================================
+ * Apple 风格 · 宠物页（wag 风格重构：大标题 / 分层卡片 / 选择网格 / Sticky CTA）
+ * ============================================================ */
+
+/* 页面大标题（Apple Large Title） */
+.apple-header { padding: 18px 2px 4px; }
+.apple-title {
+  font-size: clamp(30px, 4vw, 42px); font-weight: 800; letter-spacing: -0.02em;
+  line-height: 1.1; color: var(--text);
+}
+.apple-subtitle { font-size: 14px; color: var(--text-2); margin-top: 8px; line-height: 1.6; }
+
+/* 分层分组卡片（Apple 分组列表风格） */
+.pet-section { margin-bottom: 18px; }
+.pet-section-head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  margin: 0 6px 8px;
+}
+.pet-section-title { font-size: 13px; font-weight: 700; color: var(--text-2); text-transform: uppercase; letter-spacing: .04em; }
+.pet-section-value { font-size: 15px; font-weight: 700; color: var(--primary); }
+.pet-group {
+  background: #fff; border-radius: 18px; padding: 16px;
+  border: 1px solid var(--divider);
+  box-shadow: 0 1px 2px rgba(15, 20, 25, .03);
+}
+.pet-group + .pet-group { margin-top: 10px; }
+
+/* 输入框（Apple 灰底大圆角） */
+.pet-field { margin-bottom: 14px; }
+.pet-field label { display: block; font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 7px; }
+.pet-input {
+  width: 100%; padding: 13px 16px; font-size: 16px; font-family: inherit;
+  background: #f2f3f7; border: 1px solid transparent; border-radius: 13px; outline: none;
+  transition: border-color .2s, background .2s, box-shadow .2s;
+}
+.pet-input:focus { background: #fff; border-color: var(--primary); box-shadow: 0 0 0 4px rgba(63,140,217,.12); }
+.pet-input::placeholder { color: #9aa0ae; }
+
+/* 分段选择（宠物类型） */
+.pet-seg { display: flex; gap: 8px; }
+.pet-seg-btn {
+  flex: 1; padding: 11px 0; font-size: 15px; font-weight: 600; font-family: inherit;
+  background: #f2f3f7; color: var(--text-2); border: 1.5px solid transparent; border-radius: 13px;
+  cursor: pointer; transition: all .2s;
+}
+.pet-seg-btn:hover { background: #e9ebf2; }
+.pet-seg-btn.active { background: #f0f4ff; border-color: var(--primary); color: var(--primary); }
+
+/* 选择网格（性别双列 / 绝育三列 / 体重四列） */
+.pet-choice-grid { display: grid; gap: 10px; }
+.pet-choice-grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
+.pet-choice-grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
+.pet-choice-grid.cols-4 { grid-template-columns: repeat(4, 1fr); }
+.pet-choice {
+  padding: 14px 6px; text-align: center; font-size: 15px; font-weight: 600; font-family: inherit;
+  background: #f2f3f7; color: var(--text); border: 1.5px solid transparent; border-radius: 15px;
+  cursor: pointer; transition: all .2s;
+}
+.pet-choice small { display: block; font-size: 11px; font-weight: 500; color: var(--text-2); margin-top: 3px; }
+.pet-choice:hover { background: #e9ebf2; }
+.pet-choice.active { background: #f0f4ff; border-color: var(--primary); color: var(--primary); }
+.pet-choice.active small { color: var(--primary); opacity: .75; }
+
+/* 滑块（年龄） */
+.pet-slider { -webkit-appearance: none; appearance: none; width: 100%; height: 6px; border-radius: 6px;
+  background: linear-gradient(90deg, var(--primary) var(--fill, 20%), #e4e7ee var(--fill, 20%));
+  outline: none; margin: 6px 0 2px; cursor: pointer; }
+.pet-slider::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 26px; height: 26px; border-radius: 50%;
+  background: #fff; border: 1px solid rgba(0,0,0,.08);
+  box-shadow: 0 2px 8px rgba(15,20,25,.18); cursor: grab;
+}
+.pet-slider::-moz-range-thumb { width: 26px; height: 26px; border-radius: 50%; background: #fff;
+  border: 1px solid rgba(0,0,0,.08); box-shadow: 0 2px 8px rgba(15,20,25,.18); cursor: grab; }
+.pet-range-labels { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-2); margin-top: 4px; }
+
+/* 多选 chips（行为 / 家中反应） */
+.pet-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.pet-chip {
+  padding: 9px 16px; font-size: 14px; font-weight: 600; font-family: inherit;
+  background: #f2f3f7; color: var(--text); border: 1.5px solid transparent; border-radius: 999px;
+  cursor: pointer; transition: all .18s;
+}
+.pet-chip:hover { background: #e9ebf2; }
+.pet-chip.active { background: #f0f4ff; border-color: var(--primary); color: var(--primary); }
+
+/* 照片上传 */
+.pet-photo-box { display: flex; align-items: center; gap: 14px; }
+.pet-photo-preview {
+  width: 88px; height: 88px; border-radius: 18px; object-fit: cover;
+  background: #f2f3f7; border: 1px dashed #d5d9e2; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; font-size: 32px; color: #c3c8d4;
+}
+.pet-photo-btn {
+  padding: 10px 18px; font-size: 14px; font-weight: 600; font-family: inherit;
+  background: #f2f3f7; color: var(--primary); border: none; border-radius: 12px; cursor: pointer;
+  transition: background .2s;
+}
+.pet-photo-btn:hover { background: #e9ebf2; }
+
+/* 危险区（编辑模式） */
+.pet-danger { background: #fff7f7; border: 1px solid #f3d4d4; border-radius: 18px; padding: 16px; }
+.pet-danger-title { font-size: 13px; font-weight: 700; color: var(--danger); text-transform: uppercase; letter-spacing: .04em; }
+.pet-danger-sub { font-size: 13px; color: var(--text-2); margin: 6px 0 12px; }
+.pet-danger-btn {
+  width: 100%; padding: 13px; font-size: 15px; font-weight: 700; font-family: inherit;
+  background: #fdecec; color: var(--danger); border: none; border-radius: 13px; cursor: pointer;
+  transition: background .2s;
+}
+.pet-danger-btn:hover { background: #fbdcdc; }
+
+/* Sticky 底部操作栏（毛玻璃） */
+.pet-bottom-bar {
+  position: sticky; bottom: 0; display: flex; gap: 10px; padding: 14px 0 18px;
+  background: linear-gradient(180deg, rgba(246,248,252,0), rgba(246,248,252,.92) 30%, #f6f8fc 70%);
+  z-index: 5;
+}
+.pet-cta {
+  flex: 1; padding: 16px; font-size: 17px; font-weight: 700; font-family: inherit;
+  color: #fff; background: var(--primary); border: none; border-radius: 16px; cursor: pointer;
+  transition: transform .15s, opacity .2s, background .2s;
+  box-shadow: 0 6px 20px rgba(63,140,217,.28);
+}
+.pet-cta:hover { background: var(--primary-deep); }
+.pet-cta:active { transform: scale(.98); }
+.pet-cta:disabled { opacity: .5; cursor: not-allowed; box-shadow: none; }
+.pet-cta.secondary { background: #eef0f5; color: var(--primary); box-shadow: none; }
+.pet-cta.secondary:hover { background: #e3e6ee; }
+
+/* 水平进度指示器 */
+.pet-progress { display: flex; align-items: center; gap: 8px; margin: 14px 2px 4px; }
+.pet-progress-step { flex: 1; height: 5px; border-radius: 5px; background: #e4e7ee; overflow: hidden; }
+.pet-progress-step > i { display: block; height: 100%; width: 0; border-radius: 5px;
+  background: var(--primary); transition: width .4s cubic-bezier(.2,.8,.3,1); }
+.pet-progress-step.done > i { width: 100%; }
+.pet-progress-step.active > i { width: 100%; }
+
+/* 宠物主页卡片 */
+.pet-card-main {
+  display: flex; gap: 14px; align-items: center; padding: 14px;
+  background: #fff; border: 1px solid var(--divider); border-radius: 20px;
+  box-shadow: 0 1px 3px rgba(15,20,25,.04); cursor: pointer; transition: transform .15s, box-shadow .2s;
+}
+.pet-card-main:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(15,20,25,.08); }
+.pet-card-avatar {
+  width: 72px; height: 72px; border-radius: 18px; object-fit: cover; flex-shrink: 0;
+  background: linear-gradient(135deg, #f0f4ff, #f7f3ff); display: flex; align-items: center; justify-content: center;
+  font-size: 34px;
+}
+.pet-card-info { flex: 1; min-width: 0; }
+.pet-card-name { font-size: 17px; font-weight: 700; color: var(--text); }
+.pet-card-meta { font-size: 13px; color: var(--text-2); margin-top: 4px; line-height: 1.5; }
+.pet-card-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.pet-tag { font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 999px;
+  background: #f0f4ff; color: var(--primary); }
+.pet-card-chevron { color: #c3c8d4; font-size: 18px; }
+
+/* 宠物空状态 */
+.pet-empty { text-align: center; padding: 40px 20px; }
+.pet-empty-icon {
+  width: 88px; height: 88px; margin: 0 auto 18px; border-radius: 28px;
+  background: linear-gradient(135deg, #f0f4ff, #f7f3ff);
+  display: flex; align-items: center; justify-content: center; font-size: 40px;
+}
+.pet-empty-title { font-size: 19px; font-weight: 700; color: var(--text); }
+.pet-empty-sub { font-size: 14px; color: var(--text-2); margin-top: 8px; line-height: 1.6; }
+
+/* 编辑宠物入口按钮 */
+.pet-edit-btn {
+  border: none; background: #f2f3f7; color: var(--text-2); width: 30px; height: 30px;
+  border-radius: 50%; cursor: pointer; font-size: 13px; flex-shrink: 0; transition: background .2s;
+}
+.pet-edit-btn:hover { background: #e4e7ee; color: var(--text); }
+
+/* 减少动态偏好：关闭非必要动画 */
+@media (prefers-reduced-motion: reduce) {
+  .view, .card, .modal-box, .toast, .pet-card-main { animation: none !important; transition: none !important; }
+  .pet-card-main:hover { transform: none; }
+}
+
+/* 宠物表单页（全屏页面容器） */
+.pet-page { max-width: 640px; margin: 0 auto; padding: 0 16px 30px; }
+.pet-topbar {
+  display: flex; align-items: center; gap: 10px; padding: 14px 0 6px;
+  position: sticky; top: 0; z-index: 6; background: var(--bg-soft);
+}
+.pet-back-btn {
+  border: none; background: #f2f3f7; color: var(--text); width: 36px; height: 36px;
+  border-radius: 50%; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center;
+  transition: background .2s;
+}
+.pet-back-btn:hover { background: #e4e7ee; }
+.pet-topbar-title { font-size: 16px; font-weight: 700; color: var(--text); flex: 1; }

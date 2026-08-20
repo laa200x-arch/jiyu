@@ -409,6 +409,11 @@ final class APIClient {
         return response.pet
     }
 
+    func updatePet(id: String, _ body: [String: Any]) async throws -> ServerPet {
+        let response: PetResponse = try await request("/api/pets/\(id)", method: "PUT", body: body)
+        return response.pet
+    }
+
     func deletePet(id: String) async throws {
         let _: OkResponse = try await request("/api/pets/\(id)", method: "DELETE")
     }
