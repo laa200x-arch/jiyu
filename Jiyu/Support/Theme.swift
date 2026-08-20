@@ -9,8 +9,8 @@ enum Theme {
     static let primaryDeep = Color(red: 0.45, green: 0.34, blue: 0.98) // #7257FA
     /// 辅助色：暖橙（曝光/亮点/兴趣标签）
     static let secondary = Color(red: 0.96, green: 0.62, blue: 0.04)  // #F59E0B
-    /// 浅紫灰背景
-    static let bg = Color(red: 0.96, green: 0.965, blue: 0.988)       // #F5F6FC
+    /// 页面背景（统一纯白，避免任何灰底/暗灰观感）
+    static let bg = Color.white
     /// 卡片底色（纯白）
     static let cardBg = Color.white
     /// 输入框/未选中按钮固定浅灰（不使用 systemGray 语义色，防止暗黑模式反转成黑块）

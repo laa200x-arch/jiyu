@@ -1,13 +1,13 @@
-/* 技遇 Windows 版 - 紫色主题（主色紫罗兰 + 暖橙强调 + 浅紫灰背景，现代卡片风） */
-/* 强制浅色模式：阻止系统暗黑模式反转（黑块/灰遮罩根因） */
+/* 技遇 Windows 版 - 紫色主题（主色紫罗兰 + 暖橙强调 + 白色背景，现代卡片风） */
+/* 强制浅色模式：阻止系统暗黑模式反转（黑块/灰遮罩根因）；背景统一纯白 */
 :root {
   color-scheme: light;
   --primary: #6c5ce7;
   --primary-deep: #7257fa;
   --primary-soft: rgba(108, 92, 231, 0.12);
   --secondary: #f59e0b;
-  --bg: #f5f6fc;
-  --bg-soft: #f5f6fc;
+  --bg: #ffffff;
+  --bg-soft: #ffffff;
   --card: #ffffff;
   --text: #1f2937;
   --text-2: #6b7280;
@@ -19,7 +19,7 @@
   --shadow: 0 2px 10px rgba(108, 92, 231, 0.08);
 }
 
-html { color-scheme: light; background: #f5f6fc; }
+html { color-scheme: light; background: #ffffff; }
 
 /* 原生表单控件（input/select/textarea/button/range）统一显式浅色，防暗黑反转 */
 input, select, textarea, button {
@@ -669,10 +669,10 @@ body {
 }
 .pet-danger-btn:hover { background: #fbdcdc; }
 
-/* Sticky 底部操作栏（不透明浅色背景，防暗黑反转与灰色遮罩） */
+/* Sticky 底部操作栏（纯白背景，滚动时无灰色遮罩） */
 .pet-bottom-bar {
   position: sticky; bottom: 0; display: flex; gap: 10px; padding: 14px 0 18px;
-  background: #f5f6fc;
+  background: #ffffff;
   z-index: 5;
 }
 .pet-cta {
@@ -742,7 +742,7 @@ body {
 .pet-page { max-width: 640px; margin: 0 auto; padding: 0 16px 30px; }
 .pet-topbar {
   display: flex; align-items: center; gap: 10px; padding: 14px 0 6px;
-  position: sticky; top: 0; z-index: 6; background: #f5f6fc;
+  position: sticky; top: 0; z-index: 6; background: #ffffff;
 }
 .pet-back-btn {
   border: none; background: #f2f3f7; color: var(--text); width: 36px; height: 36px;

@@ -19,6 +19,8 @@ struct JiyuApp: App {
                 }
             }
             .environmentObject(appState)
+            // 强制浅色模式：应用仅设计浅色 UI（导航栏/TabBar/弹窗统一白色，杜绝暗黑反转）
+            .preferredColorScheme(.light)
             .task {
                 // 有持久化 Token：先显示加载页，恢复账号数据后再进主界面
                 // 恢复失败 → 回登录页（401 清 token；网络异常保留 token 便于重试）

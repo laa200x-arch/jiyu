@@ -39,6 +39,8 @@ struct ReceivedEvaluationsView: View {
                             evaluationRow(eval)
                         }
                     }
+                    .scrollContentBackground(.hidden) // 去掉系统 List 默认灰底，保持纯白
+                    .background(Theme.bg)
                 }
             }
             .navigationTitle("收到的评价")

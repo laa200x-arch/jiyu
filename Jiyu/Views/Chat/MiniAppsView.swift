@@ -79,6 +79,8 @@ struct MiniAppsView: View {
                             }
                         }
                         .listStyle(.plain)
+                        .scrollContentBackground(.hidden) // 去掉系统 List 默认灰底，保持纯白
+                        .background(Theme.bg)
                     }
                 }
 
