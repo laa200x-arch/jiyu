@@ -70,10 +70,9 @@ export function matchRouter(db) {
       })
     }
 
-    // 排序：VIP 曝光优先 → 信用分高优先 → 距离近优先
+    // 排序：VIP 曝光优先 → 距离近优先（信用分已从用户视角移除）
     results.sort((a, b) => {
       if (a.user.isExposureVip !== b.user.isExposureVip) return a.user.isExposureVip ? -1 : 1
-      if (a.user.creditScore !== b.user.creditScore) return b.user.creditScore - a.user.creditScore
       return (a.user.distanceKm ?? Infinity) - (b.user.distanceKm ?? Infinity)
     })
 

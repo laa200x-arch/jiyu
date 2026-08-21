@@ -22,8 +22,8 @@ export const CARE_SERVICES = [
 // 平台佣金率（宠物服务收费模式；其余归服务人员）
 export const COMMISSION_RATE = 0.1
 
-// 接单资历门槛（"有资历的人可以接单"：信用 ≥75 且已完成任意认证）
-export const ACCEPT_REQUIREMENT = { minCredit: 75 }
+// 接单资历门槛（"有资历的人可以接单"：已完成实名/学生认证）
+export const ACCEPT_REQUIREMENT = {}
 
 // 宠物档案字典（F-23：狗 8 行为 / 猫 10 行为 / 家中反应 4 / 体重分级 4）
 export const PET_OPTIONS = {
@@ -274,8 +274,8 @@ export function petsRouter(db, bus = { io: null }) {
     if (row.status !== 'open') return res.status(400).json({ error: '该订单已接单或已关闭' })
     const me = db.get('SELECT * FROM users WHERE id = ?', [req.userId])
     if (!me) return res.status(404).json({ error: '用户不存在' })
-    if (me.credit_score < ACCEPT_REQUIREMENT.minCredit || me.verification === 'none') {
-      return res.status(403).json({ error: `接单需要信用 ≥${ACCEPT_REQUIREMENT.minCredit} 且完成实名/学生认证（有资历要求）` })
+    if (me.verification === 'none') {
+      return res.status(403).json({ error: '接单需要完成实名/学生认证（有资历要求）' })
     }
     const existing = db.get('SELECT * FROM booking_applications WHERE booking_id = ? AND user_id = ?', [row.id, req.userId])
     if (existing) return res.status(400).json({ error: '已提交过申请，等待派单人确认' })
@@ -327,8 +327,8 @@ export function petsRouter(db, bus = { io: null }) {
     if (row.status !== 'open') return res.status(400).json({ error: '该订单已接单或已关闭' })
     const me = db.get('SELECT * FROM users WHERE id = ?', [req.userId])
     if (!me) return res.status(404).json({ error: '用户不存在' })
-    if (me.credit_score < ACCEPT_REQUIREMENT.minCredit || me.verification === 'none') {
-      return res.status(403).json({ error: `接单需要信用 ≥${ACCEPT_REQUIREMENT.minCredit} 且完成实名/学生认证（有资历要求）` })
+    if (me.verification === 'none') {
+      return res.status(403).json({ error: '接单需要完成实名/学生认证（有资历要求）' })
     }
     db.run('UPDATE bookings SET provider_id = ?, status = ? WHERE id = ?', [req.userId, 'assigned', row.id])
     res.json({ ok: true, booking: { id: String(row.id), status: 'assigned' } })

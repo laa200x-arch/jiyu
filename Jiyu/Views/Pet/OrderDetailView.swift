@@ -195,7 +195,7 @@ struct OrderDetailView: View {
                         bio: "",
                         locationLabel: user.locationLabel ?? "",
                         distanceKm: distanceKm,
-                        creditScore: user.creditScore,
+                        creditScore: 0,
                         verification: .none,
                         mySkills: [],
                         wantSkills: [],
@@ -208,7 +208,7 @@ struct OrderDetailView: View {
                         .font(.subheadline)
                         .bold()
                         .foregroundStyle(Theme.textPrimary)
-                    Text("信用 \(Int(user.creditScore))\(user.locationLabel != nil ? " · \(user.locationLabel!)" : "")\(distanceKm != nil ? " · 距离你约 \(yuan(distanceKm!)) km" : "")")
+                    Text("\(user.locationLabel != nil ? "\(user.locationLabel!)" : "")\(distanceKm != nil ? " · 距离你约 \(yuan(distanceKm!)) km" : "")")
                         .font(.caption)
                         .foregroundStyle(Theme.textSecondary)
                 }
@@ -230,9 +230,6 @@ struct OrderDetailView: View {
                                     .font(.subheadline)
                                     .bold()
                                     .foregroundStyle(Theme.textPrimary)
-                                Text("信用 \(Int(app.creditScore))")
-                                    .font(.caption2)
-                                    .foregroundStyle(Theme.textSecondary)
                                 if app.verification != "none" {
                                     Text("✅ 已认证")
                                         .font(.caption2)
@@ -308,7 +305,7 @@ struct OrderDetailView: View {
             bio: "",
             locationLabel: app.locationLabel ?? "",
             distanceKm: nil,
-            creditScore: app.creditScore,
+            creditScore: 0,
             verification: .none,
             mySkills: [],
             wantSkills: [],

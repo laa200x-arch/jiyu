@@ -297,7 +297,7 @@ struct PetTabView: View {
                 .bold()
                 .foregroundStyle(Theme.warning)
             if let provider = booking.provider {
-                Text("看护人：\(provider.userName)（信用 \(Int(provider.creditScore))）")
+                Text("看护人：\(provider.userName)")
                     .font(.caption2)
                     .foregroundStyle(Theme.textSecondary)
             } else if booking.status == "open" {
@@ -965,11 +965,11 @@ struct BookingSheet: View {
                     if orderMode == 0 {
                         Picker("选择看护人", selection: $providerID) {
                             ForEach(store.allUsers.filter { $0.id != store.currentUser.id }) { u in
-                                Text("\(u.userName)（信用 \(Int(u.creditScore))）").tag(Optional(u.id.serverIDString))
+                                Text("\(u.userName)（\(u.locationLabel.isEmpty ? "待完善位置" : u.locationLabel)）").tag(Optional(u.id.serverIDString))
                             }
                         }
                     } else {
-                        Text("订单将发布到互换动态区，信用 ≥75 且完成认证的有资历用户可接单")
+                        Text("订单将发布到互换动态区，完成实名/学生认证的有资历用户可接单")
                             .font(.caption2)
                             .foregroundStyle(Theme.textSecondary)
                     }

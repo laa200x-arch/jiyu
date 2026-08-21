@@ -173,7 +173,6 @@ async function renderMatch() {
             </div>
             <div class="card-sub">${esc(u.bio)}</div>
           </div>
-          <span class="tag tag-credit">🛡 信用 ${Math.round(u.creditScore)}</span>
         </div>
         <div class="match-reason">
           <span class="reason-title">⇄ 双向匹配成功</span><br>
@@ -214,7 +213,6 @@ async function showMatchDetail(userId, reason) {
           </div>
           <div class="card-sub">${esc(u.bio)}</div>
           <div class="row" style="margin-top:4px">
-            <span class="tag tag-credit">🛡 信用 ${Math.round(u.creditScore)}</span>
             <span class="card-sub">📍 ${esc(u.locationLabel)}</span>
           </div>
         </div>
@@ -319,7 +317,7 @@ async function renderFeed() {
       const isOwnOrder = d.orderId && String(d.userId) === String(App.state.user.id)
       const myApp = d.myApplicationStatus
       const appCount = d.applicationCount || 0
-      const qualified = (App.state.user.creditScore >= 75 && App.state.user.verification !== 'none')
+      const qualified = App.state.user.verification !== 'none'
       const orderBlock = d.orderId ? `
             <div class="feed-order-bar" data-order-detail="${esc(d.orderId)}" style="margin-top:10px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;cursor:pointer" title="查看订单详情">
               <span class="tag tag-vip">💰 收费订单 ¥${orderPrice} · 佣金 10%</span>
@@ -334,7 +332,7 @@ async function renderFeed() {
                             ? '<span class="card-sub">❌ 申请已被拒绝</span>'
                             : (qualified
                                 ? `<button class="btn btn-primary btn-sm" data-apply="${esc(d.orderId)}">接单申请</button>`
-                                : '<span class="card-sub" title="接单需信用≥75且完成认证">🔒 有资历者接单</span>'))))
+                                : '<span class="card-sub" title="接单需完成实名/学生认证">🔒 有资历者接单</span>'))))
                 : `<span class="tag tag-verified">已接单</span>`}
             </div>` : ''
       return `
@@ -401,7 +399,7 @@ async function showOrderDetail(orderId) {
       <div class="row">
         ${avatarHtml(b.initiator, 'avatar avatar-sm')}
         <div style="flex:1">
-          <div class="order-detail-line"><b>${esc(b.initiator.userName)}</b>（信用 ${Math.round(b.initiator.creditScore)}）</div>
+          <div class="order-detail-line"><b>${esc(b.initiator.userName)}</b></div>
           <div class="card-sub">${esc(b.initiator.locationLabel || '未填位置')}${b.distanceKm != null ? ' · 距离你约 ' + b.distanceKm + ' km' : ''}</div>
         </div>
       </div>
@@ -412,7 +410,7 @@ async function showOrderDetail(orderId) {
       <div class="row">
         ${avatarHtml(b.provider, 'avatar avatar-sm')}
         <div style="flex:1">
-          <div class="order-detail-line"><b>${esc(b.provider.userName)}</b>（信用 ${Math.round(b.provider.creditScore)}）</div>
+          <div class="order-detail-line"><b>${esc(b.provider.userName)}</b></div>
           <div class="card-sub">${esc(b.provider.locationLabel || '未填位置')}${b.provider.distanceKm != null ? ' · 距离你约 ' + b.provider.distanceKm + ' km' : ''}</div>
         </div>
       </div>
@@ -426,7 +424,7 @@ async function showOrderDetail(orderId) {
           <div class="row">
             ${avatarHtml(a, 'avatar avatar-sm')}
             <div style="flex:1;min-width:0">
-              <div class="order-detail-line"><b>${esc(a.userName)}</b>（信用 ${Math.round(a.creditScore)} · ${a.verification !== 'none' ? '✅ 已认证' : '未认证'}）</div>
+              <div class="order-detail-line"><b>${esc(a.userName)}</b>（${a.verification !== 'none' ? '✅ 已认证' : '未认证'}）</div>
               <div class="card-sub">${esc(a.message || '无留言')}${a.locationLabel ? ' · ' + esc(a.locationLabel) : ''}</div>
             </div>
             <span class="tag ${a.status === 'pending' ? 'tag-vip' : 'tag-verified'}">${a.status === 'pending' ? '待确认' : a.status === 'accepted' ? '已确定' : '已拒绝'}</span>
@@ -531,7 +529,6 @@ function showUserProfile(u) {
         </div>
         <div class="card-sub">${esc(u.bio)}</div>
         <div class="row" style="margin-top:4px">
-          <span class="tag tag-credit">🛡 信用 ${Math.round(u.creditScore)}</span>
           <span class="card-sub">📍 ${esc(u.locationLabel)}</span>
         </div>
       </div>
@@ -641,7 +638,6 @@ function bindUserSearch() {
                 <div class="convo-name">${esc(u.userName)}</div>
                 <div class="card-sub">${esc(u.bio || u.locationLabel || '暂无简介')}</div>
               </div>
-              <span class="tag tag-credit">${Math.round(u.creditScore)}分</span>
               <button class="btn btn-primary btn-sm" data-chat="${u.id}">💬 私信</button>
             </div>`).join('')
           const openChat = async (uid) => {
@@ -1086,7 +1082,6 @@ function renderMine() {
               </div>
               <div class="profile-bio">@${esc(u.username || u.userName)}</div>
             </div>
-            <div class="credit-ring"><span class="num">${Math.round(u.creditScore)}</span><span class="label">信用分</span></div>
           </div>
           <div class="row" style="margin-top:14px;gap:10px">
             <button class="btn btn-primary" id="edit-skills">✏️ 编辑资料</button>
@@ -1384,7 +1379,7 @@ function showEvaluate(rec) {
           communication: stars.communication,
           comment: box.querySelector('#ev-comment').value.trim()
         })
-        closeModal(); toast('✅ 评价已提交，信用分已更新'); renderMine()
+        closeModal(); toast('✅ 评价已提交'); renderMine()
       } catch (e) { toast(e.message) }
     })
   })
@@ -1404,7 +1399,7 @@ function agreementText() {
   return '【技遇平台官方技能互换协议】\n1. 本次技能互换为纯个人兴趣无偿交换，双方确认无任何金钱、物资、有偿交易行为。\n2. 双方自愿交换技能教学资源，约定教学时长、教学时间、线上/线下方式。\n3. 双方承诺认真教学、守时履约，杜绝敷衍教学、无故爽约。\n4. 线下交换请选择公共场所，注意人身与财产安全，平台仅提供信息匹配服务。\n5. 若任意一方出现交易违规、爽约、敷衍行为，平台有权扣分、限流、封禁账号。\n6. 本协议为平台约束性规则，双方确认签署即认可全部条款。'
 }
 function rulesText() {
-  return '技遇零金钱交易风控规则\n1. 平台全程禁止任何金钱、物资、有偿交易。\n2. 文本/图片内容自动风控拦截，违禁词命中即拦截。\n3. 平台人工巡检私聊与动态区。\n4. 违规处罚：首次警告 → 二次限流 → 三次永久封禁。\n5. 敷衍教学、爽约、诱导交易可投诉，人工审核并扣减信用分。'
+  return '技遇零金钱交易风控规则\n1. 平台全程禁止任何金钱、物资、有偿交易。\n2. 文本/图片内容自动风控拦截，违禁词命中即拦截。\n3. 平台人工巡检私聊与动态区。\n4. 违规处罚：首次警告 → 二次限流 → 三次永久封禁。\n5. 敷衍教学、爽约、诱导交易可投诉，平台人工审核处理。'
 }
 
 /* 我的动态历史（个人发布的全部动态） */
@@ -2164,8 +2159,8 @@ function showBookingForm(service) {
         <option value="feed">发布到互换动态，让有资历的人接单</option>
       </select>
     </div>
-    <div class="form-field" id="b-provider-wrap"><label>看护人 *（信用分供参考）</label>
-      <select id="b-provider">${providers.map((u) => `<option value="${u.id}">${esc(u.userName)}（信用 ${Math.round(u.creditScore)} · ${esc(u.locationLabel)}）</option>`).join('')}</select>
+    <div class="form-field" id="b-provider-wrap"><label>看护人 *</label>
+      <select id="b-provider">${providers.map((u) => `<option value="${u.id}">${esc(u.userName)}（${esc(u.locationLabel)}）</option>`).join('')}</select>
     </div>
     <div class="bill-box" id="b-bill"></div>
     <div class="card-sub" style="color:#f29e4d;margin-top:8px">⚠️ 宠物服务可收费，价格与佣金以订单为准；其他技能互换仍坚持零金钱</div>

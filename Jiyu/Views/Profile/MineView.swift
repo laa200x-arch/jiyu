@@ -96,8 +96,6 @@ struct MineView: View {
                         .font(.caption)
                         .foregroundStyle(Theme.textSecondary)
                 }
-                Spacer()
-                creditRing
             }
 
             HStack(spacing: 10) {
@@ -181,27 +179,6 @@ struct MineView: View {
             }
         }
         return target.jpegData(compressionQuality: 0.8)
-    }
-
-    private var creditRing: some View {
-        ZStack {
-            Circle()
-                .stroke(Theme.divider, lineWidth: 6)
-            Circle()
-                .trim(from: 0, to: min(CGFloat(store.currentUser.creditScore) / 100, 1))
-                .stroke(Theme.primary, style: StrokeStyle(lineWidth: 6, lineCap: .round))
-                .rotationEffect(.degrees(-90))
-            VStack(spacing: 0) {
-                Text("\(Int(store.currentUser.creditScore))")
-                    .font(.headline)
-                    .bold()
-                    .foregroundStyle(Theme.textPrimary)
-                Text("信用分")
-                    .font(.system(size: 9))
-                    .foregroundStyle(Theme.textSecondary)
-            }
-        }
-        .frame(width: 64, height: 64)
     }
 
     private func verificationButton(_ verification: UserVerification, label: String) -> some View {
@@ -588,7 +565,7 @@ struct RiskRulesView: View {
     2. 个人主页、动态、私聊内容均经过文本 AI 风控自动拦截；转账截图、价格海报、付费二维码等图片将被屏蔽并警告。
     3. 平台人工巡检私聊与动态区，杜绝隐性交易。
     4. 违规处罚：首次警告 → 二次限流 → 三次永久封禁。
-    5. 敷衍教学、无故爽约、诱导交易可发起投诉，平台人工审核并扣减信用分。
+    5. 敷衍教学、无故爽约、诱导交易可发起投诉，平台人工审核处理。
     """
 
     var body: some View {

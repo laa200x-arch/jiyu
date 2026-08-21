@@ -156,9 +156,11 @@ struct MessageView: View {
                         .bold()
                         .foregroundStyle(Theme.textPrimary)
                     Spacer()
-                    Text("信用 \(Int(user.creditScore))")
-                        .font(.caption2)
-                        .foregroundStyle(Theme.textSecondary)
+                    if user.verification != .none {
+                        Text("✓ \(user.verification.rawValue)")
+                            .font(.caption2)
+                            .foregroundStyle(Theme.primary)
+                    }
                 }
                 Text(user.bio.isEmpty ? user.locationLabel : user.bio)
                     .font(.caption)

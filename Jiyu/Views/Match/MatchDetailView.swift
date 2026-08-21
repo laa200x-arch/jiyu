@@ -112,7 +112,6 @@ struct MatchDetailView: View {
                     .font(.caption)
                     .foregroundStyle(Theme.textSecondary)
                 HStack(spacing: 8) {
-                    CreditBadgeView(score: displayUser.creditScore)
                     if displayUser.verification != .none {
                         Label(displayUser.verification.rawValue, systemImage: "checkmark.seal.fill")
                             .font(.caption2)

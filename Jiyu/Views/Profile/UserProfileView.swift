@@ -69,7 +69,6 @@ struct UserProfileView: View {
                     .font(.caption)
                     .foregroundStyle(Theme.textSecondary)
                 HStack(spacing: 8) {
-                    CreditBadgeView(score: user.creditScore)
                     if user.verification != .none {
                         Label(user.verification.rawValue, systemImage: "checkmark.seal.fill")
                             .font(.caption2)

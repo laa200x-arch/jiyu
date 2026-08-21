@@ -137,7 +137,7 @@ struct ExchangeDynamicView: View {
     private func orderBlock(_ item: DynamicModel) -> some View {
         let isOwn = item.userId == store.currentUser.id
         let isOpen = item.orderStatus == "open"
-        let qualified = store.currentUser.creditScore >= 75 && store.currentUser.verification != .none
+        let qualified = store.currentUser.verification != .none
         let myApp = item.myApplicationStatus
         let appCount = item.applicationCount ?? 0
         return HStack(spacing: 12) {

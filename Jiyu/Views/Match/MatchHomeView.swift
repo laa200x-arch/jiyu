@@ -29,7 +29,7 @@ struct MatchHomeView: View {
                     EmptyStateView(
                         icon: "sparkles",
                         title: "暂时没有匹配",
-                        message: "完善「我擅长」和「我想学」技能档案，并保持高信用分，匹配率会更高"
+                        message: "完善「我擅长」和「我想学」技能档案，匹配率会更高"
                     )
                 } else {
                     ForEach(results) { result in
@@ -156,7 +156,11 @@ struct MatchCardView: View {
                         .lineLimit(1)
                 }
                 Spacer()
-                CreditBadgeView(score: result.user.creditScore)
+                if result.user.verification != .none {
+                    Label(result.user.verification.rawValue, systemImage: "checkmark.seal.fill")
+                        .font(.caption2)
+                        .foregroundStyle(Theme.primary)
+                }
             }
 
             // 双向匹配理由

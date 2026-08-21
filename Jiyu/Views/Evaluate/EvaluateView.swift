@@ -65,7 +65,7 @@ struct EvaluateView: View {
             .alert("感谢评价", isPresented: $showSuccess) {
                 Button("好的") { dismiss() }
             } message: {
-                Text("评价已提交，\(record.partner.userName) 的信用分已更新。你的信用分也会随着对方的互评而更新。")
+                Text("评价已提交，感谢你的反馈。你的评价也会被对方看到。")
             }
         }
     }
