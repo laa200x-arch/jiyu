@@ -64,12 +64,20 @@ async function main() {
   console.log('✅ 安装包已上传:', asset.browser_download_url)
 
   // 3) 上传 latest.yml（electron-updater 自动更新元数据；electron-builder --win nsis 构建时生成在 dist/）
-  const ymlPath = resolve(path.dirname(exePath), 'latest.yml')
+  //    关键：yml 里引用的是构建产物原始文件名（含中文），而 GitHub 附件必须 ASCII 名，
+  //    需把 yml 中的文件名改写为上传后的 ASCII 名，否则 electron-updater 按原文件名下载会 404
+  const ymlPath = resolve(dirname(exePath), 'latest.yml')
   if (existsSync(ymlPath)) {
+    const originalName = exePath.split(/[\\/]/).pop()
+    let yml = readFileSync(ymlPath, 'utf8')
+    if (originalName !== fileName && yml.includes(originalName)) {
+      yml = yml.split(originalName).join(fileName)
+      console.log(`latest.yml 文件名改写: ${originalName} → ${fileName}`)
+    }
     const upYml = await fetch(`${uploadBase}?name=latest.yml`, {
       method: 'POST',
       headers: { ...H, 'Content-Type': 'text/yaml' },
-      body: readFileSync(ymlPath)
+      body: yml
     })
     if (upYml.ok) console.log('✅ latest.yml 已上传（自动更新元数据）')
     else console.log('⚠️ latest.yml 上传失败（自动更新将回退到应用内版本弹窗）:', await upYml.text())
