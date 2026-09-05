@@ -146,42 +146,59 @@ function createWindow() {
 }
 
 /* ---------- 自动更新（electron-updater + GitHub Releases，成熟 Electron 项目标配） ---------- */
+let updaterInited = false
+function initUpdater() {
+  if (updaterInited) return require('electron-updater').autoUpdater
+  updaterInited = true
+  const { autoUpdater } = require('electron-updater')
+  autoUpdater.autoDownload = false // 询问用户后再下载
+  autoUpdater.on('update-available', (info) => {
+    if (!mainWindow) return
+    const choice = dialog.showMessageBoxSync(mainWindow, {
+      type: 'info',
+      title: '发现新版本',
+      message: `新版本 v${info.version} 可用`,
+      detail: '是否下载更新？下载完成后重启应用即可完成安装。',
+      buttons: ['下载更新', '稍后再说'],
+      defaultId: 0,
+      cancelId: 1
+    })
+    if (choice === 0) autoUpdater.downloadUpdate().catch((e) => console.log('[updater] 下载失败:', e.message))
+  })
+  autoUpdater.on('update-downloaded', () => {
+    if (!mainWindow) return
+    const choice = dialog.showMessageBoxSync(mainWindow, {
+      type: 'info',
+      title: '更新已就绪',
+      message: '更新下载完成，是否立即重启安装？',
+      buttons: ['立即重启', '稍后自行重启'],
+      defaultId: 0,
+      cancelId: 1
+    })
+    if (choice === 0) { global.__jiyuQuitting = true; autoUpdater.quitAndInstall() }
+  })
+  autoUpdater.on('error', (e) => console.log('[updater] 检查失败:', e.message))
+  return autoUpdater
+}
 function setupAutoUpdater() {
   if (!app.isPackaged) return // 开发模式不检查
   try {
-    const { autoUpdater } = require('electron-updater')
-    autoUpdater.autoDownload = false // 询问用户后再下载
-    autoUpdater.on('update-available', (info) => {
-      if (!mainWindow) return
-      const choice = dialog.showMessageBoxSync(mainWindow, {
-        type: 'info',
-        title: '发现新版本',
-        message: `新版本 v${info.version} 可用`,
-        detail: '是否下载更新？下载完成后重启应用即可完成安装。',
-        buttons: ['下载更新', '稍后再说'],
-        defaultId: 0,
-        cancelId: 1
-      })
-      if (choice === 0) autoUpdater.downloadUpdate().catch((e) => console.log('[updater] 下载失败:', e.message))
-    })
-    autoUpdater.on('update-downloaded', () => {
-      if (!mainWindow) return
-      const choice = dialog.showMessageBoxSync(mainWindow, {
-        type: 'info',
-        title: '更新已就绪',
-        message: '更新下载完成，是否立即重启安装？',
-        buttons: ['立即重启', '稍后自行重启'],
-        defaultId: 0,
-        cancelId: 1
-      })
-      if (choice === 0) { global.__jiyuQuitting = true; autoUpdater.quitAndInstall() }
-    })
-    autoUpdater.on('error', (e) => console.log('[updater] 检查失败:', e.message))
-    autoUpdater.checkForUpdates().catch((e) => console.log('[updater] 检查失败:', e.message))
+    initUpdater().checkForUpdates().catch((e) => console.log('[updater] 启动检查失败:', e.message))
   } catch (e) {
     console.log('[updater] 初始化失败:', e.message)
   }
 }
+// 手动检查更新（顶栏菜单入口）
+ipcMain.handle('check-updates', async () => {
+  if (!app.isPackaged) return { ok: false, message: '开发模式不支持自动更新（打包安装后可用）' }
+  try {
+    const autoUpdater = initUpdater()
+    const r = await autoUpdater.checkForUpdates()
+    return { ok: true, hasUpdate: r.updateInfo.version !== app.getVersion(), latest: r.updateInfo.version, mine: app.getVersion() }
+  } catch (e) {
+    return { ok: false, message: '检查失败：' + (e.message || '网络异常（GitHub 访问受限时属正常）') }
+  }
+})
 
 // 系统托盘（缩小窗口后驻留，继续接收消息）
 function createTray() {

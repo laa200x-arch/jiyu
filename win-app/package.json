@@ -29,7 +29,8 @@
     ],
     "publish": {
       "provider": "github",
-      "repo": "laa200x-arch/jiyu"
+      "owner": "laa200x-arch",
+      "repo": "jiyu"
     },
     "win": {
       "target": "portable"

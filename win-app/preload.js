@@ -9,5 +9,7 @@ contextBridge.exposeInMainWorld('jiyu', {
   getAppVersion: () => ipcRenderer.invoke('app-version'),
   // 凭据加密存储（safeStorage/DPAPI）：登录 token、多账号列表不再明文落盘
   getSecureData: () => ipcRenderer.invoke('secure-get'),
-  saveSecureData: (data) => ipcRenderer.invoke('secure-save', data)
+  saveSecureData: (data) => ipcRenderer.invoke('secure-save', data),
+  // 手动检查更新（顶栏菜单入口）
+  checkForUpdates: () => ipcRenderer.invoke('check-updates')
 })

@@ -246,6 +246,16 @@ function bindTabs() {
       switchView('login')
     }
   })
+  // 手动检查更新（打包安装版可用；结果用弹窗/提示反馈）
+  document.getElementById('check-update-btn').addEventListener('click', async () => {
+    document.getElementById('user-dropdown').classList.add('hidden')
+    if (!window.jiyu || !window.jiyu.checkForUpdates) return toast('开发模式不支持自动更新（打包安装后可用）')
+    toast('正在检查更新…')
+    const r = await window.jiyu.checkForUpdates()
+    if (!r.ok) return toast(r.message || '检查失败')
+    if (!r.hasUpdate) toast(`已是最新版本 v${r.mine}`)
+    // 有新版本时主进程会自动弹出「发现新版本」对话框，这里不再重复提示
+  })
   // 顶栏：消息铃铛 → 跳转消息
   document.getElementById('bell-btn').addEventListener('click', () => switchView('message'))
   // 侧边栏：小程序市场推广卡 → 消息页并打开市场
