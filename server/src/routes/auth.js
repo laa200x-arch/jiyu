@@ -5,6 +5,7 @@ import { Router } from 'express'
 import bcrypt from 'bcryptjs'
 import { signToken, requireAuth, serializeUser } from '../middleware.js'
 import { sendSms, SMS_OPTIONS } from '../sms.js'
+import { loginLimiter, smsLimiter } from '../rate-limit.js'
 
 const isValidPhone = (p) => /^1[3-9]\d{9}$/.test(String(p || '').trim())
 
@@ -83,12 +84,12 @@ export function authRouter(db) {
   }
 
   // 发送注册验证码（每个手机号仅可注册一个账号；注册手机号为选填）
-  router.post('/phone/send-code', (req, res) => {
+  router.post('/phone/send-code', smsLimiter, (req, res) => {
     sendCode(req, res, { purpose: 'register', mustExist: false })
   })
 
   // 忘记密码：向已注册手机号发送重置验证码
-  router.post('/phone/forgot-code', (req, res) => {
+  router.post('/phone/forgot-code', smsLimiter, (req, res) => {
     sendCode(req, res, { purpose: 'reset', mustExist: true })
   })
 
@@ -158,8 +159,8 @@ export function authRouter(db) {
     res.status(201).json({ token: signToken(r.lastInsertRowid), user })
   })
 
-  // 登录（防爆破限流：连续失败 5 次锁定 15 分钟）
-  router.post('/login', async (req, res) => {
+  // 登录（防爆破限流：IP 维度 10 次/分钟 + 用户名+IP 连续失败 5 次锁定 15 分钟）
+  router.post('/login', loginLimiter, async (req, res) => {
     const { username, password } = req.body || {}
     const ip = req.ip || req.socket?.remoteAddress || 'unknown'
     const lock = checkLoginLock(String(username || ''), ip)

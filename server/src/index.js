@@ -3,10 +3,12 @@
  */
 import express from 'express'
 import cors from 'cors'
+import helmet from 'helmet'
 import http from 'node:http'
 import path from 'node:path'
 import { mkdirSync, unlinkSync } from 'node:fs'
 import multer from 'multer'
+import { globalLimiter, uploadLimiter } from './rate-limit.js'
 import { config } from './config.js'
 import { initDb, closeDb } from './db.js'
 import { SQLITE_DDL, MYSQL_DDL } from './schema.js'
@@ -91,6 +93,17 @@ async function main() {
   ensureSampleApps(db)
 
   const app = express()
+  app.disable('x-powered-by')
+  // 安全响应头（helmet，Express 官方安全清单标配）：
+  // - CSP 关闭：本服务不向浏览器提供业务页面（仅小程序示例页 snake-app.html 需运行脚本），避免误伤
+  // - CORP=cross-origin：Electron(file://) 客户端需跨源加载 /uploads 图片与头像
+  app.use(helmet({
+    contentSecurityPolicy: false,
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+    strictTransportSecurity: false // 当前为纯 HTTP 部署，HSTS 无意义（启用 HTTPS 后应开启）
+  }))
+  // 全局限流（防刷/防 DoS 兜底；分接口收紧在各路由模块）
+  app.use(globalLimiter)
   // CORS：白名单配置化（CORS_ORIGINS）。原生客户端（无 Origin / file:// / null）始终放行；
   // 浏览器来源仅放行白名单，防第三方站点调用接口
   app.use(cors({
@@ -142,7 +155,7 @@ async function main() {
       cb(null, true)
     }
   })
-  app.post('/api/upload', requireAuth, upload.single('file'), (req, res) => {
+  app.post('/api/upload', requireAuth, uploadLimiter, upload.single('file'), (req, res) => {
     if (!req.file) return res.status(400).json({ error: '缺少文件' })
     // 头像等图片限制 2MB（视频仍 50MB）；超限删除已写入的文件
     const isImage = String(req.file.mimetype || '').startsWith('image/')

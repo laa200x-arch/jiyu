@@ -5,6 +5,7 @@
 import { Router } from 'express'
 import { requireAuth, serializeUser, serializeMessage } from '../middleware.js'
 import { checkTextRisk } from '../risk.js'
+import { messageLimiter } from '../rate-limit.js'
 
 export function chatRouter(db, bus = { io: null }) {
   const router = Router()
@@ -114,7 +115,7 @@ export function chatRouter(db, bus = { io: null }) {
 
   // 发送消息（REST 兜底，与 Socket.io 同一套风控与落库逻辑）
   // orderId：引用宠物护理订单（卡片消息；订单须属于会话双方之一）
-  router.post('/messages', (req, res) => {
+  router.post('/messages', messageLimiter, (req, res) => {
     const { conversationId, text, mediaType, mediaUrl, orderId } = req.body || {}
     const result = saveMessage(req.userId, conversationId, { text, mediaType, mediaUrl, orderId })
     if (result.error) return res.status(result.status || 400).json({ error: result.error, blocked: result.blocked })
