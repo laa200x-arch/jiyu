@@ -5,7 +5,7 @@
  */
 import { spawnSync } from 'node:child_process'
 import { readFileSync, existsSync } from 'node:fs'
-import { resolve, basename } from 'node:path'
+import { resolve, dirname } from 'node:path'
 
 const REPO = 'laa200x-arch/jiyu'
 const args = process.argv.slice(2)
@@ -62,6 +62,20 @@ async function main() {
   if (!up.ok) { console.error('上传附件失败:', await up.text()); process.exit(1) }
   const asset = await up.json()
   console.log('✅ 安装包已上传:', asset.browser_download_url)
+
+  // 3) 上传 latest.yml（electron-updater 自动更新元数据；electron-builder --win nsis 构建时生成在 dist/）
+  const ymlPath = resolve(path.dirname(exePath), 'latest.yml')
+  if (existsSync(ymlPath)) {
+    const upYml = await fetch(`${uploadBase}?name=latest.yml`, {
+      method: 'POST',
+      headers: { ...H, 'Content-Type': 'text/yaml' },
+      body: readFileSync(ymlPath)
+    })
+    if (upYml.ok) console.log('✅ latest.yml 已上传（自动更新元数据）')
+    else console.log('⚠️ latest.yml 上传失败（自动更新将回退到应用内版本弹窗）:', await upYml.text())
+  } else {
+    console.log('⚠️ 未找到 dist/latest.yml，本次 Release 不支持 electron-updater 自动检测（仅应用内弹窗提示）')
+  }
   console.log('Release 页面:', release.html_url)
 }
 

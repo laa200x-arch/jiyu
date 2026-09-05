@@ -1,7 +1,12 @@
 /* 技遇 Windows 版 - 核心逻辑测试（Node 直连服务器）
- * 运行：node test-core.js
+ * 运行：先本地起后端（server 目录 npm start 或 npm test 内置服务器），
+ *      默认打本地 http://localhost:3199；要打其他服务器：JIYU_SERVER=http://... node test-core.js
+ * ⚠️ 默认不再直连线上生产库（避免残留测试数据）
  */
+process.env.JIYU_SERVER = process.env.JIYU_SERVER || 'http://localhost:3199'
 const { App, login, logout, refreshAll, fetchMatches, openConversation, loadMessages, sendMessageRest, uploadMedia, postDynamic, fetchUser } = require('./src/api.js')
+
+console.log('目标服务器:', App.SERVER, '\n')
 
 let passed = 0, failed = 0
 const check = (name, cond, extra = '') => {

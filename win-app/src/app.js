@@ -198,8 +198,14 @@ function afterEnterApp() {
 
 async function checkVersion() {
   const v = await fetchVersion()
-  if (!v) return
-  if (v.current !== '1.0') {
+  if (!v || !v.current) return
+  // 本机版本：Electron 下取 package.json version；无法获取时跳过（无法可靠比较）
+  let mine = null
+  try {
+    if (window.jiyu && window.jiyu.getAppVersion) mine = await window.jiyu.getAppVersion()
+  } catch (e) { /* ignore */ }
+  if (!mine) return
+  if (v.current !== mine) {
     // 无新版本（本机已提示过该版本）不再弹窗；服务器 current 变化后才会再次提示
     if (localStorage.getItem('jiyu.updateShown') === String(v.current)) return
     localStorage.setItem('jiyu.updateShown', String(v.current))
@@ -254,6 +260,11 @@ async function bootstrap() {
   bindTabs()
   bindModalMask()
   bindGlobalDelegates()
+  // 登录页服务地址提示跟随配置（src/config.js 唯一来源）
+  const hint = document.getElementById('server-hint')
+  if (hint && window.APP_CONFIG) hint.textContent = '服务地址：' + window.APP_CONFIG.server + '（体验账号 aqing / 123456）'
+  // Electron 加密凭据回填（safeStorage；清缓存后凭据不丢）
+  await restoreSecure()
   // 请求桌面通知权限（消息推送）
   if ('Notification' in window && Notification.permission === 'default') {
     try { Notification.requestPermission() } catch (e) { /* ignore */ }

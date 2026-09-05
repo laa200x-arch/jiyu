@@ -12,8 +12,48 @@ const storage = globalThis.localStorage || {
   removeItem(k) { delete this._d[k] }
 }
 
+/* 服务器地址：唯一来源 src/config.js（Node 测试可用 JIYU_SERVER 覆盖） */
+const SERVER = (typeof process !== 'undefined' && process.env && process.env.JIYU_SERVER) ||
+  (globalThis.APP_CONFIG && globalThis.APP_CONFIG.server) ||
+  'http://43.157.17.88:3000'
+
+/* ---------- 凭据加密存储（Electron safeStorage；非 Electron 环境自动跳过） ---------- */
+/* 启动时主进程加密数据若存在则以它为准回填 localStorage（清缓存后凭据不丢） */
+let secureDirty = null
+function persistSecure() {
+  if (!globalThis.jiyu || !globalThis.jiyu.saveSecureData) return
+  secureDirty = true
+  clearTimeout(persistSecure._t)
+  persistSecure._t = setTimeout(() => {
+    if (!secureDirty) return
+    secureDirty = false
+    try {
+      globalThis.jiyu.saveSecureData({
+        token: storage.getItem('jiyu.token'),
+        accounts: JSON.parse(storage.getItem('jiyu.accounts') || '[]')
+      })
+    } catch { /* ignore */ }
+  }, 300)
+}
+async function restoreSecure() {
+  if (!globalThis.jiyu || !globalThis.jiyu.getSecureData) return
+  try {
+    const data = await globalThis.jiyu.getSecureData()
+    if (!data) return
+    if (data.token && data.token !== storage.getItem('jiyu.token')) {
+      storage.setItem('jiyu.token', data.token)
+      App.state.token = data.token
+    }
+    if (Array.isArray(data.accounts) && data.accounts.length &&
+        JSON.stringify(data.accounts) !== storage.getItem('jiyu.accounts')) {
+      storage.setItem('jiyu.accounts', JSON.stringify(data.accounts))
+      App.state.savedAccounts = data.accounts
+    }
+  } catch { /* ignore */ }
+}
+
 const App = {
-  SERVER: 'http://43.157.17.88:3000',
+  SERVER: SERVER,
   state: {
     token: storage.getItem('jiyu.token') || null,
     user: null,              // 当前用户（服务端格式）
@@ -100,6 +140,7 @@ async function afterLogin({ token, user }) {
   storage.setItem('jiyu.token', token)
   App.state.user = user
   saveAccount({ username: user.username, nickname: user.userName, avatarSymbol: user.avatarSymbol, token })
+  persistSecure()
   await refreshAll()
   connectSocket()
 }
@@ -119,6 +160,7 @@ function logout() {
   App.state.careServices = []
   App.state.orderDraft = null
   App.state.orderCache = {}
+  persistSecure()
 }
 
 /* ---------- 多账号 ---------- */
@@ -127,10 +169,12 @@ function saveAccount(account) {
   list.unshift(account)
   App.state.savedAccounts = list
   storage.setItem('jiyu.accounts', JSON.stringify(list))
+  persistSecure()
 }
 function removeAccount(username) {
   App.state.savedAccounts = App.state.savedAccounts.filter((a) => a.username !== username)
   storage.setItem('jiyu.accounts', JSON.stringify(App.state.savedAccounts))
+  persistSecure()
 }
 
 /* ---------- 全量刷新 ---------- */
@@ -274,6 +318,21 @@ async function uploadMedia(data, fileName, mimeType) {
   return json.url
 }
 
+/* ---------- 连接状态指示（顶栏 #conn-status；非浏览器环境自动跳过） ---------- */
+function setConnStatus(state) {
+  if (typeof document === 'undefined') return
+  const el = document.getElementById('conn-status')
+  if (!el) return
+  const map = {
+    online: ['conn-online', '在线'],
+    offline: ['conn-offline', '连接断开'],
+    connecting: ['conn-connecting', '重连中…']
+  }
+  const [cls, label] = map[state] || map.online
+  el.className = 'conn-status ' + cls
+  el.textContent = label
+}
+
 /* ---------- Socket.io 实时 ---------- */
 function connectSocket() {
   if (typeof io === 'undefined') {
@@ -281,9 +340,26 @@ function connectSocket() {
     return
   }
   if (App.state.socket) { App.state.socket.disconnect(); App.state.socket = null }
+  let wasDisconnected = false
   const socket = io(App.SERVER, { transports: ['websocket', 'polling'], auth: { token: App.state.token } })
-  socket.on('connect', () => console.log('[socket] 已连接'))
-  socket.on('disconnect', () => console.log('[socket] 断开'))
+  socket.on('connect', () => {
+    console.log('[socket] 已连接')
+    setConnStatus('online')
+    // 断线重连后自动恢复数据（期间可能漏掉消息/动态/订单变更）
+    if (wasDisconnected) {
+      wasDisconnected = false
+      refreshAll()
+        .then(() => { if (App.state.views.onConversationUpdate) App.state.views.onConversationUpdate() })
+        .catch(() => {})
+    }
+  })
+  socket.on('disconnect', (reason) => {
+    console.log('[socket] 断开', reason || '')
+    wasDisconnected = true
+    setConnStatus('offline')
+  })
+  socket.io.on('reconnect_attempt', () => setConnStatus('connecting'))
+  socket.on('connect_error', () => setConnStatus('connecting'))
   socket.on('chat:message', (msg) => {
     const conv = App.state.conversations.find((c) => c.id === msg.conversationId)
     const isMe = msg.senderId === App.state.user.id
@@ -405,5 +481,5 @@ async function fetchVersion() {
 
 /* Node 环境导出（测试用） */
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { App, api, login, register, loginWithSaved, autoLogin, logout, refreshAll, fetchMatches, fetchUser, openConversation, loadMessages, sendMessageRest, uploadMedia, postDynamic, signAgreement, completeExchange, submitEvaluation, fetchVersion, fetchBooking, applyBooking, confirmApplication, rejectApplication }
+  module.exports = { App, api, login, register, loginWithSaved, autoLogin, logout, refreshAll, fetchMatches, fetchUser, openConversation, loadMessages, sendMessageRest, uploadMedia, postDynamic, signAgreement, completeExchange, submitEvaluation, fetchVersion, fetchBooking, applyBooking, confirmApplication, rejectApplication, restoreSecure }
 }

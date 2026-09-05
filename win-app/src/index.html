@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="color-scheme" content="light">
   <meta name="theme-color" content="#ffffff">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self' http://43.157.17.88:3000 data: blob:; img-src 'self' http://43.157.17.88:3000 data: blob:; media-src 'self' http://43.157.17.88:3000 blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' http://43.157.17.88:3000 ws://43.157.17.88:3000">
+  <!-- CSP 由主进程按配置注入（main.js setupCsp），此处不再硬编码服务器地址 -->
   <title>技遇</title>
   <link rel="stylesheet" href="style.css">
 </head>
@@ -50,7 +50,7 @@
         <button id="login-toggle" class="btn-link">没有账号？注册一个</button>
         <button id="forgot-btn" class="btn-link">忘记密码？</button>
       </div>
-      <p class="hint">服务地址：http://43.157.17.88:3000（体验账号 aqing / 123456）</p>
+      <p class="hint" id="server-hint">服务地址：http://43.157.17.88:3000（体验账号 aqing / 123456）</p>
     </div>
   </div>
 
@@ -79,6 +79,7 @@
       <header class="topbar">
         <div class="topbar-title">技遇</div>
         <div class="topbar-right">
+          <span id="conn-status" class="conn-status conn-off">连接中…</span>
           <button class="bell-btn" id="bell-btn" title="消息通知">🔔<span id="bell-dot" class="bell-dot hidden"></span></button>
           <div class="user-menu" id="user-menu">
             <span id="topbar-avatar" class="topbar-avatar"></span>
@@ -102,6 +103,7 @@
 
   <script src="../node_modules/socket.io-client/dist/socket.io.min.js"></script>
   <script src="../node_modules/leaflet/dist/leaflet.js"></script>
+  <script src="config.js"></script>
   <script src="api.js"></script>
   <script src="views.js"></script>
   <script src="map.js"></script>
