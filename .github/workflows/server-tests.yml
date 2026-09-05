@@ -16,10 +16,10 @@ jobs:
       - name: 检出代码
         uses: actions/checkout@v4
 
-      - name: 安装 Node 20
+      - name: 安装 Node 22（node:sqlite 需要 22.5+，与生产环境一致）
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           cache-dependency-path: server/package-lock.json
 
