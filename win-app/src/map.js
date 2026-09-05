@@ -51,7 +51,7 @@ async function showMap() {
       const marker = L.marker(p.coord, {
         icon: L.divIcon({
           className: '',
-          html: `<div style="width:26px;height:26px;border-radius:50%;background:${p.u.isExposureVip ? '#f29e61' : 'linear-gradient(135deg,#33d1d9,#3f8cd9)'};color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;box-shadow:0 1px 4px rgba(0,0,0,.3)">${p.u.avatarSymbol || '•'}</div>`
+          html: `<div style="width:26px;height:26px;border-radius:50%;background:${p.u.isExposureVip ? '#faad14' : 'linear-gradient(135deg,#4096ff,#1677ff)'};color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;box-shadow:0 1px 4px rgba(0,0,0,.3)">${p.u.avatarSymbol || '•'}</div>`
         })
       }).addTo(map)
       marker.bindPopup(`<b>${p.u.userName}</b><br>${p.u.locationLabel}${p.u.distanceKm != null ? '<br>' + p.u.distanceKm.toFixed(1) + 'km' : ''}`)
@@ -63,7 +63,7 @@ async function showMap() {
       navigator.geolocation.getCurrentPosition((pos) => {
         const lat = pos.coords.latitude, lng = pos.coords.longitude
         L.marker([lat, lng], {
-          icon: L.divIcon({ className: '', html: '<div style="width:26px;height:26px;border-radius:50%;background:#4dbf73;border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.3)"></div>' })
+          icon: L.divIcon({ className: '', html: '<div style="width:26px;height:26px;border-radius:50%;background:#52c41a;border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.3)"></div>' })
         }).addTo(map).bindPopup('<b>我的位置</b>')
         map.setView([lat, lng], 11)
       }, () => { /* 拒绝定位则保持区级视图 */ })

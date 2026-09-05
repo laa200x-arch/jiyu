@@ -14,15 +14,33 @@ function fmtTime(iso) {
   return `${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`
 }
 function levelClass(level) { return 'tag-' + level }
+/* iOS SF Symbol 名称 → Windows 可显示 emoji（数据存的是符号名，直接渲染会露英文） */
+const SF_EMOJI = {
+  'face.smiling': '😊', 'person.fill': '👤', 'person.crop.circle': '🧑', 'heart.fill': '❤️',
+  'star.fill': '⭐', 'camera.fill': '📷', 'book.fill': '📚', 'music.note': '🎵',
+  'paintpalette.fill': '🎨', 'sportscourt.fill': '⚽', 'fork.knife': '🍴', 'leaf.fill': '🌿',
+  'pawprint.fill': '🐾', 'gamecontroller.fill': '🎮', 'globe': '🌍', 'sparkles': '✨'
+}
+function avatarGlyph(symbol) {
+  if (!symbol) return '👤'
+  if (SF_EMOJI[symbol]) return SF_EMOJI[symbol]
+  if (/^[a-z]/.test(String(symbol)) && String(symbol).includes('.')) return '👤'
+  return symbol
+}
+/* 英文枚举 → 中文（skillLevel / verification 种子值为英文） */
+const LEVEL_ZH = { beginner: '入门', skilled: '进阶', master: '精通', advanced: '进阶' }
+function levelZh(level) { return LEVEL_ZH[level] || level }
+const VERIFY_ZH = { full: '已认证', student: '学生认证', realname: '实名认证' }
+function verifyZh(v) { return VERIFY_ZH[v] || v }
 function avatarHtml(user, cls = 'avatar') {
   // 自定义头像优先显示图片
   if (user && user.avatarUrl) return `<img class="${cls} avatar-img" src="${mediaUrl(user.avatarUrl)}" alt="">`
-  return `<div class="${cls}">${esc((user && user.avatarSymbol) || '👤')}</div>`
+  return `<div class="${cls}">${esc(avatarGlyph(user && user.avatarSymbol))}</div>`
 }
 function skillTags(skills) {
   if (!skills || !skills.length) return '<span class="card-sub">暂无</span>'
   return skills.map((s) =>
-    `<span class="tag ${levelClass(s.skillLevel)}">${esc(s.skillName)} · ${esc(s.skillLevel)}</span>`).join(' ')
+    `<span class="tag ${levelClass(s.skillLevel)}">${esc(s.skillName)} · ${esc(levelZh(s.skillLevel))}</span>`).join(' ')
 }
 function mediaUrl(u) { return u ? App.SERVER + u : '' }
 function toast(msg) {
@@ -113,7 +131,7 @@ function renderLogin() {
   const box = document.getElementById('saved-accounts')
   if (App.state.savedAccounts.length) {
     box.classList.remove('hidden')
-    box.innerHTML = '<div style="width:100%;text-align:center;color:#737d87;font-size:11px;margin-bottom:4px">已保存账号（点击切换）</div>' +
+    box.innerHTML = '<div style="width:100%;text-align:center;color:rgba(0,0,0,0.45);font-size:11px;margin-bottom:4px">已保存账号（点击切换）</div>' +
       App.state.savedAccounts.map((a) => `
         <div class="saved-account" data-username="${esc(a.username)}">
           <span class="saved-remove" data-remove="${esc(a.username)}" title="删除">✕</span>
@@ -152,7 +170,7 @@ async function renderMatch() {
   })
   v.querySelector('#match-map-btn').addEventListener('click', () => showMap())
   const list = v.querySelector('#match-list')
-  list.innerHTML = '<div class="empty">加载中…</div>'
+  list.innerHTML = '<div class="empty"><span class="spin"></span>加载中…</div>'
   try {
     const matches = await fetchMatches({ nearbyOnly: matchFilters.nearbyOnly ? 1 : '', type: matchFilters.type, keyword: matchFilters.keyword })
     if (!matches.length) {
@@ -169,7 +187,7 @@ async function renderMatch() {
             <div class="row">
               <span class="convo-name">${esc(u.userName)}</span>
               ${u.isExposureVip ? '<span class="tag tag-vip">👑 曝光</span>' : ''}
-              ${u.verification !== 'none' ? `<span class="tag tag-verified">✓ ${esc(u.verification)}</span>` : ''}
+              ${u.verification !== 'none' ? `<span class="tag tag-verified">✓ ${esc(verifyZh(u.verification))}</span>` : ''}
             </div>
             <div class="card-sub">${esc(u.bio)}</div>
           </div>
@@ -209,7 +227,7 @@ async function showMatchDetail(userId, reason) {
           <div class="row">
             <span class="convo-name">${esc(u.userName)}</span>
             ${u.isExposureVip ? '<span class="tag tag-vip">👑 曝光</span>' : ''}
-            ${u.verification !== 'none' ? `<span class="tag tag-verified">✓ ${esc(u.verification)}</span>` : ''}
+            ${u.verification !== 'none' ? `<span class="tag tag-verified">✓ ${esc(verifyZh(u.verification))}</span>` : ''}
           </div>
           <div class="card-sub">${esc(u.bio)}</div>
           <div class="row" style="margin-top:4px">
@@ -255,7 +273,7 @@ function showAgreementForm(u) {
       <div class="form-field"><label>约定时间</label><input id="ag-time" placeholder="如：本周六 14:00"></div>
     </div>
     <div class="form-field"><label>线下地点（公共场所，线上可留空）</label><input id="ag-location" placeholder="如：国贸图书馆三楼"></div>
-    <div class="card" style="background:#f7f9fa">
+    <div class="card" style="background:#fafafa">
       <div class="card-sub" style="line-height:1.8">【技遇平台官方技能互换协议】<br>
       1. 本次技能互换为纯个人兴趣无偿交换，无任何金钱、物资、有偿交易。<br>
       2. 双方承诺认真教学、守时履约，杜绝敷衍教学、无故爽约。<br>
@@ -293,7 +311,7 @@ async function renderFeed() {
   const v = document.getElementById('view')
   v.innerHTML = `
     <div class="row" style="margin-bottom:14px">
-      <span class="section-title" style="margin:0;flex:1">互换动态</span>
+      
       <button class="btn btn-outline btn-sm" id="feed-refresh" title="刷新动态">⟳ 刷新</button>
       <button class="btn btn-primary btn-sm" id="feed-compose">✏️ 发布动态</button>
     </div>
@@ -301,7 +319,7 @@ async function renderFeed() {
   v.querySelector('#feed-compose').addEventListener('click', showFeedCompose)
   v.querySelector('#feed-refresh').addEventListener('click', () => renderFeed())
   const list = v.querySelector('#feed-list')
-  list.innerHTML = '<div class="empty">加载中…</div>'
+  list.innerHTML = '<div class="empty"><span class="spin"></span>加载中…</div>'
   try {
     await refreshAll()
     if (!App.state.dynamics.length) {
@@ -525,7 +543,7 @@ function showUserProfile(u) {
         <div class="row">
           <span class="convo-name">${esc(u.userName)}</span>
           ${u.isExposureVip ? '<span class="tag tag-vip">👑 曝光</span>' : ''}
-          ${u.verification !== 'none' ? `<span class="tag tag-verified">✓ ${esc(u.verification)}</span>` : ''}
+          ${u.verification !== 'none' ? `<span class="tag tag-verified">✓ ${esc(verifyZh(u.verification))}</span>` : ''}
         </div>
         <div class="card-sub">${esc(u.bio)}</div>
         <div class="row" style="margin-top:4px">
@@ -557,7 +575,7 @@ function showFeedCompose() {
       <label class="btn btn-outline btn-sm" style="cursor:pointer">🖼 添加图片<input type="file" id="fd-image" accept="image/*" hidden></label>
       <span id="fd-image-name" class="card-sub"></span>
     </div>
-    <div class="card-sub" style="color:#f29e4d;margin-bottom:10px">⚠️ 禁止发布收费、交易、接单等商业信息，内容将自动经过平台风控审核</div>
+    <div class="card-sub" style="color:#d48806;margin-bottom:10px">⚠️ 禁止发布收费、交易、接单等商业信息，内容将自动经过平台风控审核</div>
     <div class="modal-actions">
       <button class="btn btn-outline" data-close>取消</button>
       <button class="btn btn-primary" id="fd-submit">发布</button>
@@ -710,7 +728,7 @@ async function showChat(conv) {
   const msgs = document.getElementById('chat-messages')
   const input = document.getElementById('chat-input')
   head.innerHTML = `${avatarHtml(conv.partner, 'avatar avatar-sm')} <span>${esc(conv.partner.userName)}</span>`
-  msgs.innerHTML = '<div class="empty">加载中…</div>'
+  msgs.innerHTML = '<div class="empty"><span class="spin"></span>加载中…</div>'
   input.innerHTML = buildChatInput(conv)
   bindChatInput(conv)
 
@@ -784,7 +802,7 @@ async function fillOrderCard(el, orderId) {
     const b = await fetchBooking(orderId)
     el.innerHTML = `
       <div class="order-card-head">🐾 宠物护理订单</div>
-      <div class="order-card-line">${esc(b.serviceName)} · <b style="color:#d97b2e">¥${b.priceYuan}</b></div>
+      <div class="order-card-line">${esc(b.serviceName)} · <b style="color:#fa8c16">¥${b.priceYuan}</b></div>
       <div class="card-sub">${esc(b.pet ? b.pet.name : '')} · ${orderStatusText(b.status)} · 佣金 10%</div>`
     el.addEventListener('click', () => showOrderDetail(orderId))
   } catch (e) {
@@ -810,7 +828,7 @@ function buildChatInput(conv) {
       <span id="ci-recording" class="recording-indicator hidden"><span class="recording-dot"></span>录音中…</span>
     </div>
     <div id="ci-order-chip" class="order-chip hidden"></div>
-    <textarea id="ci-text" placeholder="发送消息（严禁金钱交易内容）" rows="1"></textarea>
+    <textarea id="ci-text" placeholder="发送消息…" rows="1"></textarea>
     <button class="btn btn-primary" id="ci-send" disabled>发送</button>`
 }
 
@@ -1214,7 +1232,7 @@ function renderMine() {
 function skillLead(skills) {
   if (!skills || !skills.length) return '尚未添加技能'
   const s = skills[0]
-  const level = { beginner: 'Beginner', skilled: '熟练', master: '精通' }[s.skillLevel] || s.skillLevel
+  const level = { beginner: '入门', skilled: '进阶', master: '精通' }[s.skillLevel] || s.skillLevel
   return `${s.skillName} · ${level}`
 }
 
@@ -1356,7 +1374,7 @@ function showEvaluate(rec) {
   let stars = { punctuality: 5, serious: 5, communication: 5 }
   openModal(`
     <div class="modal-title">双向互评 · ${esc(rec.partner.userName)}</div>
-    <div class="card-sub" style="margin-bottom:10px">${esc(rec.mySkillName)} ⇄ ${esc(rec.learnSkillName)} · ${esc(rec.scheduledTime)}</div>
+    <div class="card-sub" style="margin-bottom:10px">${esc(rec.mySkillName)} ⇄ ${esc(rec.learnSkillName)}（${esc(rec.scheduledTime)}）</div>
     ${starRow('serious', '教学认真度')}
     ${starRow('punctuality', '守时度')}
     ${starRow('communication', '沟通体验')}
@@ -1769,7 +1787,7 @@ function renderServices(category) {
         <div class="card-sub">${esc(s.desc)} · ${esc(s.duration)}</div>
       </div>
       <div style="text-align:center">
-        <div style="font-weight:700;color:#d97b2e">¥${s.priceYuan}</div>
+        <div style="font-weight:700;color:#fa8c16">¥${s.priceYuan}</div>
         <div class="card-sub" style="font-size:10px">平台佣金 10%</div>
       </div>
       <button class="btn btn-primary btn-sm" data-service='${JSON.stringify(s)}'>发起订单</button>
@@ -2163,7 +2181,7 @@ function showBookingForm(service) {
       <select id="b-provider">${providers.map((u) => `<option value="${u.id}">${esc(u.userName)}（${esc(u.locationLabel)}）</option>`).join('')}</select>
     </div>
     <div class="bill-box" id="b-bill"></div>
-    <div class="card-sub" style="color:#f29e4d;margin-top:8px">⚠️ 宠物服务可收费，价格与佣金以订单为准；其他技能互换仍坚持零金钱</div>
+    <div class="card-sub" style="color:#d48806;margin-top:8px">⚠️ 宠物服务可收费，价格与佣金以订单为准；其他技能互换仍坚持零金钱</div>
     <div class="modal-actions">
       <button class="btn btn-outline" data-close>取消</button>
       <button class="btn btn-primary" id="b-submit" disabled>发布订单</button>
@@ -2377,7 +2395,7 @@ function renderBookings() {
           <div class="convo-name">${esc(b.serviceName)} <span class="tag tag-verified">${esc(b.pet ? b.pet.name : '')}</span></div>
           <div class="card-sub">🕐 ${esc(b.scheduledTime)} · 📍 ${esc(b.location)}</div>
           <div class="card-sub">${isMine ? '看护人：' + esc(b.provider ? b.provider.userName : '待接单…') : '下单人：' + esc(b.initiator ? b.initiator.userName : '—')}</div>
-          ${b.priceYuan != null ? `<div class="card-sub">💰 服务费 <b style="color:#d97b2e">¥${b.priceYuan}</b> · 平台佣金 ¥${b.commissionYuan} · 服务人员所得 ¥${b.workerIncome}</div>` : ''}
+          ${b.priceYuan != null ? `<div class="card-sub">💰 服务费 <b style="color:#fa8c16">¥${b.priceYuan}</b> · 平台佣金 ¥${b.commissionYuan} · 服务人员所得 ¥${b.workerIncome}</div>` : ''}
         </div>
         <span class="exchange-status ${b.status}">${orderStatusText(b.status)}</span>
       </div>
@@ -2431,7 +2449,7 @@ function showBookingHistory() {
                 <div class="convo-name">${esc(b.serviceName)} <span class="tag tag-verified">${esc(b.pet ? b.pet.name : '')}</span></div>
                 <div class="card-sub">🕐 ${esc(b.scheduledTime)} · 📍 ${esc(b.location || '—')}</div>
                 <div class="card-sub">${isMine(b) ? '看护人：' + esc(b.provider ? b.provider.userName : '待接单…') : '下单人：' + esc(b.initiator ? b.initiator.userName : '—')}</div>
-                ${b.priceYuan != null ? `<div class="card-sub">💰 服务费 <b style="color:#d97b2e">¥${b.priceYuan}</b> · 佣金 ¥${b.commissionYuan} · 服务人员 ¥${b.workerIncome}</div>` : ''}
+                ${b.priceYuan != null ? `<div class="card-sub">💰 服务费 <b style="color:#fa8c16">¥${b.priceYuan}</b> · 佣金 ¥${b.commissionYuan} · 服务人员 ¥${b.workerIncome}</div>` : ''}
                 <div class="card-sub" style="color:#9aa0ae">🕓 ${fmtTime(b.createdAt)}</div>
               </div>
               <span class="exchange-status ${b.status}">${orderStatusText(b.status)}</span>

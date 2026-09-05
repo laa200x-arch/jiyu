@@ -8,6 +8,10 @@ const views = App.views
 function switchView(name) {
   App.views.current = name
   document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('active', t.dataset.view === name))
+  // 顶栏标题跟随当前页（与侧栏导航一致）
+  const titles = { match: '技能匹配', feed: '互换动态', message: '消息', pet: '宠物', mine: '我的' }
+  const titleEl = document.querySelector('.topbar-title')
+  if (titleEl && titles[name]) titleEl.textContent = titles[name]
   if (name === 'login') {
     document.getElementById('app').classList.add('hidden')
     document.getElementById('login-page').classList.remove('hidden')
