@@ -64,15 +64,18 @@ async function main() {
   console.log('✅ 安装包已上传:', asset.browser_download_url)
 
   // 3) 上传 latest.yml（electron-updater 自动更新元数据；electron-builder --win nsis 构建时生成在 dist/）
-  //    关键：yml 里引用的是构建产物原始文件名（含中文），而 GitHub 附件必须 ASCII 名，
-  //    需把 yml 中的文件名改写为上传后的 ASCII 名，否则 electron-updater 按原文件名下载会 404
+  //    关键：yml 里的文件名（原始中文名或 ASCII 化名）与 GitHub 附件名不一致时下载会 404，
+  //    统一改写为上传后的 ASCII 附件名（sha512 不变，仅改文件名）
   const ymlPath = resolve(dirname(exePath), 'latest.yml')
   if (existsSync(ymlPath)) {
-    const originalName = exePath.split(/[\\/]/).pop()
     let yml = readFileSync(ymlPath, 'utf8')
-    if (originalName !== fileName && yml.includes(originalName)) {
-      yml = yml.split(originalName).join(fileName)
-      console.log(`latest.yml 文件名改写: ${originalName} → ${fileName}`)
+    const pathMatch = yml.match(/^path:\s*(.+)$/m)
+    if (pathMatch) {
+      const ymlName = pathMatch[1].trim()
+      if (ymlName !== fileName) {
+        yml = yml.split(ymlName).join(fileName)
+        console.log(`latest.yml 文件名改写: ${ymlName} → ${fileName}`)
+      }
     }
     const upYml = await fetch(`${uploadBase}?name=latest.yml`, {
       method: 'POST',
@@ -81,6 +84,18 @@ async function main() {
     })
     if (upYml.ok) console.log('✅ latest.yml 已上传（自动更新元数据）')
     else console.log('⚠️ latest.yml 上传失败（自动更新将回退到应用内版本弹窗）:', await upYml.text())
+
+    // 4) 上传 blockmap（改名同附件名；缺失时 electron-updater 自动退回整包下载，不阻塞更新）
+    const blockmapPath = exePath + '.blockmap'
+    if (existsSync(blockmapPath)) {
+      const upBm = await fetch(`${uploadBase}?name=${encodeURIComponent(fileName + '.blockmap')}`, {
+        method: 'POST',
+        headers: { ...H, 'Content-Type': 'application/octet-stream' },
+        body: readFileSync(blockmapPath)
+      })
+      if (upBm.ok) console.log('✅ blockmap 已上传（支持差量更新）')
+      else console.log('⚠️ blockmap 上传失败（自动更新将用整包下载）:', await upBm.text())
+    }
   } else {
     console.log('⚠️ 未找到 dist/latest.yml，本次 Release 不支持 electron-updater 自动检测（仅应用内弹窗提示）')
   }
