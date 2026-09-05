@@ -18,10 +18,16 @@ export const config = {
     port: Number(env.MYSQL_PORT || 3306),
     user: env.MYSQL_USER || 'jiyu',
     password: env.MYSQL_PASSWORD || 'jiyu123456',
-    database: env.MYSQL_DATABASE || 'jiyu'
+    database: env.MYSQL_DATABASE || 'jiyu',
+    poolSize: Number(env.MYSQL_POOL_SIZE || 10)
   },
   jwtSecret,
   jwtExpires: env.JWT_EXPIRES || '7d',
+  // 客户端版本检查（/api/version）：发布新版时更新这三个值（或用环境变量覆盖）
+  appVersion: env.APP_VERSION || '1.1.2',
+  updateMessage: env.UPDATE_MESSAGE ||
+    'v1.1.2 更新：修复宠物订单风控误拦截；新增忘记密码；评价文字展示与违规申诉；安全加固（手机号隐私 / Electron 隔离 / 上传白名单）',
+  downloadUrl: env.DOWNLOAD_URL || 'https://github.com/laa200x-arch/jiyu/releases/tag/win-v1.1.2',
   baiduAI: {
     apiKey: env.BAIDU_AI_API_KEY || '',
     secretKey: env.BAIDU_AI_SECRET_KEY || ''

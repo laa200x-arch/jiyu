@@ -1,5 +1,5 @@
-/* 安全与功能修复综合验证（本地服务器） */
-const BASE = 'http://localhost:3000'
+/* 安全与功能修复综合验证（本地服务器；可用 BASE_URL 指定目标） */
+const BASE = process.env.BASE_URL || 'http://localhost:3000'
 let passed = 0, failed = 0
 const check = (name, cond, extra = '') => {
   if (cond) { passed++; console.log(`  ✅ ${name}`) }

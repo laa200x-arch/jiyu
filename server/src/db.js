@@ -12,48 +12,53 @@ import { dirname } from 'node:path'
 import { config } from './config.js'
 
 let db
+let rawSqlite
 
 function initSqlite() {
   const file = config.sqlitePath
   if (file !== ':memory:') mkdirSync(dirname(file), { recursive: true })
-  db = new DatabaseSync(file)
-  db.exec('PRAGMA journal_mode = WAL')
-  db.exec('PRAGMA foreign_keys = ON')
+  rawSqlite = new DatabaseSync(file)
+  rawSqlite.exec('PRAGMA journal_mode = WAL')
+  rawSqlite.exec('PRAGMA foreign_keys = ON')
+  const d = rawSqlite
   return {
-    exec: (sql) => db.exec(sql),
+    exec: (sql) => d.exec(sql),
     run: (sql, params = []) => {
-      const r = db.prepare(sql).run(...params)
+      const r = d.prepare(sql).run(...params)
       return { lastInsertRowid: Number(r.lastInsertRowid), changes: r.changes }
     },
-    get: (sql, params = []) => db.prepare(sql).get(...params) ?? null,
-    all: (sql, params = []) => db.prepare(sql).all(...params)
+    get: (sql, params = []) => d.prepare(sql).get(...params) ?? null,
+    all: (sql, params = []) => d.prepare(sql).all(...params)
   }
 }
 
 async function initMysql() {
   const mysql = await import('mysql2/promise')
-  const conn = await mysql.createConnection({
+  // 连接池（成熟项目标配）：复用连接避免每请求建连，支持并发
+  const pool = mysql.createPool({
     host: config.mysql.host,
     port: config.mysql.port,
     user: config.mysql.user,
     password: config.mysql.password,
     database: config.mysql.database,
     charset: 'utf8mb4',
-    timezone: '+00:00'
+    timezone: '+00:00',
+    connectionLimit: config.mysql.poolSize,
+    waitForConnections: true
   })
-  db = conn
+  db = pool
   return {
-    exec: (sql) => conn.query(sql).then(() => ({})),
+    exec: (sql) => pool.query(sql).then(() => ({})),
     run: async (sql, params = []) => {
-      const [r] = await conn.execute(sql, params)
+      const [r] = await pool.execute(sql, params)
       return { lastInsertRowid: Number(r.insertId), changes: r.affectedRows }
     },
     get: async (sql, params = []) => {
-      const [rows] = await conn.execute(sql, params)
+      const [rows] = await pool.execute(sql, params)
       return rows[0] ?? null
     },
     all: async (sql, params = []) => {
-      const [rows] = await conn.execute(sql, params)
+      const [rows] = await pool.execute(sql, params)
       return rows
     }
   }
@@ -66,6 +71,7 @@ export async function initDb() {
   return initSqlite()
 }
 
-export function closeDb() {
-  try { db?.close?.() } catch { /* ignore */ }
+export async function closeDb() {
+  try { await db?.end?.() } catch { /* ignore */ } // mysql 池
+  try { rawSqlite?.close?.() } catch { /* ignore */ } // sqlite 句柄
 }

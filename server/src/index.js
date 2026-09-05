@@ -8,12 +8,15 @@ import http from 'node:http'
 import path from 'node:path'
 import { mkdirSync, unlinkSync } from 'node:fs'
 import multer from 'multer'
-import { globalLimiter, uploadLimiter } from './rate-limit.js'
+import pinoHttp from 'pino-http'
 import { config } from './config.js'
+import { logger } from './logger.js'
 import { initDb, closeDb } from './db.js'
 import { SQLITE_DDL, MYSQL_DDL } from './schema.js'
+import { runMigrations } from './migrations.js'
 import { seed, ensureEveryoneHasDynamics, ensureSampleApps } from './seed.js'
 import { requireAuth, serializeUser } from './middleware.js'
+import { globalLimiter, uploadLimiter } from './rate-limit.js'
 import { authRouter } from './routes/auth.js'
 import { profileRouter } from './routes/profile.js'
 import { matchRouter } from './routes/match.js'
@@ -25,65 +28,13 @@ import { setupSocket } from './socket.js'
 import { smsStatus } from './sms.js'
 
 async function main() {
-  console.log(`[jiyu-server] 启动中... 数据库驱动: ${config.dbDriver}`)
+  logger.info(`[jiyu-server] 启动中... 数据库驱动: ${config.dbDriver}`)
 
   const db = await initDb()
   // 建表
   db.exec(config.dbDriver === 'mysql' ? MYSQL_DDL : SQLITE_DDL)
-  // 轻量迁移：为已存在的 dynamics 表补充 image_base64 列（重复执行无副作用）
-  try {
-    db.exec('ALTER TABLE dynamics ADD COLUMN image_base64 TEXT')
-  } catch { /* 列已存在 */ }
-  // 轻量迁移：messages 表补充媒体字段
-  try { db.exec('ALTER TABLE messages ADD COLUMN media_type TEXT') } catch { /* 列已存在 */ }
-  try { db.exec('ALTER TABLE messages ADD COLUMN media_url TEXT') } catch { /* 列已存在 */ }
-  // 轻量迁移：宠物订单收费字段 + 动态订单卡片
-  try { db.exec('ALTER TABLE bookings ADD COLUMN price_yuan REAL') } catch { /* 列已存在 */ }
-  try { db.exec('ALTER TABLE bookings ADD COLUMN commission_rate REAL') } catch { /* 列已存在 */ }
-  try { db.exec('ALTER TABLE bookings ADD COLUMN commission_yuan REAL') } catch { /* 列已存在 */ }
-  try { db.exec('ALTER TABLE bookings ADD COLUMN worker_income REAL') } catch { /* 列已存在 */ }
-  try { db.exec('ALTER TABLE bookings ADD COLUMN open_to_feed INTEGER NOT NULL DEFAULT 0') } catch { /* 列已存在 */ }
-  try { db.exec('ALTER TABLE bookings ADD COLUMN services_json TEXT') } catch { /* 列已存在 */ }
-  try { db.exec('ALTER TABLE dynamics ADD COLUMN order_id TEXT') } catch { /* 列已存在 */ }
-  try { db.exec('ALTER TABLE messages ADD COLUMN order_id TEXT') } catch { /* 列已存在 */ }
-  // 迁移：旧 bookings 表 provider_id 为 NOT NULL，需重建为可空（订单可发布待接单）
-  if (config.dbDriver === 'sqlite') {
-    try {
-      const cols = db.all('PRAGMA table_info(bookings)')
-      const pid = cols.find((c) => c.name === 'provider_id')
-      if (pid && pid.notnull === 1) {
-        db.exec(`
-          CREATE TABLE bookings_new (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
-            provider_id INTEGER,
-            pet_id INTEGER NOT NULL,
-            service_id TEXT NOT NULL,
-            service_name TEXT NOT NULL,
-            scheduled_time TEXT NOT NULL,
-            location TEXT,
-            status TEXT NOT NULL DEFAULT 'open',
-            price_yuan REAL,
-            commission_rate REAL,
-            commission_yuan REAL,
-            worker_income REAL,
-            open_to_feed INTEGER NOT NULL DEFAULT 0,
-            created_at TEXT NOT NULL
-          );
-          INSERT INTO bookings_new (id, user_id, provider_id, pet_id, service_id, service_name, scheduled_time, location, status, created_at)
-            SELECT id, user_id, provider_id, pet_id, service_id, service_name, scheduled_time, location, status, created_at FROM bookings;
-          DROP TABLE bookings;
-          ALTER TABLE bookings_new RENAME TO bookings;
-        `)
-        console.log('[migrate] bookings 表已重建（provider_id 可空，支持发布待接单）')
-      }
-    } catch (e) { /* 新表无需迁移 */ }
-  }
-  // 轻量迁移：users 表补充头像 URL 列
-  try { db.exec('ALTER TABLE users ADD COLUMN avatar_url TEXT') } catch { /* 列已存在 */ }
-  // 轻量迁移：users 表补充手机号列（注册手机验证，一手机号一号）
-  try { db.exec('ALTER TABLE users ADD COLUMN phone TEXT') } catch { /* 列已存在 */ }
-  try { db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_phone ON users(phone)') } catch { /* 索引已存在 */ }
+  // 版本化迁移（幂等；见 src/migrations.js）
+  runMigrations(db, config.dbDriver)
   // 演示数据（动态区不再生成模拟动态）
   if (config.autoSeed) {
     await seed(db)
@@ -104,6 +55,8 @@ async function main() {
   }))
   // 全局限流（防刷/防 DoS 兜底；分接口收紧在各路由模块）
   app.use(globalLimiter)
+  // HTTP 请求访问日志（健康检查不记，避免刷屏）
+  app.use(pinoHttp({ logger, autoLogging: { ignore: (req) => req.url === '/api/health' } }))
   // CORS：白名单配置化（CORS_ORIGINS）。原生客户端（无 Origin / file:// / null）始终放行；
   // 浏览器来源仅放行白名单，防第三方站点调用接口
   app.use(cors({
@@ -123,11 +76,7 @@ async function main() {
 
   // 版本检查（App 启动时轮询：仅当服务器 current 与客户端已提示版本不同时客户端才弹更新窗）
   app.get('/api/version', (req, res) => {
-    res.json({
-      current: '1.1.2',
-      updateMessage: 'v1.1.2 更新：修复宠物订单风控误拦截；新增忘记密码；评价文字展示与违规申诉；安全加固（手机号隐私 / Electron 隔离 / 上传白名单）',
-      downloadUrl: 'https://github.com/laa200x-arch/jiyu/releases/tag/win-v1.1.2'
-    })
+    res.json({ current: config.appVersion, updateMessage: config.updateMessage, downloadUrl: config.downloadUrl })
   })
 
   // 文件上传（聊天图片/视频，方案 2.3.3 资料传输）
@@ -214,27 +163,26 @@ async function main() {
 
   // 全局错误处理（body-parser 解析错误返回 400 而非 500）
   app.use((err, req, res, next) => {
-    console.error('[error]', err)
+    logger.error({ err, req: { method: req.method, url: req.url } }, 'unhandled error')
     const status = err.statusCode || err.status || 500
     const message = err.type === 'entity.parse.failed' ? '请求格式错误' : '服务器内部错误'
     res.status(status).json({ error: message })
   })
 
   httpServer.listen(config.port, () => {
-    console.log(`[jiyu-server] 已启动: http://localhost:${config.port}`)
-    console.log(`[jiyu-server] 健康检查: http://localhost:${config.port}/api/health`)
+    logger.info(`[jiyu-server] 已启动: http://localhost:${config.port} · 健康检查 /api/health`)
     const sms = smsStatus()
-    console.log(
+    logger.info(
       `[jiyu-server] 短信通道: ${sms.provider}${sms.configured ? '' : '（未配置完整，发送会失败/降级）'}` +
         `${sms.devFallback ? '，SMS_DEV_FALLBACK=1（失败降级 devCode，生产请置 0）' : '，SMS_DEV_FALLBACK=0（失败即报错）'}`
     )
   })
 
   const shutdown = () => {
-    console.log('\n[jiyu-server] 正在关闭...')
+    logger.info('[jiyu-server] 正在关闭...')
     try { io.close() } catch {}
-    httpServer.close(() => {
-      closeDb()
+    httpServer.close(async () => {
+      await closeDb()
       process.exit(0)
     })
   }
@@ -243,6 +191,6 @@ async function main() {
 }
 
 main().catch((err) => {
-  console.error('[jiyu-server] 启动失败:', err)
+  logger.error({ err }, '[jiyu-server] 启动失败')
   process.exit(1)
 })

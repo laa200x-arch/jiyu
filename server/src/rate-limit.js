@@ -5,17 +5,30 @@
  */
 import rateLimit from 'express-rate-limit'
 
-const make = ({ windowMs, limit, message }) => rateLimit({
-  windowMs,
-  limit,
-  standardHeaders: 'draft-7',
-  legacyHeaders: false,
-  handler: (req, res) => res.status(429).json({ error: message || '操作过于频繁，请稍后再试' })
-})
+// 测试/压测开关：RATE_LIMIT_OFF=1 时全部放行（e2e 用临时服务器可重复执行，不因 IP 配额误伤）
+const off = process.env.RATE_LIMIT_OFF === '1'
+
+const make = ({ windowMs, limit, message }) => off
+  ? (req, res, next) => next()
+  : rateLimit({
+      windowMs,
+      limit,
+      standardHeaders: 'draft-7',
+      legacyHeaders: false,
+      handler: (req, res) => res.status(429).json({ error: message || '操作过于频繁，请稍后再试' })
+    })
 
 /** 全局兜底：每 IP 每分钟 300 次（健康检查不计入） */
-export const globalLimiter = make({ windowMs: 60_000, limit: 300 })
-globalLimiter.skip = (req) => req.path === '/api/health'
+export const globalLimiter = off
+  ? (req, res, next) => next()
+  : rateLimit({
+      windowMs: 60_000,
+      limit: 300,
+      standardHeaders: 'draft-7',
+      legacyHeaders: false,
+      skip: (req) => req.path === '/api/health',
+      handler: (req, res) => res.status(429).json({ error: '操作过于频繁，请稍后再试' })
+    })
 
 /** 登录：每 IP 每分钟 10 次（叠加应用层「用户名+IP 连续失败锁定」） */
 export const loginLimiter = make({ windowMs: 60_000, limit: 10, message: '登录尝试过于频繁，请 1 分钟后再试' })

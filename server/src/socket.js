@@ -8,6 +8,7 @@
 import jwt from 'jsonwebtoken'
 import { Server } from 'socket.io'
 import { config } from './config.js'
+import { logger } from './logger.js'
 
 export function setupSocket(httpServer, db, chatApi) {
   const io = new Server(httpServer, {
@@ -54,12 +55,12 @@ export function setupSocket(httpServer, db, chatApi) {
   io.on('connection', (socket) => {
     const userId = socket.userId
     socket.join(`user:${userId}`)
-    console.log(`[socket] 用户 ${userId} 已连接 (${socket.id})`)
+    logger.info({ userId, socketId: socket.id }, '[socket] 用户已连接')
 
     // 实时发送消息（走与 REST 相同风控与落库；支持 orderId 订单引用）
     socket.on('chat:send', (payload, ack) => {
       if (!chatAllowed(userId)) {
-        console.warn(`[socket] user=${userId} chat:send 触发限流（>20 条/10s）`)
+        logger.warn({ userId }, '[socket] chat:send 触发限流（>20 条/10s）')
         if (ack) ack({ ok: false, error: '消息发送过于频繁，请稍后再试' })
         return
       }
@@ -68,15 +69,15 @@ export function setupSocket(httpServer, db, chatApi) {
       const mediaType = payload?.mediaType || null
       const mediaUrl = payload?.mediaUrl || null
       const orderId = payload?.orderId || null
-      console.log(`[socket] user=${userId} chat:send conv=${conversationId} text="${String(text).slice(0, 20)}" media=${mediaType || 'none'} order=${orderId || 'none'}`)
+      logger.debug({ userId, conversationId, hasMedia: !!mediaType, orderId }, '[socket] chat:send')
       const result = chatApi.saveMessage(userId, conversationId, { text, mediaType, mediaUrl, orderId })
-      console.log(`[socket] user=${userId} chat:send 结果: ${result.error || (result.blocked ? 'blocked' : 'ok')}`)
+      logger.info({ userId, conversationId, outcome: result.error || (result.blocked ? 'blocked' : 'ok') }, '[socket] chat:send 完成')
       if (ack) ack({ ok: !result.error && !result.blocked, ...result })
     })
 
     socket.on('disconnect', () => {
       recentSends.delete(userId)
-      console.log(`[socket] 用户 ${userId} 断开`)
+      logger.info({ userId }, '[socket] 用户断开')
     })
   })
 
